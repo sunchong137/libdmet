@@ -1,5 +1,5 @@
 __version__ = "0.1"
-__author__ = "Bo-Xiao Zheng (boxiao.zheng@gmail.com)"
+__author__ = "Bo-Xiao Zheng <boxiao.zheng@gmail.com>"
 
 """
 libdmet %s
