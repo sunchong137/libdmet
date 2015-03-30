@@ -1,0 +1,21 @@
+find . -name "Spin*" |xargs rm >/dev/null 2>&1
+find . -name "StateInfo*" |xargs rm >/dev/null 2>&1
+find . -name "wave*" |xargs rm >/dev/null 2>&1
+find . -name "Overlap*" |xargs rm >/dev/null 2>&1
+find . -name "dmrg.e" |xargs rm >/dev/null 2>&1
+find . -name "spatial*" |xargs rm >/dev/null 2>&1
+find . -name "Rotation*" |xargs rm >/dev/null 2>&1
+find . -name "statefile*"|xargs rm >/dev/null 2>&1
+find . -name "onepdm.*" |xargs rm >/dev/null 2>&1
+find . -name "twopdm.*" |xargs rm >/dev/null 2>&1
+find . -name "Restart*" |xargs rm >/dev/null 2>&1
+find . -name "onepdm_fromtpdm" |xargs rm >/dev/null 2>&1
+find . -name "pairmat.*" |xargs rm >/dev/null 2>&1
+find . -name "dmrg.out" |xargs rm >/dev/null 2>&1
+find . -name "RI*tmp" |xargs rm >/dev/null 2>&1
+rm npdm_h2o_small/A16_matrix.0.0.txt
+rm npdm_h2o_small/partial_A16_matrix.0.0.p0.n0.bin
+rm npdm_h2o_small/partial_A16_matrix.0.0.p1.n0.bin
+rm npdm_h2o_small/threepdm.0.0.bin
+rm npdm_h2o_small/threepdm.0.0.txt
+rm npdm_h2o_small/*.tmp
