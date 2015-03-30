@@ -1,2 +1,6 @@
 *.pyc
 *.swp
+*.o
+*.a
+block/OH
+block/block.spin_adapted
