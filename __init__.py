@@ -7,4 +7,4 @@ libdmet %s
 by %s
 """ % (__version__, __author__)
 
-import dmet
+import libdmet.dmet as dmet

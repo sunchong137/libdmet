@@ -1,4 +1,4 @@
-import logger as log
+import libdmet.utils.logger as log
 import numpy as np
 
 log.verbose = log.Level["DEBUG0"]
