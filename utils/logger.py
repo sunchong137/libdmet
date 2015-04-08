@@ -5,68 +5,66 @@ from datetime import datetime
 Logger
 """
 
-Level = dict(zip("FATAL ERR RESULT WARNING INFO DEBUG".split(), range(8)))
+Level = dict(zip("FATAL ERR RESULT WARNING INFO DEBUG0 DEBUG1 DEBUG2".split(), range(8)))
 
+stdout = sys.stdout
+verbose = "INFO"
+clock = False
 
-class Logger:
-    """
-    - Define Levels of input
+def fatal(msg, *args):
+    if verbose >= Level['FATAL']:
+        __clock()
+        flush("  FATAL ", msg, *args, indent = clock * 19)
 
-    TODO:
-    - Implement output functions
-    """
-    def __init__(self, stdout, verbose, clock = False):
-        self.stdout = stdout
-        self.verbose = verbose
-        self.addclock = clock
+def error(msg, *args):
+    if verbose >= Level['ERR']:
+        __clock()
+        flush("  ERROR ", msg, *args, indent = clock * 19)
 
-    def fatal(self, msg, *args):
-        if self.verbose >= Level['FATAL']:
-            self.clock()
-            flush(self, "FATAL: "+msg, *args)
+def result(msg, *args):
+    if verbose >= Level['RESULT']:
+        __clock()
+        flush("******* ", msg, *args, indent = clock * 19)
 
-    def error(self, msg, *args):
-        if self.verbose >= Level['ERR']:
-            self.clock()
-            flush(self, "ERROR: "+msg, *args)
-    
-    def result(self, msg, *args):
-        if self.verbose >= Level['RESULT']:
-            self.clock()
-            flush(self, "*** " + msg, *args)
+def warning(msg, *args):
+    if verbose >= Level['WARNING']:
+        __clock()
+        flush("WARNING ", msg, *args, indent = clock * 19)
 
-    def warning(self, msg, *args):
-        if self.verbose >= Level['WARNING']:
-            self.clock()
-            flush(self, "WARNING: "+msg, *args)
-    
-    def info(self, msg, *args):
-        if self.verbose >= Level['INFO']:
-            self.clock()
-            flush(self, "****** "+msg, *args)
-    
-    def debug(self, level, msg, *args):
-        if self.verbose >= Level["DEBUG"] + level:
-            self.clock()
-            flush(self, msg, *args)
+def info(msg, *args):
+    if verbose >= Level['INFO']:
+        __clock()
+        flush("   INFO ", msg, *args, indent = clock * 19)
 
-    def clock(self):
-        if self.addclock:
-            self.stdout.write(datetime.now().strftime("%Y %b %d %I:%M:%S") + " ")
+def debug(level, msg, *args):
+    if verbose >= Level["DEBUG0"] + level:
+        __clock()
+        flush("  DEBUG ", msg, *args, indent = clock * 19)
 
-def flush(logger, msg, *args):
-    logger.stdout.write(msg%args)
-    logger.stdout.write('\n')
-    logger.stdout.flush()
+def flush(msgtype, msg, *args, **kwargs):
+    indent = 0
+    if "indent" in kwargs:
+        indent = kwargs["indent"]
+
+    __msg = (msg % args).split('\n')
+    __msg = map(lambda line: msgtype + line, __msg)
+    __msg = ("\n" + " " * indent) .join(__msg)
+
+    stdout.write(__msg)
+    stdout.write('\n')
+    stdout.flush()
+
+def __clock():
+    if clock:
+        stdout.write(datetime.now().strftime("%y %b %d %I:%M:%S") + " ")
 
 if __name__ == "__main__":
-    log = Logger(sys.stdout, 6, False)
-    log.result("Logger Levels: %s", Level)    
-    log.warning("Logger Levels: %s", Level)    
-    log.info("Logger Levels: %s", Level)
-    log.debug(0, "Logger Levels: %s", Level)
-    log.debug(1, "Logger Levels: %s", Level)
-    log.debug(2, "Logger Levels: %s", Level)
-    log.error("Logger Levels: %s", Level)
-    log.fatal("Logger Levels: %s", Level)
+    result("Logger Levels: %s", Level)    
+    warning("Logger Levels: %s", Level)    
+    info("Logger Levels: %s", Level)
+    debug(0, "Logger Levels: %s", Level)
+    debug(1, "Logger Levels: %s", Level)
+    debug(2, "Logger Levels: %s", Level)
+    error("Logger Levels: %s", Level)
+    fatal("Logger Levels: %s", Level)
 
