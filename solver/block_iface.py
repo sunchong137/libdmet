@@ -92,8 +92,8 @@ class Schedule(object):
     def custom(self, arrayM, arraySweep, arrayTol, arrayNoise, twodot_to_onedot = None):
         log.debug(1, "Generate custom schedule")
         nstep = len(arrayM)
-        if len(arraySweep) != nstep or len(arrayTol) != nstep or len(arrayNoise) != nstep:
-            log.error("The lengths of input arrays are not consistent.")
+        log.eassert(len(arraySweep) == nstep and len(arrayTol) == nstep and len(arrayNoise) == nstep, \
+            "The lengths of input arrays are not consistent.")
 
         self.arrayM, self.arraySweep, self.arrayTol, self.arrayNoise = \
             arrayM, arraySweep, arrayTol, arrayNoise
@@ -118,24 +118,21 @@ class Schedule(object):
         self.initialized = True
 
     def get_schedule(self):
-        if not self.initialized:
-            log.error("DMRG schedule has not been generated.")
-            raise Exception
-        else:
-            text = ["", "schedule"]
-            nstep = len(self.arrayM)
-            text += map(lambda n: "%d %d %.0e %.0e" % \
-                (self.arrayM[n], self.arraySweep[n], self.arrayTol[n], self.arrayNoise[n]), range(nstep))
-            text.append("end")
-            text.append("")
-            text.append("maxiter %d" % self.maxiter)
-            text.append("twodot_to_onedot %d" % self.twodot_to_onedot)
-            text.append("sweep_tol %.0e" % self.sweeptol)
-            text.append("")            
-            text = "\n".join(text)
+        log.eassert(self.initialized, "DMRG schedule has not been generated.")
+        text = ["", "schedule"]
+        nstep = len(self.arrayM)
+        text += map(lambda n: "%d %d %.0e %.0e" % \
+            (self.arrayM[n], self.arraySweep[n], self.arrayTol[n], self.arrayNoise[n]), range(nstep))
+        text.append("end")
+        text.append("")
+        text.append("maxiter %d" % self.maxiter)
+        text.append("twodot_to_onedot %d" % self.twodot_to_onedot)
+        text.append("sweep_tol %.0e" % self.sweeptol)
+        text.append("")            
+        text = "\n".join(text)
 
-            log.debug(2, "Generated schedule in configuration file")
-            log.debug(1, text)
+        log.debug(2, "Generated schedule in configuration file")
+        log.debug(1, text)
             
 
 class Block(object):
@@ -179,16 +176,13 @@ class Block(object):
     def set_system(self, nelec, spin, spinAdapted, bogoliubov):
         self.nelec = nelec
         self.spin = spin
-        if spinAdapted and bogoliubov:
-            log.fatal("Bogoliubov calculation with spin adaption is not implemented")
-            raise Exception
+        log.fassert(not (spinAdapted and bogoliubov), "Bogoliubov calculation with spin adaption is not implemented")
         self.spinAdapted = spinAdapted
         self.bogoliubov = bogoliubov
         self.sys_initialized = True
 
     def set_integral(self, H0, H1, H2):
-        if self.sys_initialized = False:
-            log.error("set_integral() should be used after initializing set_system()")
+        log.eassert(self.sys_initialized, "set_integral() should be used after initializing set_system()")
         pass
         integral.dump()
         self.integral_initialized = True
@@ -281,5 +275,5 @@ if __name__ == "__main__":
     schedule.extrapolate(300)
     schedule.get_schedule()
     
-    Block.set()
-    print Block.block_path
+    #Block.set()
+    #print Block.block_path
