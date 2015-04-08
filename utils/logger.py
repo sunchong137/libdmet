@@ -16,10 +16,20 @@ def fatal(msg, *args):
         __clock()
         flush("  FATAL ", msg, *args, indent = clock * 19)
 
+def fassert(cond, msg, *args):
+    if not cond:
+        fatal(msg, *args)
+        raise Exception
+
 def error(msg, *args):
     if verbose >= Level['ERR']:
         __clock()
         flush("  ERROR ", msg, *args, indent = clock * 19)
+
+def eassert(cond, msg, *args):
+    if not cond:
+        error(msg, *args)
+        raise Exception
 
 def result(msg, *args):
     if verbose >= Level['RESULT']:
@@ -31,6 +41,10 @@ def warning(msg, *args):
         __clock()
         flush("WARNING ", msg, *args, indent = clock * 19)
 
+def check(cond, msg, *args):
+    if not cond:
+        warning(msg, *args)
+
 def info(msg, *args):
     if verbose >= Level['INFO']:
         __clock()
@@ -39,18 +53,19 @@ def info(msg, *args):
 def debug(level, msg, *args):
     if verbose >= Level["DEBUG0"] + level:
         __clock()
-        flush("  DEBUG ", msg, *args, indent = clock * 19)
+        flush("  DEBUG " + "  " * level, msg, *args, indent = clock * 19)
 
 def flush(msgtype, msg, *args, **kwargs):
     indent = 0
-    if "indent" in kwargs:
-        indent = kwargs["indent"]
+    if len(msg) > 0:
+      if "indent" in kwargs:
+          indent = kwargs["indent"]
 
-    __msg = (msg % args).split('\n')
-    __msg = map(lambda line: msgtype + line, __msg)
-    __msg = ("\n" + " " * indent) .join(__msg)
-
-    stdout.write(__msg)
+      __msg = (msg % args).split('\n')
+      __msg = map(lambda line: msgtype + line, __msg)
+      __msg = ("\n" + " " * indent) .join(__msg)
+      stdout.write(__msg)
+    
     stdout.write('\n')
     stdout.flush()
 
