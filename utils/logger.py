@@ -9,7 +9,7 @@ Level = dict(zip("FATAL ERR RESULT WARNING INFO DEBUG0 DEBUG1 DEBUG2".split(), r
 
 stdout = sys.stdout
 verbose = "INFO"
-clock = False
+clock = True
 
 def fatal(msg, *args):
     if verbose >= Level['FATAL']:
