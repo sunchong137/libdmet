@@ -1,6 +1,7 @@
 import libdmet.utils.logger as log
 import h5py
 import numpy as np
+import itertools as it
 
 class Integral(object):
     def __init__(self, norb, restricted, bogoliubov, H0, H1, H2):
@@ -10,15 +11,128 @@ class Integral(object):
         self.H0 = H0
         self.H1 = H1
         self.H2 = H2
+    
+    def pairNoSymm(self):
+        return list(it.product(range(self.norb), repeat = 2))
 
-def dump(filename, integral):
-    log.fassert(not (integral.bogoliubov and integral.restricted), \
-        "Bogoliubov Hamiltonian with spin restriction is not implemented")
+    def pairSymm(self):
+        return list(it.combinations_with_replacement(range(self.norb)[::-1], 2))[::-1]
 
-    pass
+    def pairAntiSymm(self):
+        return list(it.combinations(range(self.norb)[::-1], 2))[::-1]
 
-def read(filename, restricted, bogoliubov, norb):
-    log.fassert(not (bogoliubov and restricted), "Bogoliubov Hamiltonian with spin restriction is not implemented")
+def dump(filename, integral, thr = 1e-8):
+    header = []
+    if integral.bogoliubov:
+        header.append(" &BCS NORB= %d," % integral.norb)
+    else:
+        header.append(" &FCI NORB= %d,NELEC= %d,MS2= %d," % (integral.norb, integral.norb, 0))
+    header.append("  ORBSYM=" + "1," * integral.norb)
+    header.append("  ISYM=1,")
+    if not integral.restricted:
+        header.append("  IUHF=1,")
+    header.append(" &END")
+
+    def writeInt(fout, val, i, j, k = -1, l = -1):
+        if abs(val) > thr:
+            fout.write("%20.16f%4d%4d%4d%4d\n" % (val, i+1, j+1, k+1, l+1))
+
+    def insert_ccdd(fout, matrix, symm_herm = True, symm_spin = True):
+        if symm_herm:
+            p = integral.pairSymm()
+        else:
+            p = integral.pairNoSymm()
+
+        if symm_spin:
+            for (i,j), (k,l) in list(it.combinations_with_replacement(p[::-1], 2))[::-1]:
+                writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+        else:
+            for (i,j), (k,l) in it.product(p, repeat = 2):
+                writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+
+    def insert_cccd(fout, matrix):
+        for (i,j), (k,l) in it.product(integral.pairAntiSymm(), integral.pairNoSymm()):
+            writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+
+    def insert_cccc(fout, matrix, symm_spin = True):
+        if symm_spin:
+            for (i,j), (k,l) in list(it.combinations_with_replacement(integral.pairAntiSymm()[::-1], 2))[::-1]:
+                writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+
+        else:
+            for (i,j), (k,l) in it.product(integral.pairAntiSymm(), repeat = 2):
+                writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+    
+    def insert_2dArray(fout, matrix, symm_herm = True):
+        if symm_herm:
+            for i,j in integral.pairSymm():
+                writeInt(fout, matrix[i,j], i, j)
+        else:
+            for i,j in integral.pairNoSymm():
+                writeInt(fout, matrix[i,j], i, j)
+
+    def insert_H0(fout, val = 0):
+        fout.write("%20.16f%4d%4d%4d%4d\n" % (val, 0, 0, 0, 0)) # cannot be ignored even if smaller than thr
+    
+    if isinstance(filename, str):
+        f = open(filename, "w", 1024*1024*128)
+    elif isinstance(filename, file):
+        f = filename
+        
+    f.write("\n".join(header) + "\n")
+    if integral.restricted and not integral.bogoliubov:
+        insert_ccdd(f, integral.H2["ccdd"])
+        insert_2dArray(f, integral.H1["cd"])
+        insert_H0(f, integral.H0)
+    elif not integral.restricted and not integral.bogoliubov:
+        insert_ccdd(f, integral.H2["ccddA"])
+        insert_H0(f, 0)
+        insert_ccdd(f, integral.H2["ccddB"])
+        insert_H0(f, 0)
+        insert_ccdd(f, integral.H2["ccddAB"], symm_spin = False)
+        insert_H0(f, 0)
+        insert_2dArray(f, integral.H1["cdA"])
+        insert_H0(f, 0)
+        insert_2dArray(f, integral.H1["cdB"])
+        insert_H0(f, 0)
+        insert_H0(f, integral.H0)
+    elif integral.restricted and integral.bogoliubov:
+        insert_ccdd(f, integral.H2["ccdd"])
+        insert_H0(f, 0)
+        insert_cccd(f, integral.H2["cccd"])
+        insert_H0(f, 0)
+        insert_cccc(f, integral.H2["cccc"])
+        insert_H0(f, 0)
+        insert_2dArray(f, integral.H1["cd"])
+        insert_H0(f,0)
+        insert_2dArray(f, integral.H1["cc"])
+        insert_H0(f,0)
+        insert_H0(f, integral.H0)
+    else:
+        insert_ccdd(f, integral.H2["ccddA"], symm_herm = False)
+        insert_H0(f, 0)
+        insert_ccdd(f, integral.H2["ccddB"], symm_herm = False)
+        insert_H0(f, 0)
+        insert_ccdd(f, integral.H2["ccddAB"], symm_herm = False, symm_spin = False)
+        insert_H0(f, 0)
+        insert_cccd(f, integral.H2["cccdA"])
+        insert_H0(f, 0)
+        insert_cccd(f, integral.H2["cccdB"])
+        insert_H0(f, 0)
+        insert_cccc(f, integral.H2["cccc"], symm_spin = False)
+        insert_H0(f, 0)
+        insert_2dArray(f, integral.H1["cdA"])
+        insert_H0(f, 0)
+        insert_2dArray(f, integral.H1["cdB"])
+        insert_H0(f, 0)
+        insert_2dArray(f, integral.H1["cc"], symm_herm = False)
+        insert_H0(f, 0)
+        insert_H0(f, integral.H0)
+    
+    if isinstance(filename, str):
+        f.close()
+
+def read(filename, norb, restricted, bogoliubov):
     with open(filename, "r") as f:
         head = f.readline()
         log.eassert((bogoliubov and "&BCS" in head) or (not bogoliubov and "&FCI" in head), \
@@ -47,21 +161,153 @@ def read(filename, restricted, bogoliubov, norb):
                     H1["cd"][i,j] = H1["cd"][j,i] = val
                 else:
                     H0 += val
-            return Integral(norb, restricted, bogoliubov, H0, H1, H2)
+        elif not restricted and not bogoliubov:
+            H0 = 0
+            H1 = {"cdA": np.zeros((norb, norb)), "cdB": np.zeros((norbs, norbs))}
+            H2 = {"ccddA": np.zeros((norb, norb, norb, norb)), 
+                  "ccddB": np.zeros((norb, norb, norb, norb)), 
+                  "ccddAB": np.zeros((norb, norb, norb, norb)) }
+            lines = f.readlines()
+            section = 0
+            for line in lines:
+                tokens = line.split()
+                val = float(tokens[0])
+                i,j,k,l = [int(x) - 1 for x in tokens[1:]]
+                if i < 0 and j < 0 and k < 0 and l < 0:
+                    section += 1
+                    H0 += val
+                elif section == 0 or section == 1:
+                    key = "ccdd" + ["A", "B"][section]
+                    H2[key][i,j,k,l] = H2[key][j,i,k,l] = H2[key][i,j,l,k] = \
+                        H2[key][j,i,l,k] = H2[key][k,l,i,j] = H2[key][k,l,j,i] = \
+                        H2[key][l,k,i,j] = H2[key][l,k,j,i] = val
+                elif section == 2:
+                    key = "ccddAB"
+                    H2[key][i,j,k,l] = H2[key][j,i,k,l] = H2[key][i,j,l,k] = \
+                        H2[key][j,i,l,k] = val # cannot swap ij <-> kl
+                elif section == 3 or section == 4:
+                    log.eassert(k == -1 and l == -1, "Integral Syntax unrecognized")
+                    key = "cd" + ["A", "B"][section-3]
+                    H1[key][i,j] = H1[key][j,i] = val
+        elif restricted and bogoliubov:
+            H0 = 0
+            H1 = {"cd": np.zeros((norb, norb)), "cc": np.zeros((norb, norb))}
+            H2 = {"ccdd": np.zeros((norb, norb, norb, norb)),
+                  "cccd": np.zeros((norb, norb, norb, norb)),
+                  "cccc": np.zeros((norb, norb, norb, norb)) }
+            lines = f.readlines()
+            section = 0
+            for line in lines:
+              tokens = line.split()
+              val = float(tokens[0])
+              i,j,k,l = [int(x) - 1 for x in tokens[1:]]
+              if i < 0 and j < 0 and k < 0 and l < 0:
+                  section += 1
+                  H0 += val
+              elif section == 0:
+                  H2["ccdd"][i,j,k,l] = H2["ccdd"][j,i,k,l] = H2["ccdd"][i,j,l,k] = \
+                    H2["ccdd"][j,i,l,k] = H2["ccdd"][k,l,i,j] = H2["ccdd"][k,l,j,i] = \
+                    H2["ccdd"][l,k,i,j] = H2["ccdd"][l,k,j,i] = val
+              elif section == 1:
+                  H2["cccd"][i,j,k,l] = val
+                  H2["cccd"][j,i,k,l] = -val
+              elif section == 2:
+                  H2["cccc"][i,j,k,l] = H2["cccc"][j,i,l,k] = \
+                      H2["cccc"][k,l,i,j] = H2["cccc"][l,k,j,i] = val
+                  H2["cccc"][j,i,k,l] = H2["cccc"][i,j,l,k] = \
+                      H2["cccc"][k,l,j,i] = H2["cccc"][l,k,i,j] = -val
+        else: # bogoliubov, not restricted
+            H0 = 0
+            H1 = {"cdA": np.zeros((norb, norb)), "cdB": np.zeros((norb, norb)),
+                  "cc": np.zeros((norb, norb)) }
+            H2 = {"ccddA": np.zeros((norb, norb, norb, norb)),
+                  "ccddB": np.zeros((norb, norb, norb, norb)), 
+                  "ccddAB": np.zeros((norb, norb, norb, norb)),
+                  "cccdA": np.zeros((norb, norb, norb, norb)),
+                  "cccdB": np.zeros((norb, norb, norb, norb)),
+                  "cccc": np.zeros((norb, norb, norb, norb)) }
+            lines = f.readlines()
+            section = 0
+            for line in lines:
+                tokens = line.split()
+                val = float(tokens[0])
+                i,j,k,l = [int(x) - 1 for x in tokens[1:]]
+                if i < 0 and j < 0 and k < 0 and l < 0:
+                    section += 1
+                    H0 += val
+                if section == 0 or section == 1:
+                    key = "ccdd" + ["A", "B"][section]
+                    H2[key][i,j,k,l] = H2[key][k,l,i,j] = val
+                elif section == 2:
+                    H2["ccddAB"][i,j,k,l] = val
+                elif section == 3 or section == 4: # cccdA/cccdB
+                    key = "cccd" + ["A", "B"][section-3]
+                    H2[key][i,j,k,l] = val
+                    H2[key][j,i,k,l] = -val
+                elif section == 5:
+                    key = "cccc"
+                    H2[key][i,j,k,l] = H2[j,i,l,k] = val
+                    H2[key][j,i,k,l] = H2[i,j,l,k] = -val
+                elif section == 6 or section == 7:
+                    log.eassert(k == -1 and l == -1, "Integral Syntax unrecognized")
+                    key = "cd" + ["A", "B"][section-6]
+                    H1[key][i,j] = H1[key][j,i] = val
+                elif section == 8:
+                    log.eassert(k == -1 and l == -1, "Integral Syntax unrecognized")
+                    H1["cc"][i,j] = val                      
+    return Integral(norb, restricted, bogoliubov, H0, H1, H2)
+
+def dump_hdf5(filename, Ham):
+    log.error("function not implemented: dump_bin")
+    raise Exception
 
 
-read("/home/zhengbx/dev/libdmet/block/dmrg_tests/hubbard/FCIDUMP", True, False, 12)
-
-
-def dump_bin(filename, restricted, bogoliubov, norb, H0, H1, H2):
-    log.fassert(not (bogoliubov and restricted), "Bogoliubov Hamiltonian with spin restriction is not implemented")
-    
-
-
-def read_bin(filename, restricted, bogoliubov, norb):
-    log.fassert(not (bogoliubov and restricted), "Bogoliubov Hamiltonian with spin restriction is not implemented")
+def read_hdf5(filename, norb, restricted, bogoliubov):
     log.eassert(h5py.is_hdf5(filename), "File %s is not hdf5 file", filename)
     f = h5py.File(filename)
     log.eassert(f["restricted"] == restricted, "spin restriction is not consistent")
     log.eassert(f["bogoliubov"] == bogoliubov, "particle number conservation is not consistent")
     log.eassert(f["norb"] == norb, "orbital number is not consistent")
+    log.error("function not implemented: read_bin")
+    raise Exception
+
+def dump_mmap(filename, Ham):
+    log.error("function not implemented: dump_bin")
+    raise Exception
+
+def read_mmap(filename, norb, restricted, bogoliubov):
+    log.error("function not implemented: dump_bin")
+    raise Exception
+
+def test():
+    from subprocess import call
+    log.info("Testing Bogoliubov unrestricted integrals ...")
+    input = "../block/dmrg_tests/bcs/DMETDUMP"
+    Ham = read(input, 8, False, True)
+    output = "../block/dmrg_tests/bcs/DMETDUMPtest"
+    dump(output, Ham)
+    s = call(["diff", input, output])
+
+    if s == 0:
+        log.info("... Successful")
+        call(["rm", output])        
+    else:
+        log.info("... Failed")
+        log.info("Manually check input vs. output file: %s %s", input, output)
+
+    log.info("Testing Hubbard restricted integrals ...")
+    input = "../block/dmrg_tests/hubbard/FCIDUMP"
+    Ham = read(input, 12, True, False)
+    output = "../block/dmrg_tests/hubbard/FCIDUMPtest"
+    dump(output, Ham)
+    s = call(["diff", input, output])
+    
+    if s == 0:
+        log.info("... Successful")
+        call(["rm", output])        
+    else:
+        log.info("... Failed")
+        log.info("Manually check input vs. output file: %s %s", input, output)
+
+if __name__ == "__main__":
+    test()

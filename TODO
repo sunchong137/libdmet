@@ -1,0 +1,15 @@
+DONE:
+Schedule class
+
+IN PROCESS:
+Block class: 
+- write integrals
+- conduct multiple types of calculations
+- properties
+- evaluate operator
+- handle restart and save
+
+Integral.py:
+- read/write integrals in binary formats
+
+
