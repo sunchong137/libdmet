@@ -73,7 +73,7 @@ def __clock():
     if clock:
         stdout.write(datetime.now().strftime("%y %b %d %I:%M:%S") + " ")
 
-if __name__ == "__main__":
+def test():
     result("Logger Levels: %s", Level)    
     warning("Logger Levels: %s", Level)    
     info("Logger Levels: %s", Level)
@@ -83,3 +83,6 @@ if __name__ == "__main__":
     error("Logger Levels: %s", Level)
     fatal("Logger Levels: %s", Level)
 
+
+if __name__ == "__main__":
+    test()
