@@ -21,7 +21,7 @@ class Integral(object):
     def pairAntiSymm(self):
         return list(it.combinations(range(self.norb)[::-1], 2))[::-1]
 
-def dump(filename, integral, thr = 1e-8):
+def dumpFCIDUMP(filename, integral, thr = 1e-8):
     header = []
     if integral.bogoliubov:
         header.append(" &BCS NORB= %d," % integral.norb)
@@ -132,7 +132,7 @@ def dump(filename, integral, thr = 1e-8):
     if isinstance(filename, str):
         f.close()
 
-def read(filename, norb, restricted, bogoliubov):
+def readFCIDUMP(filename, norb, restricted, bogoliubov):
     with open(filename, "r") as f:
         head = f.readline()
         log.eassert((bogoliubov and "&BCS" in head) or (not bogoliubov and "&FCI" in head), \
@@ -257,12 +257,12 @@ def read(filename, norb, restricted, bogoliubov):
                     H1["cc"][i,j] = val                      
     return Integral(norb, restricted, bogoliubov, H0, H1, H2)
 
-def dump_hdf5(filename, Ham):
+def dumpHDF5(filename, Ham):
     log.error("function not implemented: dump_bin")
     raise Exception
 
 
-def read_hdf5(filename, norb, restricted, bogoliubov):
+def readHDF5(filename, norb, restricted, bogoliubov):
     log.eassert(h5py.is_hdf5(filename), "File %s is not hdf5 file", filename)
     f = h5py.File(filename)
     log.eassert(f["restricted"] == restricted, "spin restriction is not consistent")
@@ -271,21 +271,41 @@ def read_hdf5(filename, norb, restricted, bogoliubov):
     log.error("function not implemented: read_bin")
     raise Exception
 
-def dump_mmap(filename, Ham):
+def dumpMMAP(filename, Ham):
     log.error("function not implemented: dump_bin")
     raise Exception
 
-def read_mmap(filename, norb, restricted, bogoliubov):
+def readMMAP(filename, norb, restricted, bogoliubov):
     log.error("function not implemented: dump_bin")
     raise Exception
+
+def read(filename, norb, restricted, bogoliubov, fmt):
+    if fmt == "FCIDUMP":
+        return readFCIDUMP(filename, norb, restricted, bogoliubov)
+    elif fmt == "HDF5":
+        return readHDF5(filename, norb, restricted, bogoliubov)
+    elif fmt == "MMAP":
+        return readMMAP(filename, norb, restricted, bogoliubov)
+    else:
+        raise Exception("Unrecognized formt %s" % fmt)
+
+def dump(filename, Ham, fmt):
+    if fmt == "FCIDUMP":
+        return dumpFCIDUMP(filename, Ham)
+    elif fmt == "HDF5":
+        return dumpHDF5(filename, Ham)
+    elif fmt == "MMAP":
+        return dumpMMAP(filename, Ham)
+    else:
+        raise Exception("Unrecognized formt %s" % fmt)
 
 def test():
     from subprocess import call
     log.info("Testing Bogoliubov unrestricted integrals ...")
     input = "../block/dmrg_tests/bcs/DMETDUMP"
-    Ham = read(input, 8, False, True)
+    Ham = read(input, 8, False, True, "FCIDUMP")
     output = "../block/dmrg_tests/bcs/DMETDUMPtest"
-    dump(output, Ham)
+    dump(output, Ham, "FCIDUMP")
     s = call(["diff", input, output])
 
     if s == 0:
@@ -297,9 +317,9 @@ def test():
 
     log.info("Testing Hubbard restricted integrals ...")
     input = "../block/dmrg_tests/hubbard/FCIDUMP"
-    Ham = read(input, 12, True, False)
+    Ham = read(input, 12, True, False, "FCIDUMP")
     output = "../block/dmrg_tests/hubbard/FCIDUMPtest"
-    dump(output, Ham)
+    dump(output, Ham, "FCIDUMP")
     s = call(["diff", input, output])
     
     if s == 0:
