@@ -1,15 +1,18 @@
-DONE:
-Schedule class
-
-IN PROCESS:
 Block class: 
-- write integrals
 - conduct multiple types of calculations
 - properties
-- evaluate operator
 - handle restart and save
+- multiple roots
+- dump and read binary integral file: need to modify block
+
+  Done:
+  - schedule class
+  - evaluate operator
 
 Integral.py:
-- read/write integrals in binary formats
+- read/write integrals in binary format
+
+  Done:
+  - read/write integrals in FCIDUMP format
 
 

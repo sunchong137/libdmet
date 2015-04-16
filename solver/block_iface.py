@@ -1,12 +1,11 @@
 import numpy as np
-from os.path import * 
+import os 
 from tempfile import mkdtemp
 import libdmet.utils.logger as log
 from libdmet.utils import integral
+from libdmet.utils.miscellaneous import grep
 from copy import deepcopy
-
-log.clock = True
-log.verbose = log.Level["DEBUG0"]
+import subprocess as sub
 
 class Schedule(object):
     def __init__(self, maxiter = 30, sweeptol = 1e-8):
@@ -15,7 +14,7 @@ class Schedule(object):
         self.maxiter = maxiter
         self.sweeptol = sweeptol
 
-    def initial(self, minM, maxM):
+    def gen_initial(self, minM, maxM):
         defaultM = [100, 250, 400, 800, 1500, 2500]
         log.debug(1, "Generate default schedule with startM = %d maxM = %d, maxiter = %d", \
             minM, maxM, self.maxiter)
@@ -46,7 +45,7 @@ class Schedule(object):
             self.maxiter = self.twodot_to_onedot + 4
         self.initialized = True
 
-    def restart(self, M):
+    def gen_restart(self, M):
         log.debug(1, "Generate default schedule with restart calculation M = %d, maxiter = %d", M, self.maxiter)
         self.arrayM = [M, M]
         self.arraySweep = [0, 2]
@@ -69,7 +68,7 @@ class Schedule(object):
             self.maxiter = self.twodot_to_onedot + 4
         self.initialized = True
 
-    def extrapolate(self, M):
+    def gen_extrapolate(self, M):
         log.debug(1, "Generate default schedule for truncation error extrapolation M = %d", M)
         self.arrayM = [M]
         self.arraySweep = [0]
@@ -89,7 +88,7 @@ class Schedule(object):
 
         self.initialized = True
 
-    def custom(self, arrayM, arraySweep, arrayTol, arrayNoise, twodot_to_onedot = None):
+    def gen_custom(self, arrayM, arraySweep, arrayTol, arrayNoise, twodot_to_onedot = None):
         log.debug(1, "Generate custom schedule")
         nstep = len(arrayM)
         log.eassert(len(arraySweep) == nstep and len(arrayTol) == nstep and len(arrayNoise) == nstep, \
@@ -122,7 +121,7 @@ class Schedule(object):
         text = ["", "schedule"]
         nstep = len(self.arrayM)
         text += map(lambda n: "%d %d %.0e %.0e" % \
-            (self.arrayM[n], self.arraySweep[n], self.arrayTol[n], self.arrayNoise[n]), range(nstep))
+            (self.arraySweep[n], self.arrayM[n], self.arrayTol[n], self.arrayNoise[n]), range(nstep))
         text.append("end")
         text.append("")
         text.append("maxiter %d" % self.maxiter)
@@ -130,10 +129,10 @@ class Schedule(object):
         text.append("sweep_tol %.0e" % self.sweeptol)
         text.append("")            
         text = "\n".join(text)
-
         log.debug(2, "Generated schedule in configuration file")
         log.debug(1, text)
-            
+
+        return text
 
 class Block(object):
     """
@@ -159,121 +158,250 @@ class Block(object):
     - back sweep and extrapolation to M=\inf limit
     """
 
-    block_path = realpath(join(dirname(realpath(__file__)), "../block"))
+    execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../block"))
     nproc = 1
     nnode = 1
+    intFormat = "FCIDUMP"
+    basicFiles = ["dmrg.conf", "FCIDUMP"]
+    restartFiles = ["RestartReorder.dat", "Rotation*", "StateInfo*", "statefile*", "wave*"]
+    mpipernode = ["mpirun", "-npernode", "1"]
     
-    def __init__(self):
+    def __init__(self, tmp = "/tmp", shared = None):
         self.sys_initialized = False
         self.schedule_initialized = False
         self.integral_initialized = False
+        self.optimized = False
+        self.count = 0
     
         self.warmup_method = "local_2site"
-        self.onepdm = True
         self.outputlevel = 0
         self.restart = False
+        self.tmpDir = mkdtemp(prefix = "BLOCK", dir = tmp)
+        log.info("Block interface  running with %d nodes, %d processors per node", Block.nnode, Block.nproc)
+        log.debug(0, "Using Block version %s", Block.execPath)
+        log.info("Block working dir %s", self.tmpDir)
+        if Block.nnode > 1:
+            log.eassert(shared is not None, "when running on multiple nodes, a shared tmporary folder is required")
+            self.tmpShared = mkdtemp(prefix = "BLOCK", dir = shared)
+            sub.check_call(Block.mpipernode + ["mkdir", "-p", self.tmpDir])
+            log.info("Block shared dir %s", self.tmpShared)
 
-    def set_system(self, nelec, spin, spinAdapted, bogoliubov):
+    def set_system(self, nelec, spin, spinAdapted, bogoliubov, spinRestricted):
         self.nelec = nelec
         self.spin = spin
-        log.fassert(not (spinAdapted and bogoliubov), "Bogoliubov calculation with spin adaption is not implemented")
+        log.fassert(not (spinAdapted and bogoliubov), \
+            "Bogoliubov calculation with spin adaption is not implemented")
         self.spinAdapted = spinAdapted
+        self.spinRestricted = spinRestricted
         self.bogoliubov = bogoliubov
         self.sys_initialized = True
 
-    def set_integral(self, H0, H1, H2):
+    def set_integral(self, norb, H0, H1, H2):
         log.eassert(self.sys_initialized, "set_integral() should be used after initializing set_system()")
-        pass
-        integral.dump()
+        self.integral = integral.Integral(norb, self.spinRestricted, self.bogoliubov, H0, H1, H2)
         self.integral_initialized = True
 
-    def copy_restartfile(self, src):
-        pass
-
     def set_schedule(self, schedule):
+        self.schedule = schedule
+        self.schedule_initialized = True
+
+    def write_conf(self, f):
+        f.write("nelec %d\n" % self.nelec)
+        f.write("spin %d\n" % self.spin)
+        f.write("hf_occ integral\n")
+        f.write(self.schedule.get_schedule())
+        f.write("orbitals %s\n" % os.path.join(self.tmpDir, "FCIDUMP"))
+        f.write("warmup %s\n" % self.warmup_method)
+        f.write("nroots 1\n")
+        f.write("outputlevel %d\n" % self.outputlevel)
+        f.write("prefix %s\n" % self.tmpDir)
+        if self.bogoliubov:
+            f.write("bogoliubov\n")
+        if not self.spinAdapted:
+            f.write("nonspinadapted\n")
+
+    def copy_restartfile(self):
         pass
 
-    def run(self, rdm = True):
-        pass
-        return truncation, energy, (rdm)
+    def broadcast(self):
+        files = Block.basicFiles
+        if self.restart:
+            files += Block.restartFiles
 
-    def evaluate(self):
+        for f in files:
+            sub.check_call(Block.mpipernode + ["cp", os.path.join(self.tmpShared, f), self.tmpDir])
+
+    def callBlock(self):
+        outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % self.count)
+        log.info("BLOCK call No. %d", self.count)
+        log.debug(0, "Written to file %s", outputfile)
+        with open(outputfile, "w", buffering = 1) as f:
+            sub.check_call(["mpirun", "-np", "%d" % (Block.nproc * Block.nnode), \
+                os.path.join(Block.execPath, "block.spin_adapted"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
+                stdout = f)
+        log.result("BLOCK sweep summary")
+        log.result(grep("Sweep Energy", outputfile))
+        self.count += 1
+
+    def callOH(self):
+        outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % self.count)
+        log.info("OH call No. %d", self.count)
+        log.debug(0, "Written to file %s", outputfile)
+        with open(outputfile, "w", buffering = 1) as f:
+            sub.check_call(["mpirun", "-np", "1", \
+                os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
+                stdout = f)
+        self.count += 1        
+
+    def extractE(self, text):
+        results = []    
+        lines = map(lambda s: s.split(), text.split('\n')[-2:])        
+        keys = ["Weight"]
+        for key in keys:
+            place = map(lambda tokens: tokens.index(key), lines)
+            results.append(np.average(map(lambda (tokens, idx): float(tokens[idx+2]), zip(lines, place))))
+
+        lines = map(lambda s: s.split(), text.split('\n')[-1:])
+        keys = ["Energy"]
+        for key in keys:
+            place = map(lambda tokens: tokens.index(key), lines)
+            results.append(np.average(map(lambda (tokens, idx): float(tokens[idx+2]), zip(lines, place))))
+
+        return tuple(results)
+
+    def readonepdm(self, filename):
+        with open(filename, "r") as f:
+            lines = f.readlines()
+
+        nsites = int(lines[0])
+        pdm = np.zeros((nsites, nsites))
+    
+        for line in lines[1:]:
+            tokens = line.split(" ")
+            pdm[int(tokens[0]), int(tokens[1])] = float(tokens[2])
+    
+        return pdm
+
+    def optimize(self, onepdm = True):
+        log.eassert(self.sys_initialized and self.integral_initialized and self.schedule_initialized, \
+                "components for optimization are not ready\nsys_init = %s\nint_init = %s\nschedule_init = %s" \
+                % (self.sys_initialized, self.integral_initialized, self.schedule_initialized))
+
+        if self.optimized:
+            return self.restart_optimize(onepdm)
+
+        if Block.nnode == 1:
+            startPath = self.tmpDir
+        else:
+            startPath = self.tmpShared
+        configFile = os.path.join(startPath, "dmrg.conf.%03d" % self.count)
+        with open(configFile, "w") as f:
+            self.write_conf(f)
+            if onepdm:
+                f.write("onepdm\n")
+        
+        intFile = os.path.join(startPath, "FCIDUMP")
+        integral.dump(intFile, self.integral, Block.intFormat)
+        if self.restart:
+            self.copy_restartfile()
+        if Block.nnode > 1:
+            self.broadcast()
+        self.callBlock()
+        self.optimized = True
+        
+        outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % (self.count-1))
+        truncation, energy = self.extractE(grep("Sweep Energy", outputfile))
+        
+        if onepdm:
+            if self.spinRestricted:
+                rho = self.readonepdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
+            else:
+                rho = self.readonepdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
+            if self.bogoliubov:
+                kappa = self.readonepdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
+                if self.spinRestricted:
+                    kappa = (kappa + kappa.T) / 2
+                return truncation, energy, (rho, kappa)
+            else:
+                return truncation, energy, (rho, None)
+        else:
+            return truncation, energy, None
+
+    def restart_optimize(self, onepdm = True):
         pass
+
+    def evaluate(self, *args):
+        log.eassert(self.optimized, "No wavefunction available")
+        self.set_integral(self.integral.norb, *args)
+
+        if Block.nnode == 1:
+            startPath = self.tmpDir
+        else:
+            startPath = self.tmpShared
+
+        # just copy configure file
+        sub.check_call(Block.mpipernode + ["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
+            os.path.join(startPath, "dmrg.conf.%03d" % (self.count))])
+        intFile = os.path.join(startPath, "FCIDUMP")
+        integral.dump(intFile, self.integral, Block.intFormat)
+        if Block.nnode > 1:
+            self.broadcast()
+        self.callOH()
+
+        outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % (self.count-1))
+        h = float(grep("helement", outputfile).split()[-1])
+        log.debug(1, "operator evaluated: %20.12f" % h)
+        return h
 
     def extrapolate(self, rdm = True, evaluate = False):
         pass
 
-        
-    
-    #default = {
-    #    # executables
-    #    'block_path': realpath(join(dirname(realpath(__file__)), "../block")),
-    #    # symmetry
-    #    'sym_n': True, # particle number conserving
-    #    'sym_s': True, # spin-adapted
-    #    # sweep control
-    #    'e_tol': 1e-6,
-    #    'max_it': 30,
-    #    'minM': 250,
-    #    'maxM': 400,
-    #    'twodot_to_onedot': None,
-    #    'schedule': None, # a ([(start_iter, M, tol, noise), (start_iter, M, tol, noise), ...], twodot_to_onedot)
-    #    # whether or not compute onepdm
-    #    'onepdm': True,
-    #    # mpi information
-    #    'nproc': 1,
-    #    'nnode': 1,
-    #    'nelec': None,
-    #    'nsites': None,
-    #    'temp': None,
-    #    'temp_parent': "/tmp"
-    #}
+    def cleanup(keep_restart = False):
+        if keep_restart:
+            pass
+        else:
+            sub.check_call(Block.mpipernode + ["rm", "-rf", self.tmpDir])
+            if Block.nnode > 1:
+                sub.check_call(["rm", "-rf", self.tmpShared])
 
-    #def __init__(self, **kwargs):
-    #    for key in self.default:
-    #        if key in kwargs:
-    #            self.__dict__[key] = kwargs[key]            
-    #        else:
-    #            self.__dict__[key] = self.default[key]
-    #    if self.temp is None:
-    #        self.temp = mkdtemp(prefix = "BLOCK", dir = self.temp_parent)
-    #    if self.sym_n is False:
-    #        
-    #        self.nelec
-
-
-    #def optimize(self, Int1e, Int2e, nelec = None):
-    #    if nelec is not None:
-    #        self.nelec = nelec
-    #    self.__write_config()
-
-    #def evaluate(self):
-    #    pass
-
-    #def __write_config(self):
-    #    with open(join(self.temp, "dmrg.conf"), "w") as f:
-    #        f.write("nelec %d" % self.nelec)
-
-if __name__ == "__main__":
-    log.verbose = log.Level["DEBUG1"]    
+def test():
+    log.verbose = log.Level["DEBUG0"]
     schedule = Schedule()
     
-    schedule.initial(minM = 50, maxM = 400)
+    schedule.gen_initial(minM = 50, maxM = 400)
     schedule.get_schedule()
     
     schedule.maxiter = 12
-    schedule.restart(M = 400)
+    schedule.gen_restart(M = 400)
     schedule.get_schedule()
     
     schedule.maxiter = 20
     schedule.sweep_tol = 1e-5
     
-    schedule.custom([150, 250, 400, 600, 800, 1000, 1200], [0, 4, 8, 12, 16, 20, 24], \
+    schedule.gen_custom([150, 250, 400, 600, 800, 1000, 1200], [0, 4, 8, 12, 16, 20, 24], \
         [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6], [0] * 7, 0)
     schedule.get_schedule()
     
-    schedule.extrapolate(300)
+    schedule.gen_extrapolate(300)
     schedule.get_schedule()
+
+    log.info("Testing BLOCK")
     
-    #Block.set()
+    solver = Block("/tmp", "/tmp")
+    solver.set_system(4, 0, False, False, True)
+    Int1e = np.eye(4, k = 1) + np.eye(4, k = -1)
+    Int2e = np.zeros((4,4,4,4))
+    for i in range(4):
+        Int2e[i,i,i,i] = 4
+    solver.set_integral(4, 0, {"cd": Int1e}, {"ccdd": Int2e})
+    schedule = Schedule()
+    schedule.gen_initial(minM = 50, maxM = 200)
+    solver.set_schedule(schedule)
+    t, E, pdm = solver.optimize()
+    log.result("truncation error = %20.12f  E = %20.12f", t, E)
+    log.result("onepdm is\n%s", pdm[0])
+    solver.cleanup()
     #print Block.block_path
+
+if __name__ == "__main__":
+    test()
