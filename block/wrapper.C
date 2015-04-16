@@ -50,14 +50,14 @@ void test()
   calcHamiltonianAndOverlap(statea, statea, h, o);
   printf("overlap = %20.12e\n", o);
   printf("helement = %20.12e\n", h);
-  MPS stateb(1);
-  calcHamiltonianAndOverlap(stateb, statea, h, o);
-  cout << o<<"  "<<h<<endl;
-  stateb.normalize();
-  calcHamiltonianAndOverlap(stateb, stateb, h, o);
-  cout << o<<"  "<<h<<endl;
-  calcHamiltonianAndOverlap(stateb, statea, h, o);
-  cout << o<<"  "<<h<<endl;
+  //MPS stateb(1);
+  //calcHamiltonianAndOverlap(stateb, statea, h, o);
+  //cout << o<<"  "<<h<<endl;
+  //stateb.normalize();
+  //calcHamiltonianAndOverlap(stateb, stateb, h, o);
+  //cout << o<<"  "<<h<<endl;
+  //calcHamiltonianAndOverlap(stateb, statea, h, o);
+  //cout << o<<"  "<<h<<endl;
 }
 
 void evaluateOverlapAndHamiltonian(long *occ, int length, double* o, double* h) {
