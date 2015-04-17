@@ -1,11 +1,14 @@
 import numpy as np
 from libdmet.solver import block
 import libdmet.utils.logger as log
+from libdmet.utils import integral
 
 log.clock = True
 log.verbose = log.Level["INFO"]
 
 block.Block.nproc = 4
+
+# a Hubbard example
 solver = block.Block()
 solver.set_system(8, 0, False, False, True)
 
@@ -34,5 +37,22 @@ for i in range(8):
 solver.integral.H2["ccdd"] = Int2e
 
 log.result("E = %20.12f", solver.restart_optimize(onepdm = False, M = 600)[1])
+
+solver.cleanup()
+
+# a BCS example
+
+solver.createTmp()
+
+solver.set_system(16, 0, False, True, False)
+solver.integral = integral.read("../block/dmrg_tests/bcs/DMETDUMP", \
+    8, False, True, "FCIDUMP")
+
+scheduler.gen_initial(minM = 100, maxM = 400)
+
+solver.set_schedule(scheduler)
+
+w, E, _ = solver.optimize(onepdm = False)
+log.result("E = %20.12f", E)
 
 solver.cleanup()

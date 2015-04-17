@@ -140,35 +140,15 @@ class Schedule(object):
         return text
 
 class Block(object):
-    """
-    Interface to Block dmrg code
-
-    - take particle number conserving/non-conserving, spin-restricted/unrestricted Hamiltonian    
-    - specify sequence of M or only min/max M
-    - specify number of iterations or use default
-    - specify twodot_to_onedot or use default
-    - specify energy tolerance
-    - compute 1pdm in patch    
-    
-    TODO:
-    - optimize the wavefunction
-    - compute other expectation values one at a time
-    - specify reorder or noreorder
-    - specify the outputlevel for DMRG itself, and for my output
-    - dry run: just generate input files
-    - error handling
-    - set whether to restart, restart folder, whether or not delete it
-    - set temp folder
-    - set number of processors, number of nodes
-    - back sweep and extrapolation to M=\inf limit
-    """
 
     execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../block"))
     nproc = 1
     nnode = 1
     intFormat = "FCIDUMP"
-    basicFiles = ["dmrg.conf", "FCIDUMP"]
+    basicFiles = ["dmrg.conf.*", "FCIDUMP"]
     restartFiles = ["RestartReorder.dat", "Rotation*", "StateInfo*", "statefile*", "wave*"]
+    tempFiles = ["Spin*", "Overlap*", "dmrg.e", "spatial*", "onepdm.*", "twopdm.*", "pairmat.*", \
+        "dmrg.out.*", "RI*"]
     mpipernode = ["mpirun", "-npernode", "1"]
     
     def __init__(self, tmp = "/tmp", shared = None):
@@ -181,9 +161,12 @@ class Block(object):
         self.warmup_method = "local_2site"
         self.outputlevel = 0
         self.restart = False
-        self.tmpDir = mkdtemp(prefix = "BLOCK", dir = tmp)
         log.info("Block interface  running with %d nodes, %d processors per node", Block.nnode, Block.nproc)
         log.debug(0, "Using Block version %s", Block.execPath)
+        self.createTmp(tmp)
+
+    def createTmp(self, tmp = "/tmp"):
+        self.tmpDir = mkdtemp(prefix = "BLOCK", dir = tmp)
         log.info("Block working dir %s", self.tmpDir)
         if Block.nnode > 1:
             log.eassert(shared is not None, "when running on multiple nodes, a shared tmporary folder is required")
@@ -401,52 +384,55 @@ class Block(object):
         log.debug(1, "operator evaluated: %20.12f" % h)
         return h
 
-    def cleanup(keep_restart = False):
+    def cleanup(self, keep_restart = False):
         if keep_restart:
-            pass
+            for filename in Block.tempFiles:
+                sub.check_call(Block.mpipernode + ["rm", "-rf", os.path.join(self.tmpDir, filename)])
         else:
             sub.check_call(Block.mpipernode + ["rm", "-rf", self.tmpDir])
             if Block.nnode > 1:
                 sub.check_call(["rm", "-rf", self.tmpShared])
+            self.optimized = False
 
-def test():
-    log.verbose = log.Level["DEBUG0"]
-    schedule = Schedule()
-    
-    schedule.gen_initial(minM = 50, maxM = 400)
-    schedule.get_schedule()
-    
-    schedule.maxiter = 12
-    schedule.gen_restart(M = 400)
-    schedule.get_schedule()
-    
-    schedule.maxiter = 20
-    schedule.sweep_tol = 1e-5
-    
-    schedule.gen_custom([150, 250, 400, 600, 800, 1000, 1200], [0, 4, 8, 12, 16, 20, 24], \
-        [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6], [0] * 7, 0)
-    schedule.get_schedule()
-    
-    schedule.gen_extrapolate(300)
-    schedule.get_schedule()
 
-    log.info("Testing BLOCK")
-    
-    solver = Block("/tmp", "/tmp")
-    solver.set_system(4, 0, False, False, True)
-    Int1e = np.eye(4, k = 1) + np.eye(4, k = -1)
-    Int2e = np.zeros((4,4,4,4))
-    for i in range(4):
-        Int2e[i,i,i,i] = 4
-    solver.set_integral(4, 0, {"cd": Int1e}, {"ccdd": Int2e})
-    schedule = Schedule()
-    schedule.gen_initial(minM = 50, maxM = 200)
-    solver.set_schedule(schedule)
-    t, E, pdm = solver.optimize()
-    log.result("truncation error = %20.12f  E = %20.12f", t, E)
-    log.result("onepdm is\n%s", pdm[0])
-    solver.cleanup()
-    #print Block.block_path
-
-if __name__ == "__main__":
-    test()
+#def test():
+#    log.verbose = log.Level["DEBUG0"]
+#    schedule = Schedule()
+#
+#    schedule.gen_initial(minM = 50, maxM = 400)
+#    schedule.get_schedule()
+#
+#    schedule.maxiter = 12
+#    schedule.gen_restart(M = 400)
+#    schedule.get_schedule()
+#
+#    schedule.maxiter = 20
+#    schedule.sweep_tol = 1e-5
+#
+#    schedule.gen_custom([150, 250, 400, 600, 800, 1000, 1200], [0, 4, 8, 12, 16, 20, 24], \
+#        [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6], [0] * 7, 0)
+#    schedule.get_schedule()
+#
+#    schedule.gen_extrapolate(300)
+#    schedule.get_schedule()
+#
+#    log.info("Testing BLOCK")
+#
+#    solver = Block("/tmp", "/tmp")
+#    solver.set_system(4, 0, False, False, True)
+#    Int1e = np.eye(4, k = 1) + np.eye(4, k = -1)
+#    Int2e = np.zeros((4,4,4,4))
+#    for i in range(4):
+#        Int2e[i,i,i,i] = 4
+#    solver.set_integral(4, 0, {"cd": Int1e}, {"ccdd": Int2e})
+#    schedule = Schedule()
+#    schedule.gen_initial(minM = 50, maxM = 200)
+#    solver.set_schedule(schedule)
+#    t, E, pdm = solver.optimize()
+#    log.result("truncation error = %20.12f  E = %20.12f", t, E)
+#    log.result("onepdm is\n%s", pdm[0])
+#    solver.cleanup()
+#    #print Block.block_path
+#
+#if __name__ == "__main__":
+#    test()
