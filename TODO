@@ -1,13 +1,13 @@
 Block class: 
-- conduct multiple types of calculations
-- properties
-- handle restart and save
+- extrapolation calculations
 - multiple roots
 - dump and read binary integral file: need to modify block
 
   Done:
   - schedule class
   - evaluate operator
+  - support just_run, optimize, restart_optimize, evaluate properties
+  - handle restart files and save
 
 Integral.py:
 - read/write integrals in binary format

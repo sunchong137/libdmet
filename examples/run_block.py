@@ -1,5 +1,5 @@
 import numpy as np
-import libdmet.solver.block_iface as block
+from libdmet.solver import block
 import libdmet.utils.logger as log
 
 log.clock = True
@@ -26,6 +26,13 @@ solver.set_schedule(scheduler)
 
 solver.optimize()
 
-log.result("E = %20.12f", solver.evaluate(0, {"cd": Int1e}, {"ccdd": Int2e}))
+log.result("E = %20.12f", solver.evaluate(0, {"cd": Int1e}, {"ccdd": Int2e}, op = "Hamiltonian"))
+
+for i in range(8):
+    Int2e[i,i,i,i] = 8
+
+solver.integral.H2["ccdd"] = Int2e
+
+log.result("E = %20.12f", solver.restart_optimize(onepdm = False, M = 600)[1])
 
 solver.cleanup()

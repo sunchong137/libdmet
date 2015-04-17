@@ -125,7 +125,12 @@ class Schedule(object):
         text.append("end")
         text.append("")
         text.append("maxiter %d" % self.maxiter)
-        text.append("twodot_to_onedot %d" % self.twodot_to_onedot)
+        if self.twodot_to_onedot <= 0:
+            text.append("onedot")
+        elif self.twodot_to_onedot >= self.maxiter:
+            text.append("twodot")
+        else:
+            text.append("twodot_to_onedot %d" % self.twodot_to_onedot)
         text.append("sweep_tol %.0e" % self.sweeptol)
         text.append("")            
         text = "\n".join(text)
@@ -220,12 +225,30 @@ class Block(object):
         if not self.spinAdapted:
             f.write("nonspinadapted\n")
 
-    def copy_restartfile(self):
-        pass
+    def copy_restartfile(self, src, cleanup = True):
+        files = Block.restartFiles
+        if Block.nnode == 1:
+            startPath = self.tmpDir
+        else:
+            startPath = self.tmpShared
+        for f in files:
+            sub.check_call(Block.mpipernode + ["cp", os.path.join(src, f), startPath])
+        if Cleanup:
+            sub.check_call(["rm", "-rf", src])
+        self.restart = True
+
+    def save_restartfile(self, des, cleanup = True):
+        # the des has to be created before calling this method
+        # recommanded using mkdtemp(prefix = "BLOCK_RESTART", dir = path_to_storage)
+        files = Block.restartFiles
+        for f in files:
+            sub.check_call(["cp", os.path.join(self.tmpDir, f), des])
+        if cleanup:
+            self.cleanup()
 
     def broadcast(self):
         files = Block.basicFiles
-        if self.restart:
+        if self.restart and not self.optimized:
             files += Block.restartFiles
 
         for f in files:
@@ -269,18 +292,62 @@ class Block(object):
 
         return tuple(results)
 
-    def readonepdm(self, filename):
-        with open(filename, "r") as f:
-            lines = f.readlines()
+    def onepdm(self):
+        def readpdm(filename):
+            with open(filename, "r") as f:
+                lines = f.readlines()
 
-        nsites = int(lines[0])
-        pdm = np.zeros((nsites, nsites))
+            nsites = int(lines[0])
+            pdm = np.zeros((nsites, nsites))
     
-        for line in lines[1:]:
-            tokens = line.split(" ")
-            pdm[int(tokens[0]), int(tokens[1])] = float(tokens[2])
+            for line in lines[1:]:
+                tokens = line.split(" ")
+                pdm[int(tokens[0]), int(tokens[1])] = float(tokens[2])
     
-        return pdm
+            return pdm
+
+        if self.spinRestricted:
+            rho = readpdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
+        else:
+            rho = readpdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
+        if self.bogoliubov:
+            kappa = readpdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
+            if self.spinRestricted:
+                kappa = (kappa + kappa.T) / 2
+            return (rho, kappa)
+        else:
+            return (rho, None)
+
+    def just_run(self, onepdm = True, dry_run = False):
+        log.debug(0, "Run BLOCK")
+
+        if Block.nnode == 1:
+            startPath = self.tmpDir
+        else:
+            startPath = self.tmpShared
+
+        configFile = os.path.join(startPath, "dmrg.conf.%03d" % self.count)
+        with open(configFile, "w") as f:
+            self.write_conf(f)
+            if onepdm:
+                f.write("onepdm\n")
+
+        intFile = os.path.join(startPath, "FCIDUMP")
+        integral.dump(intFile, self.integral, Block.intFormat)
+        if Block.nnode > 1:
+            self.broadcast()
+        
+        if not dry_run:
+            self.callBlock()
+            outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % (self.count-1))
+            truncation, energy = self.extractE(grep("Sweep Energy", outputfile))
+        
+            if onepdm:
+                return truncation, energy, self.onepdm()
+            else:
+                return truncation, energy, None
+        else:
+            return None, None, None
 
     def optimize(self, onepdm = True):
         log.eassert(self.sys_initialized and self.integral_initialized and self.schedule_initialized, \
@@ -289,50 +356,31 @@ class Block(object):
 
         if self.optimized:
             return self.restart_optimize(onepdm)
-
-        if Block.nnode == 1:
-            startPath = self.tmpDir
-        else:
-            startPath = self.tmpShared
-        configFile = os.path.join(startPath, "dmrg.conf.%03d" % self.count)
-        with open(configFile, "w") as f:
-            self.write_conf(f)
-            if onepdm:
-                f.write("onepdm\n")
         
-        intFile = os.path.join(startPath, "FCIDUMP")
-        integral.dump(intFile, self.integral, Block.intFormat)
-        if self.restart:
-            self.copy_restartfile()
-        if Block.nnode > 1:
-            self.broadcast()
-        self.callBlock()
+        log.info("Run BLOCK to optimize wavefunction")
+        results = self.just_run(onepdm, dry_run = False)
         self.optimized = True
-        
-        outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % (self.count-1))
-        truncation, energy = self.extractE(grep("Sweep Energy", outputfile))
-        
-        if onepdm:
-            if self.spinRestricted:
-                rho = self.readonepdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
-            else:
-                rho = self.readonepdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
-            if self.bogoliubov:
-                kappa = self.readonepdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
-                if self.spinRestricted:
-                    kappa = (kappa + kappa.T) / 2
-                return truncation, energy, (rho, kappa)
-            else:
-                return truncation, energy, (rho, None)
-        else:
-            return truncation, energy, None
+        return results
 
-    def restart_optimize(self, onepdm = True):
-        pass
-
-    def evaluate(self, *args):
+    def restart_optimize(self, onepdm = True, M = None):
         log.eassert(self.optimized, "No wavefunction available")
-        self.set_integral(self.integral.norb, *args)
+
+        if M is None:
+            M = self.schedule.arrayM[-1]
+        self.schedule.gen_restart(M = M)
+
+        log.info("Run BLOCK to optimize wavefunction (restart)")
+        return self.just_run(onepdm, dry_run = False)
+
+
+    def extrapolate(self, rdm = True, evaluate = False):
+        log.error("extrapolate not implemented yet")
+
+    def evaluate(self, H0, H1, H2, op = "unknown operator"):
+        log.eassert(self.optimized, "No wavefunction available")
+        self.set_integral(self.integral.norb, H0, H1, H2)
+
+        log.info("Run OH to evaluate expectation value of %s", op)
 
         if Block.nnode == 1:
             startPath = self.tmpDir
@@ -352,9 +400,6 @@ class Block(object):
         h = float(grep("helement", outputfile).split()[-1])
         log.debug(1, "operator evaluated: %20.12f" % h)
         return h
-
-    def extrapolate(self, rdm = True, evaluate = False):
-        pass
 
     def cleanup(keep_restart = False):
         if keep_restart:
