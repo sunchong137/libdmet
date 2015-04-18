@@ -15,4 +15,9 @@ Integral.py:
   Done:
   - read/write integrals in FCIDUMP format
 
+lattice.py:
+- find a better way to integrate with Hamiltonian
 
+  Done:
+  - transfer the old lattice code
+  - write several general constructor of lattices, eg. square, graphene, cuprate
