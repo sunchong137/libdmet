@@ -6,12 +6,14 @@ import numpy as np
 import numpy.linalg as la
 import itertools as it
 import libdmet.utils.logger as log
+import libdmet.system.hamiltonian as ham
 
 def ChainLattice(length, scsites):
     log.eassert(length % scsites == 0, "incompatible lattice size and supercell size")
     uc = UnitCell(np.eye(1), [(np.array([0]), "X")])
     sc = SuperCell(uc, np.array([scsites]))
     lat = Lattice(sc, np.array([length / scsites]))
+    lat.neighborDist = [1.,2.,3.]
     return lat
 
 def SquareLattice(lx, ly, scx, scy):
@@ -19,6 +21,7 @@ def SquareLattice(lx, ly, scx, scy):
     uc = UnitCell(np.eye(2), [(np.array([0, 0]), "X")])
     sc = SuperCell(uc, np.array([scx, scy]))
     lat = Lattice(sc, np.array([lx / scx, ly / scy]))
+    lat.neighborDist = [1., 2.**0.5, 2.]
     return lat
 
 def HoneycombLattice(lx, ly, scx, scy):
@@ -29,9 +32,10 @@ def CubicLattice(lx, ly, lz, scx, scy, scz):
     uc = UnitCell(np.eye(3), [(np.array([0, 0, 0]), "X")])
     sc = SuperCell(uc, np.array([scx, scy, scz]))
     lat = Lattice(sc, np.array([lx / scx, ly / scy, lz / scz]))
+    lat.neighborDist = [1., 2.**0.5, 3.**0.5]
     return lat
 
-def __translateSites(baseSites, usize, csize):
+def translateSites(baseSites, usize, csize):
     # csize = [3,3], then cells = [0,0], [0,1], [0,2], [0,3], [1,0], ..., [3,3]
     cells = map(np.asarray, it.product(*tuple(map(range, csize))))
     sites = list(it.chain.from_iterable(map(lambda c: \
@@ -69,7 +73,7 @@ class SuperCell(object):
         self.ncells = np.product(self.csize)
         self.nsites = uc.nsites * self.ncells
 
-        self.cells, self.sites = __translateSites(uc.sites, uc.size, size)
+        self.cells, self.sites = translateSites(uc.sites, uc.size, size)
         self.names = uc.names * self.ncells
 
         self.celldict = dict(zip(map(tuple, self.cells), range(self.ncells)))
@@ -92,12 +96,13 @@ class Lattice(object):
         self.ncells = np.product(self.csize)
         self.nsites = sc.nsites * self.ncells
 
-        self.cells, self.sites = __translateSites(sc.sites, sc.size, size)
+        self.cells, self.sites = translateSites(sc.sites, sc.size, size)
         self.names = sc.names * self.ncells
         
         self.celldict = dict(zip(map(tuple, self.cells), range(self.ncells)))
         self.sitedict = dict(zip(map(tuple, self.sites), range(self.nsites)))
-  
+        self.neighborDist = []
+
     def __str__(self):
         r = self.supercell.__str__()
         r += "Lattice Shape\n%s\n" % self.csize
@@ -199,6 +204,28 @@ class Lattice(object):
                         break
         return neighbors
 
+    def setHam(self, Ham):
+        self.Ham = Ham
+        self.H1 = self.Ham.H1
+        self.H1_kspace = self.FFTtoK(self.H1)
+        self.Fock = self.Ham.Fock
+        self.Fock_kspace = self.FFTtoK(self.Fock)
+
+    def getH1(self, kspace = False):
+        if kspace:
+            return self.H1_kspace
+        else:
+            return self.H1
+
+    def getFock(self, kspace = False):
+        if kspace:
+            return self.Fock_kspace
+        else:
+            return self.Fock
+
+    def getH2(self):
+        return self.Ham.H2
+
 def test():
     chain = ChainLattice(240, 4)
     log.result("%s", chain)
@@ -206,10 +233,16 @@ def test():
     log.result("neighbors: %s", chain.neighbor(sitesA = range(4)))
     log.result("")
 
-    square = SquareLattice(72, 72, 4, 4)
+    square = SquareLattice(72, 72, 2, 2)
     log.result("%s", square)
     log.result("1st neigbors: %s", square.neighbor(dis = 1., sitesA = range(4)))
     log.result("2nd neigbors: %s", square.neighbor(dis = 2**0.5, sitesA = range(4)))
+
+    Ham = ham.HubbardHamiltonian(square, 4, [1, 0.])
+    square.setHam(Ham)
+    log.result("%s", square.getH1(kspace = True))
+    log.result("%s", square.getFock(kspace = True))
+    log.result("%s", square.getH2())
 
 if __name__ == "__main__":
     test()
