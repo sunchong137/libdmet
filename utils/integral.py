@@ -2,6 +2,7 @@ import libdmet.utils.logger as log
 import h5py
 import numpy as np
 import itertools as it
+import os
 
 class Integral(object):
     def __init__(self, norb, restricted, bogoliubov, H0, H1, H2):
@@ -11,7 +12,7 @@ class Integral(object):
         self.H0 = H0
         self.H1 = H1
         self.H2 = H2
-    
+
     def pairNoSymm(self):
         return list(it.product(range(self.norb), repeat = 2))
 
@@ -62,7 +63,7 @@ def dumpFCIDUMP(filename, integral, thr = 1e-8):
         else:
             for (i,j), (k,l) in it.product(integral.pairAntiSymm(), repeat = 2):
                 writeInt(fout, matrix[i,j,k,l], i, j, k, l)
-    
+
     def insert_2dArray(fout, matrix, symm_herm = True):
         if symm_herm:
             for i,j in integral.pairSymm():
@@ -73,12 +74,12 @@ def dumpFCIDUMP(filename, integral, thr = 1e-8):
 
     def insert_H0(fout, val = 0):
         fout.write("%20.16f%4d%4d%4d%4d\n" % (val, 0, 0, 0, 0)) # cannot be ignored even if smaller than thr
-    
+
     if isinstance(filename, str):
         f = open(filename, "w", 1024*1024*128)
     elif isinstance(filename, file):
         f = filename
-        
+
     f.write("\n".join(header) + "\n")
     if integral.restricted and not integral.bogoliubov:
         insert_ccdd(f, integral.H2["ccdd"])
@@ -128,7 +129,7 @@ def dumpFCIDUMP(filename, integral, thr = 1e-8):
         insert_2dArray(f, integral.H1["cc"], symm_herm = False)
         insert_H0(f, 0)
         insert_H0(f, integral.H0)
-    
+
     if isinstance(filename, str):
         f.close()
 
@@ -164,9 +165,11 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
         elif not restricted and not bogoliubov:
             H0 = 0
             H1 = {"cdA": np.zeros((norb, norb)), "cdB": np.zeros((norbs, norbs))}
-            H2 = {"ccddA": np.zeros((norb, norb, norb, norb)), 
-                  "ccddB": np.zeros((norb, norb, norb, norb)), 
-                  "ccddAB": np.zeros((norb, norb, norb, norb)) }
+            H2 = {
+                "ccddA": np.zeros((norb, norb, norb, norb)),
+                "ccddB": np.zeros((norb, norb, norb, norb)),
+                "ccddAB": np.zeros((norb, norb, norb, norb))
+            }
             lines = f.readlines()
             section = 0
             for line in lines:
@@ -192,9 +195,11 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
         elif restricted and bogoliubov:
             H0 = 0
             H1 = {"cd": np.zeros((norb, norb)), "cc": np.zeros((norb, norb))}
-            H2 = {"ccdd": np.zeros((norb, norb, norb, norb)),
-                  "cccd": np.zeros((norb, norb, norb, norb)),
-                  "cccc": np.zeros((norb, norb, norb, norb)) }
+            H2 = {
+                "ccdd": np.zeros((norb, norb, norb, norb)),
+                "cccd": np.zeros((norb, norb, norb, norb)),
+                "cccc": np.zeros((norb, norb, norb, norb))
+            }
             lines = f.readlines()
             section = 0
             for line in lines:
@@ -218,14 +223,19 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
                       H2["cccc"][k,l,j,i] = H2["cccc"][l,k,i,j] = -val
         else: # bogoliubov, not restricted
             H0 = 0
-            H1 = {"cdA": np.zeros((norb, norb)), "cdB": np.zeros((norb, norb)),
-                  "cc": np.zeros((norb, norb)) }
-            H2 = {"ccddA": np.zeros((norb, norb, norb, norb)),
-                  "ccddB": np.zeros((norb, norb, norb, norb)), 
-                  "ccddAB": np.zeros((norb, norb, norb, norb)),
-                  "cccdA": np.zeros((norb, norb, norb, norb)),
-                  "cccdB": np.zeros((norb, norb, norb, norb)),
-                  "cccc": np.zeros((norb, norb, norb, norb)) }
+            H1 = {
+                "cdA": np.zeros((norb, norb)),
+                "cdB": np.zeros((norb, norb)),
+                "cc": np.zeros((norb, norb))
+            }
+            H2 = {
+                "ccddA": np.zeros((norb, norb, norb, norb)),
+                "ccddB": np.zeros((norb, norb, norb, norb)),
+                "ccddAB": np.zeros((norb, norb, norb, norb)),
+                "cccdA": np.zeros((norb, norb, norb, norb)),
+                "cccdB": np.zeros((norb, norb, norb, norb)),
+                "cccc": np.zeros((norb, norb, norb, norb))
+            }
             lines = f.readlines()
             section = 0
             for line in lines:
@@ -254,10 +264,10 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
                     H1[key][i,j] = H1[key][j,i] = val
                 elif section == 8:
                     log.eassert(k == -1 and l == -1, "Integral Syntax unrecognized")
-                    H1["cc"][i,j] = val                      
+                    H1["cc"][i,j] = val
     return Integral(norb, restricted, bogoliubov, H0, H1, H2)
 
-def dumpHDF5(filename, Ham):
+def dumpHDF5(filename, integral):
     log.error("function not implemented: dump_bin")
     raise Exception
 
@@ -271,37 +281,94 @@ def readHDF5(filename, norb, restricted, bogoliubov):
     log.error("function not implemented: read_bin")
     raise Exception
 
-def dumpMMAP(filename, Ham):
-    log.error("function not implemented: dump_bin")
-    raise Exception
+def dumpMMAP(filename, integral):
+    log.eassert(os.path.isdir(filename), "unable to dump memory map files")
 
-def readMMAP(filename, norb, restricted, bogoliubov):
-    log.error("function not implemented: dump_bin")
-    raise Exception
+    def mmap_write(itype, data):
+        temp = np.memmap(os.path.join(filename, itype + ".mmap"), dtype = "float", mode = 'w+', shape = data.shape)
+        temp[:] = data[:]
+        del temp
 
-def read(filename, norb, restricted, bogoliubov, fmt):
+    for key, data in integral.H1.items():
+        mmap_write(key, data)
+    for key, data in integral.H2.items():
+        mmap_write(key, data)
+
+    temp = np.memmap(os.path.join(filename, "H0.mmap"), dtype = "float", mode = 'w+', shape = (1,))
+    temp[0] = integral.H0
+    del temp
+
+def readMMAP(filename, norb, restricted, bogoliubov, copy = False):
+    log.eassert(os.path.isdir(filename), "unable to read memory map files")
+
+    def bind(itype, shape):
+        if copy:
+            return np.array(np.memmap(os.path.join(filename, itype+".mmap"), dtype = "float", mode = 'r', shape = shape))
+        else:
+            return np.memmap(os.path.join(filename, itype + ".mmap"), dtype = "float", mode = 'r+', shape = shape)
+
+
+    if restricted and not bogoliubov:
+        H1 = {"cd": bind("cd", (norb, norb))}
+        H2 = {"ccdd": bind("ccdd", (norb, norb, norb, norb))}
+    elif not restricted and not bogoliubov:
+        H1 = {"cdA": bind("cdA", (norb, norb)), "cdB": bind("cdB", (norb, norb))}
+        H2 = {
+            "ccddA": bind("ccddA", (norb, norb, norb, norb)),
+            "ccddB": bind("ccddB", (norb, norb, norb, norb)),
+            "ccddAB": bind("ccddAB", (norb, norb, norb, norb)),
+        }
+    elif restricted and bogoliubov:
+        H1 = {"cd": bind("cd", (norb, norb)), "cc": bind("cc", (norb, norb))}
+        H2 = {
+            "ccdd": bind("ccdd", (norb, norb, norb, norb)),
+            "cccd": bind("cccd", (norb, norb, norb, norb)),
+            "cccc": bind("cccc", (norb, norb, norb, norb)),
+        }
+    else:
+        H1 = {
+            "cdA": bind("cdA", (norb, norb)),
+            "cdB": bind("cdB", (norb, norb)),
+            "cc": bind("cc", (norb, norb)),
+        }
+        H2 = {
+            "ccddA": bind("ccddA", (norb, norb, norb, norb)),
+            "ccddB": bind("ccddB", (norb, norb, norb, norb)),
+            "ccddAB": bind("ccddAB", (norb, norb, norb, norb)),
+            "cccdA": bind("cccdA", (norb, norb, norb, norb)),
+            "cccdB": bind("cccdB", (norb, norb, norb, norb)),
+            "cccc": bind("cccc", (norb, norb, norb, norb)),
+        }
+    H0 = bind("H0", (1,))[0]
+
+    return Integral(norb, restricted, bogoliubov, H0, H1, H2)
+
+def read(filename, norb, restricted, bogoliubov, fmt, **kwargs):
     if fmt == "FCIDUMP":
-        return readFCIDUMP(filename, norb, restricted, bogoliubov)
+        return readFCIDUMP(filename, norb, restricted, bogoliubov, **kwargs)
     elif fmt == "HDF5":
-        return readHDF5(filename, norb, restricted, bogoliubov)
+        return readHDF5(filename, norb, restricted, bogoliubov, **kwargs)
     elif fmt == "MMAP":
-        return readMMAP(filename, norb, restricted, bogoliubov)
+        return readMMAP(filename, norb, restricted, bogoliubov, **kwargs)
     else:
         raise Exception("Unrecognized formt %s" % fmt)
 
-def dump(filename, Ham, fmt):
+def dump(filename, Ham, fmt, **kwargs):
     if fmt == "FCIDUMP":
-        return dumpFCIDUMP(filename, Ham)
+        return dumpFCIDUMP(filename, Ham, **kwargs)
     elif fmt == "HDF5":
-        return dumpHDF5(filename, Ham)
+        return dumpHDF5(filename, Ham, **kwargs)
     elif fmt == "MMAP":
-        return dumpMMAP(filename, Ham)
+        return dumpMMAP(filename, Ham, **kwargs)
     else:
         raise Exception("Unrecognized formt %s" % fmt)
 
 def test():
     from subprocess import call
-    log.info("Testing Bogoliubov unrestricted integrals ...")
+    from tempfile import mkdtemp
+    import numpy.linalg as la
+
+    log.result("Testing Bogoliubov unrestricted integrals ...")
     input = "../block/dmrg_tests/bcs/DMETDUMP"
     Ham = read(input, 8, False, True, "FCIDUMP")
     output = "../block/dmrg_tests/bcs/DMETDUMPtest"
@@ -309,25 +376,41 @@ def test():
     s = call(["diff", input, output])
 
     if s == 0:
-        log.info("... Successful")
-        call(["rm", output])        
+        log.result("... Successful")
+        call(["rm", output])
     else:
-        log.info("... Failed")
-        log.info("Manually check input vs. output file: %s %s", input, output)
+        log.result("... Failed")
+        log.result("Manually check input vs. output file: %s %s", input, output)
+    log.result("")
 
-    log.info("Testing Hubbard restricted integrals ...")
+    log.result("Testing Hubbard restricted integrals ...")
     input = "../block/dmrg_tests/hubbard/FCIDUMP"
     Ham = read(input, 12, True, False, "FCIDUMP")
     output = "../block/dmrg_tests/hubbard/FCIDUMPtest"
     dump(output, Ham, "FCIDUMP")
     s = call(["diff", input, output])
-    
+
     if s == 0:
-        log.info("... Successful")
-        call(["rm", output])        
+        log.result("... Successful")
+        call(["rm", output])
     else:
-        log.info("... Failed")
-        log.info("Manually check input vs. output file: %s %s", input, output)
+        log.result("... Failed")
+        log.result("Manually check input vs. output file: %s %s", input, output)
+    log.result("")
+
+    log.result("Testing memory map integrals ...")
+    output = mkdtemp(prefix = "MMAP_INT", dir = "../examples")
+    log.result("Stored to %s", output)
+    dump(output, Ham, "MMAP")
+    Ham1 = read(output, 12, True, False, "MMAP", copy = False)
+    log.result("H0: %f %f", Ham1.H0, Ham.H0)
+    log.result("H1: %s", np.allclose(Ham1.H1["cd"], Ham.H1["cd"]))
+    log.result("H2: %s", np.allclose(Ham1.H2["ccdd"], Ham.H2["ccdd"]))
+    if Ham1.H0 == Ham.H0 and np.allclose(Ham1.H1["cd"], Ham.H1["cd"]) and np.allclose(Ham1.H2["ccdd"], Ham.H2["ccdd"]):
+        log.result("...Successful")
+        call(["rm", "-rf", output])
+    else:
+        log.result("... Failed")
 
 if __name__ == "__main__":
     test()
