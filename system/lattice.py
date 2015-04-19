@@ -206,9 +206,9 @@ class Lattice(object):
 
     def setHam(self, Ham):
         self.Ham = Ham
-        self.H1 = self.Ham.H1
+        self.H1 = self.Ham.getH1()
         self.H1_kspace = self.FFTtoK(self.H1)
-        self.Fock = self.Ham.Fock
+        self.Fock = self.Ham.getFock()
         self.Fock_kspace = self.FFTtoK(self.Fock)
 
     def getH1(self, kspace = False):
@@ -224,7 +224,7 @@ class Lattice(object):
             return self.Fock
 
     def getH2(self):
-        return self.Ham.H2
+        return self.Ham.getH2()
 
 def test():
     chain = ChainLattice(240, 4)
