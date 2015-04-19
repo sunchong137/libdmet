@@ -98,7 +98,7 @@ class Lattice(object):
 
         self.cells, self.sites = translateSites(sc.sites, sc.size, size)
         self.names = sc.names * self.ncells
-        
+
         self.celldict = dict(zip(map(tuple, self.cells), range(self.ncells)))
         self.sitedict = dict(zip(map(tuple, self.sites), range(self.nsites)))
         self.neighborDist = []
@@ -109,7 +109,7 @@ class Lattice(object):
         r += "Number of SuperCells: %4d\n" % self.ncells
         r += "Number of Sites:      %4d\n" % self.nsites
         return r
-    
+
     """
     functions on translations
     """
@@ -165,7 +165,7 @@ class Lattice(object):
                 idx = self.add(i, j)
                 bigA[i*nscsites:(i+1)*nscsites, idx*nscsites:(idx+1)*nscsites] = A[j]
         return bigA
-    
+
     def transpose(self, A):
         # return the transpose of ncells * nscsites * nscsites translational invariant matrix
         AT = np.zeros_like(A)
@@ -175,27 +175,27 @@ class Lattice(object):
     """
     get neighbor sites
     """
-    
+
     def neighbor(self, dis = 1., max_range = 1, sitesA = None, sitesB = None):
         # siteA, siteB are indices, not positions
         if sitesA is None:
             sitesA = range(self.nsites)
         if sitesB is None:
             sitesB = range(self.nsites)
-        
+
         nscsites = self.supercell.nsites
         cellshifts = map(lambda s: self.cell_pos2idx(np.asarray(s)), \
             it.product(range(-max_range, max_range+1), repeat = self.dim))
 
         shifts = map(lambda s: np.asarray(s), it.product([-1, 0, 1], repeat = self.dim))
-        
+
         neighbors = []
         for siteA in sitesA:
             cellA = siteA / nscsites
             cellB = map(lambda x: self.add(cellA, x), cellshifts)
             psitesB = list(set(sitesB) & \
                 set(it.chain.from_iterable(map(lambda c:range(c*nscsites, (c+1)*nscsites), cellB))))
-            
+
             for siteB in psitesB:
                 for shift in shifts:
                     if abs(la.norm(self.sites[siteA] - self.sites[siteB] - np.dot(shift, self.size)) \

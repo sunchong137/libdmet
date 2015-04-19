@@ -1,5 +1,5 @@
 import numpy as np
-import os 
+import os
 from tempfile import mkdtemp
 import libdmet.utils.logger as log
 from libdmet.utils import integral
@@ -29,7 +29,7 @@ class Schedule(object):
         self.arrayTol.append(self.arrayTol[-1])
         self.arrayNoise.append(0)
 
-        log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)  
+        log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)
         log.debug(2, "at sweeps       " + " %d" * len(self.arraySweep), *self.arraySweep)
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
@@ -51,17 +51,17 @@ class Schedule(object):
         self.arraySweep = [0, 2]
         self.arrayTol = [self.sweeptol * 0.1] * 2
         self.arrayNoise = [self.sweeptol * 0.1, 0]
-        
-        log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)  
+
+        log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)
         log.debug(2, "at sweeps       " + " %d" * len(self.arraySweep), *self.arraySweep)
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
 
         self.twodot_to_onedot = self.arraySweep[-1] + 2
-        
+
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
-        
+
         if self.twodot_to_onedot + 4 > self.maxiter:
             log.warning("only %d onedot iterations\nmodify maxiter to %d", \
                 self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 4)
@@ -74,8 +74,8 @@ class Schedule(object):
         self.arraySweep = [0]
         self.arrayTol = [self.sweeptol * 0.1]
         self.arrayNoise = [0]
-        
-        log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)  
+
+        log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)
         log.debug(2, "at sweeps       " + " %d" * len(self.arraySweep), *self.arraySweep)
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
@@ -96,8 +96,8 @@ class Schedule(object):
 
         self.arrayM, self.arraySweep, self.arrayTol, self.arrayNoise = \
             arrayM, arraySweep, arrayTol, arrayNoise
-        
-        log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)  
+
+        log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)
         log.debug(2, "at sweeps       " + " %d" * len(self.arraySweep), *self.arraySweep)
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
@@ -132,7 +132,7 @@ class Schedule(object):
         else:
             text.append("twodot_to_onedot %d" % self.twodot_to_onedot)
         text.append("sweep_tol %.0e" % self.sweeptol)
-        text.append("")            
+        text.append("")
         text = "\n".join(text)
         log.debug(2, "Generated schedule in configuration file")
         log.debug(1, text)
@@ -150,14 +150,14 @@ class Block(object):
     tempFiles = ["Spin*", "Overlap*", "dmrg.e", "spatial*", "onepdm.*", "twopdm.*", "pairmat.*", \
         "dmrg.out.*", "RI*"]
     mpipernode = ["mpirun", "-npernode", "1"]
-    
+
     def __init__(self, tmp = "/tmp", shared = None):
         self.sys_initialized = False
         self.schedule_initialized = False
         self.integral_initialized = False
         self.optimized = False
         self.count = 0
-    
+
         self.warmup_method = "local_2site"
         self.outputlevel = 0
         self.restart = False
@@ -257,11 +257,11 @@ class Block(object):
             sub.check_call(["mpirun", "-np", "1", \
                 os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
                 stdout = f)
-        self.count += 1        
+        self.count += 1
 
     def extractE(self, text):
-        results = []    
-        lines = map(lambda s: s.split(), text.split('\n')[-2:])        
+        results = []
+        lines = map(lambda s: s.split(), text.split('\n')[-2:])
         keys = ["Weight"]
         for key in keys:
             place = map(lambda tokens: tokens.index(key), lines)
@@ -282,11 +282,11 @@ class Block(object):
 
             nsites = int(lines[0])
             pdm = np.zeros((nsites, nsites))
-    
+
             for line in lines[1:]:
                 tokens = line.split(" ")
                 pdm[int(tokens[0]), int(tokens[1])] = float(tokens[2])
-    
+
             return pdm
 
         if self.spinRestricted:
@@ -319,12 +319,12 @@ class Block(object):
         integral.dump(intFile, self.integral, Block.intFormat)
         if Block.nnode > 1:
             self.broadcast()
-        
+
         if not dry_run:
             self.callBlock()
             outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % (self.count-1))
             truncation, energy = self.extractE(grep("Sweep Energy", outputfile))
-        
+
             if onepdm:
                 return truncation, energy, self.onepdm()
             else:
@@ -339,7 +339,7 @@ class Block(object):
 
         if self.optimized:
             return self.restart_optimize(onepdm)
-        
+
         log.info("Run BLOCK to optimize wavefunction")
         results = self.just_run(onepdm, dry_run = False)
         self.optimized = True

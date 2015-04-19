@@ -65,7 +65,7 @@ def flush(msgtype, msg, *args, **kwargs):
       __msg = map(lambda line: msgtype + line, __msg)
       __msg = ("\n" + " " * indent) .join(__msg)
       stdout.write(__msg)
-    
+
     stdout.write('\n')
     stdout.flush()
 
@@ -74,8 +74,8 @@ def __clock():
         stdout.write(datetime.now().strftime("%y %b %d %I:%M:%S") + " ")
 
 def test():
-    result("Logger Levels: %s", Level)    
-    warning("Logger Levels: %s", Level)    
+    result("Logger Levels: %s", Level)
+    warning("Logger Levels: %s", Level)
     info("Logger Levels: %s", Level)
     debug(0, "Logger Levels: %s", Level)
     debug(1, "Logger Levels: %s", Level)

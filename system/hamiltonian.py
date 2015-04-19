@@ -17,7 +17,7 @@ class HamNonInt(object):
             self.Fock = Fock
         log.eassert(H2.shape == (nscsites,) * 4, "H2 shape not compatible with supercell")
         self.H2 = H2
-    
+
     def getH1(self):
         return self.H1
 
@@ -31,18 +31,18 @@ def HubbardHamiltonian(lattice, U, tlist):
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
     H1 = np.zeros((ncells, nscsites, nscsites))
-    
+
     for order, t in enumerate(tlist):
         if abs(t < 1e-7):
             continue
-        log.eassert(order < len(lattice.neighborDist), 
+        log.eassert(order < len(lattice.neighborDist),
             "%dth near neighbor distance unspecified in Lattice object", order+1)
         dis = lattice.neighborDist[order]
         log.warning("Searching neighbor within only one supercell")
         pairs = lattice.neighbor(dis = dis, sitesA = range(nscsites))
         for i, j in pairs:
             H1[j / nscsites, i, j % nscsites] = -t
-    
+
     H2 = np.zeros((nscsites,) * 4)
     for s in range(nscsites):
         H2[s,s,s,s] = U
