@@ -1,6 +1,7 @@
 # define type/symmetry of correlation potential
 # potential fitting algorithms using the symmetry
 # initial guess
+
 import itertools as it
 import numpy as np
 import libdmet.utils.logger as log
@@ -15,9 +16,12 @@ class Vcor(object):
         self.param = param
         self.value = self.evaluate()
 
-    def __call__(self, *args):
+    def __call__(self, i = 0, kspace = True):
         log.eassert(self.value is not None, "Vcor not initialized yet")
-        return self.value
+        if kspace or i == 0:
+            return self.value
+        else:
+            return np.zeros_like(self.value)
 
     def evaluate(self):
         log.error("function evaulate() is not implemented")
