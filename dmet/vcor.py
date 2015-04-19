@@ -15,7 +15,7 @@ class Vcor(object):
         self.param = param
         self.value = self.evaluate()
 
-    def __call__(self):
+    def __call__(self, *args):
         log.eassert(self.value is not None, "Vcor not initialized yet")
         return self.value
 
@@ -27,7 +27,6 @@ class Vcor(object):
 
     def len(self):
         log.error("function len() is not implemented")
-
 
 def VcorLocal(restricted, bogoliubov, nscsites):
     if restricted:
@@ -199,6 +198,10 @@ def VcorLocalPhSymm(bogoliubov, subA, subB):
     vcor.gradient = types.MethodType(gradient, vcor)
     vcor.length = types.MethodType(lambda self: nV+nD, vcor)
     return vcor
+
+def VcorNonLocl(restricted, bogoliubov, ncells, nscsites):
+    # need to replace __call__ function
+    log.error("VcorNonLocal not implemented yet")
 
 def test():
     log.result("Test resctricted potential")
