@@ -110,12 +110,11 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
     else:
         vcorT = np.asarray(map(lambda i: vcor(i, kspace = False), range(lattice.ncells)))
     if rhoT.shape[0] == 1:
-        rhoT = rhoT[0]
-        E = np.sum((FockT+H1T)*rhoT)
+        E = np.sum((FockT+H1T)*rhoT[0])
         if vcor.islocal():
-            E += np.sum(vcorT[0] * rhoT[0])
+            E += np.sum(vcorT[0] * rhoT[0][0])
         else:
-            E += np.sum(vcorT[:,0,:,:] * rhoT)
+            E += np.sum(vcorT[:,0,:,:] * rhoT[0])
     else:
         E = 0.5 * np.sum((FockT+H1T)*(rhoT[0]+rhoT[1]))
         if vcor.islocal():
