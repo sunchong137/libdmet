@@ -6,6 +6,7 @@ import itertools as it
 import numpy as np
 import libdmet.utils.logger as log
 import types
+from scipy.optimize import minimize
 
 class Vcor(object):
     def __init__(self):
@@ -32,8 +33,21 @@ class Vcor(object):
     def gradient(self):
         log.error("function gradient() is not implemented")
 
-    def len(self):
+    def length(self):
         log.error("function len() is not implemented")
+
+def VcorGuess(obj_v, v0):
+    log.eassert(obj_v.islocal(), "This routine is for local vcor")
+    log.eassert(v0.shape == obj_v.gradient().shape[1:], \
+        "The initial guess should have shape %s, rather than %s",
+        v0.shape, obj_v.gradient().shape[1:])
+
+    def fn(x):
+        obj_v.update(x)
+        return np.sum((obj_v() - v0) ** 2)
+
+    res = minimize(fn, np.zeros(obj_v.length()))
+    log.check(fn(res.x) < 1e-6, "symmetrization imposed on initial guess")
 
 def VcorLocal(restricted, bogoliubov, nscsites):
     if restricted:
@@ -194,7 +208,7 @@ def VcorLocalPhSymm(bogoliubov, subA, subB):
 
         def gradient(self):
             if self.grad is None:
-                g = np.zeros((nV+nD, 3, nscsites, nscsites))
+                g = np.zeros((nV, 2, nscsites, nscsites))
                 for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
                     g[idx,0,i,j] = g[idx,0,j,i] = 1
                     g[idx,1,i,j] = g[idx,1,j,i] = -sign(i,j)

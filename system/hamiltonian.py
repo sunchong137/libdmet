@@ -27,7 +27,7 @@ class HamNonInt(object):
     def getFock(self):
         return self.Fock
 
-def HubbardHamiltonian(lattice, U, tlist):
+def HubbardHamiltonian(lattice, U, tlist = [1.]):
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
     H1 = np.zeros((ncells, nscsites, nscsites))
