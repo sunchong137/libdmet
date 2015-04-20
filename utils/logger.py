@@ -73,6 +73,8 @@ def __clock():
     if clock:
         stdout.write(datetime.now().strftime("%y %b %d %I:%M:%S") + " ")
 
+info("libDMET ---- A Period DMET Code\n\tby. Bo-Xiao Zheng\n\t<boxiao.zheng@gmail.com>")
+
 def test():
     result("Logger Levels: %s", Level)
     warning("Logger Levels: %s", Level)
