@@ -142,10 +142,10 @@ class Lattice(object):
     def FFTtoT(self, B):
         A = np.fft.ifftn(B.reshape(tuple(self.csize) + B.shape[-2:]), \
             axes = range(self.dim)).reshape(B.shape)
-        if np.allclose(C.imag, 0.):
-            return C.real
+        if np.allclose(A.imag, 0.):
+            return A.real
         else:
-            return C
+            return A
 
     def kpoints(self):
         return map(lambda d: np.fft.fftfreq(self.csize[d], 1./(2*np.pi)), range(self.dim))
@@ -156,12 +156,12 @@ class Lattice(object):
         bigA = np.zeros((self.nsites, self.nsites))
         nscsites = self.supercell.nsites
         if dense:
-            for i, j in it.product(range(self.ncells, repeat = 2)):
+            for i, j in it.product(range(self.ncells), repeat = 2):
                 idx = self.add(i, j)
                 bigA[i*nscsites:(i+1)*nscsites, idx*nscsites:(idx+1)*nscsites] = A[j]
         else:
             nonzero = filter(lambda j: not np.allclose(A[j], 0.), range(self.ncells))
-            for i, j in it.product(range(self.ncells, nonzero)):
+            for i, j in it.product(range(self.ncells), nonzero):
                 idx = self.add(i, j)
                 bigA[i*nscsites:(i+1)*nscsites, idx*nscsites:(idx+1)*nscsites] = A[j]
         return bigA
@@ -211,13 +211,13 @@ class Lattice(object):
         self.Fock = self.Ham.getFock()
         self.Fock_kspace = self.FFTtoK(self.Fock)
 
-    def getH1(self, kspace = False):
+    def getH1(self, kspace = True):
         if kspace:
             return self.H1_kspace
         else:
             return self.H1
 
-    def getFock(self, kspace = False):
+    def getFock(self, kspace = True):
         if kspace:
             return self.Fock_kspace
         else:

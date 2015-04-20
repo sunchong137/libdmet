@@ -16,6 +16,9 @@ class Vcor(object):
         self.param = param
         self.value = self.evaluate()
 
+    def islocal(self):
+        return True
+
     def __call__(self, i = 0, kspace = True):
         log.eassert(self.value is not None, "Vcor not initialized yet")
         if kspace or i == 0:
