@@ -170,7 +170,8 @@ class Lattice(object):
         # return the transpose of ncells * nscsites * nscsites translational invariant matrix
         AT = np.zeros_like(A)
         for n in range(self.ncells):
-            B[n] = A[self.cell_pos2idx(-self.cell_idx2pos(n))].T
+            AT[n] = A[self.cell_pos2idx(-self.cell_idx2pos(n))].T
+        return AT
 
     """
     get neighbor sites
