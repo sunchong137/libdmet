@@ -4,7 +4,7 @@ import libdmet.utils.logger as log
 from libdmet.system import integral
 
 log.clock = True
-log.verbose = log.Level["INFO"]
+log.verbose = "INFO"
 
 block.Block.nproc = 4
 

@@ -1,7 +1,7 @@
 import libdmet.utils.logger as log
 import numpy as np
 
-log.verbose = log.Level["DEBUG0"]
+log.verbose = "DEBUG0"
 log.clock = True
 
 log.result("I'm result %20.12f", 42)

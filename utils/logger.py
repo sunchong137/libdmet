@@ -11,8 +11,11 @@ stdout = sys.stdout
 verbose = "INFO"
 clock = True
 
+def __verbose():
+    return Level[verbose]
+
 def fatal(msg, *args):
-    if verbose >= Level['FATAL']:
+    if __verbose() >= Level['FATAL']:
         __clock()
         flush("  FATAL ", msg, *args, indent = clock * 19)
 
@@ -22,7 +25,7 @@ def fassert(cond, msg, *args):
         raise Exception
 
 def error(msg, *args):
-    if verbose >= Level['ERR']:
+    if __verbose() >= Level['ERR']:
         __clock()
         flush("  ERROR ", msg, *args, indent = clock * 19)
 
@@ -32,12 +35,12 @@ def eassert(cond, msg, *args):
         raise Exception
 
 def result(msg, *args):
-    if verbose >= Level['RESULT']:
+    if __verbose() >= Level['RESULT']:
         __clock()
         flush("******* ", msg, *args, indent = clock * 19)
 
 def warning(msg, *args):
-    if verbose >= Level['WARNING']:
+    if __verbose() >= Level['WARNING']:
         __clock()
         flush("WARNING ", msg, *args, indent = clock * 19)
 
@@ -46,12 +49,12 @@ def check(cond, msg, *args):
         warning(msg, *args)
 
 def info(msg, *args):
-    if verbose >= Level['INFO']:
+    if __verbose() >= Level['INFO']:
         __clock()
         flush("   INFO ", msg, *args, indent = clock * 19)
 
 def debug(level, msg, *args):
-    if verbose >= Level["DEBUG0"] + level:
+    if __verbose() >= Level["DEBUG0"] + level:
         __clock()
         flush("  DEBUG " + "  " * level, msg, *args, indent = clock * 19)
 
