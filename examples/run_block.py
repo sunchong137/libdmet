@@ -1,7 +1,7 @@
 import numpy as np
 from libdmet.solver import block
 import libdmet.utils.logger as log
-from libdmet.utils import integral
+from libdmet.system import integral
 
 log.clock = True
 log.verbose = log.Level["INFO"]

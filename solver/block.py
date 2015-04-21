@@ -2,7 +2,7 @@ import numpy as np
 import os
 from tempfile import mkdtemp
 import libdmet.utils.logger as log
-from libdmet.utils import integral
+from libdmet.system import integral
 from libdmet.utils.misc import grep
 from copy import deepcopy
 import subprocess as sub
