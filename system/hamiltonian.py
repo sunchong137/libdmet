@@ -4,7 +4,7 @@ import itertools as it
 import libdmet.utils.logger as log
 
 class HamNonInt(object):
-    def __init__(self, lattice, H1, H2, Fock = None):
+    def __init__(self, lattice, H1, H2, Fock = None, ImpJK = None):
         ncells = lattice.ncells
         nscsites = lattice.supercell.nsites
         log.eassert(H1.shape == (ncells, nscsites, nscsites), \
@@ -15,6 +15,12 @@ class HamNonInt(object):
         else:
             log.eassert(Fock.shape == H1.shape, "Fock shape not compatible with lattice")
             self.Fock = Fock
+        if ImpJK is None:
+            self.ImpJK = None
+        else:
+            log.eassert(ImpJK.shape == H1[0].shape, "ImpJK shape not compatible with supercell")
+            self.ImpJK = ImpJK
+
         log.eassert(H2.shape == (nscsites,) * 4, "H2 shape not compatible with supercell")
         self.H2 = H2
 
@@ -26,6 +32,9 @@ class HamNonInt(object):
 
     def getFock(self):
         return self.Fock
+
+    def getImpJK(self):
+        return self.ImpJK
 
 def HubbardHamiltonian(lattice, U, tlist = [1.]):
     ncells = lattice.ncells

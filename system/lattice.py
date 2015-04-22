@@ -129,6 +129,8 @@ class Lattice(object):
     def add(self, i, j):
         return self.cell_pos2idx(self.cell_idx2pos(i) + self.cell_idx2pos(j))
 
+    def substract(self, i, j):
+        return self.cell_pos2idx(self.cell_idx2pos(i) - self.cell_idx2pos(j))
     """
     functions on matrices in the system
     """
@@ -226,6 +228,9 @@ class Lattice(object):
 
     def getH2(self):
         return self.Ham.getH2()
+
+    def getImpJK(self):
+        return self.Ham.getImpJK()
 
 def test():
     chain = ChainLattice(240, 4)
