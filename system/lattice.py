@@ -42,6 +42,18 @@ def translateSites(baseSites, usize, csize):
             map(lambda s: np.dot(c, usize) + s, baseSites), cells)))
     return cells, sites
 
+def BipartiteSquare(impsize):
+    subA = []
+    subB = []
+    for idx, pos in enumerate(it.product(*map(range, impsize))):
+        if np.sum(pos) % 2 == 0:
+            subA.append(idx)
+        else:
+            subB.append(idx)
+    log.eassert(len(subA) == len(subB), \
+        "The impurity cannot be divided into two sublattices")
+    return subA, subB
+
 class UnitCell(object):
     def __init__(self, size, sites):
         # unit cell shape

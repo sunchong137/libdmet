@@ -184,9 +184,16 @@ class Block(object):
         self.bogoliubov = bogoliubov
         self.sys_initialized = True
 
-    def set_integral(self, norb, H0, H1, H2):
+    def set_integral(self, *args):
         log.eassert(self.sys_initialized, "set_integral() should be used after initializing set_system()")
-        self.integral = integral.Integral(norb, self.spinRestricted, self.bogoliubov, H0, H1, H2)
+        if len(args) == 1:
+            # a single integral object
+            self.integral = args[0]
+        elif len(args) == 4:
+            # norb, H0, H1, H2
+            self.integral = integral.Integral(norb, self.spinRestricted, self.bogoliubov, H0, H1, H2)
+        else:
+            log.error("input either an integral object, or (norb, H0, H1, H2)")
         self.integral_initialized = True
 
     def set_schedule(self, schedule):
@@ -292,14 +299,17 @@ class Block(object):
         if self.spinRestricted:
             rho = readpdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
         else:
-            rho = readpdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
+            rho0 = readpdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
+            rho = np.empty((2, self.integral.norb, self.integral.norb))
+            rho[0] = rho0[::2, ::2]
+            rho[1] = rho0[1::2, 1::2]
         if self.bogoliubov:
             kappa = readpdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
             if self.spinRestricted:
                 kappa = (kappa + kappa.T) / 2
             return (rho, kappa)
         else:
-            return (rho, None)
+            return rho
 
     def just_run(self, onepdm = True, dry_run = False):
         log.debug(0, "Run BLOCK")
