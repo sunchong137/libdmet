@@ -60,23 +60,26 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
     log.eassert(beta >= 0, "beta cannot be negative")
     Fock = lattice.getFock(kspace = True)
     if restricted:
+        log.info("restricted Hartree-Fock")
         ew, ev = DiagRHF(Fock, vcor)
         ew = ew[np.newaxis,:]
         ev = ev[np.newaxis,:]
     else:
+        log.info("unrestricted Hartree-Fock")
         ew, ev = DiagUHF(Fock, vcor)
     nelec = ew.size * occ # rhf: per spin  uhf: total nelec
 
     ew_sorted = np.sort(np.ravel(ew))
     if beta < np.inf:
         # finite temperature occupation, n is continuous
+        log.info("thermal occupation T=%10.5f", 1./beta)
         opt = minimize(lambda x: (np.sum(fermi(ew, x, beta)) - nelec)**2, mu0, tol = 5e-6)
         mu = opt.x
         nerr = abs(np.sum(fermi(ew, mu, beta)) - nelec)
         ewocc = fermi(ew, mu, beta)
     else:
         thr_degenerate = 1e-6
-        log.warning("T=0, nelec is rounded to integer nelec = %d (original %.2f)", int(nelec), nelec)
+        log.info("T=0, nelec is rounded to integer nelec = %d (original %.2f)", int(nelec), nelec)
         nelec = int(nelec)
         # we prefer not to change mu
         if np.sum(ew < mu0-thr_degenerate) <= nelec and np.sum(ew <= mu0 + thr_degenerate) >= nelec:
@@ -90,7 +93,10 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
         if nremain_elec > 0:
             # fractional occupation
             remain_orb = np.logical_and(ew <= mu + thr_degenerate, ew >= mu - thr_degenerate)
-            ewocc += (float(nremain_elec) / np.sum(remain_orb)) * remain_orb
+            nremain_orb = np.sum(remain_orb)
+            log.warning("degenerate HOMO-LUMO, assign fractional occupation\n"
+                "%d electrons assigned to %d orbitals", nremain_elec, nremain_orb)
+            ewocc += (float(nremain_elec) / nremain_orb) * remain_orb
         nerr = 0.
 
     rho = np.empty_like(ev)
@@ -123,7 +129,7 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
             E += 0.5 * np.sum(vcorT[:,0,:,:] * rhoT[0] + vcorT[:,1,:,:] * rhoT[1])
 
     if ires:
-        homo, lumo = filter(lambda x: x < mu, ew_sorted)[-1], filter(lambda x: x > mu, ew_sorted)[0]
+        homo, lumo = filter(lambda x: x <= mu, ew_sorted)[-1], filter(lambda x: x >= mu, ew_sorted)[0]
         res = {"gap": lumo - homo, "e": ew, "coef": ev, "nerr": nerr}
         return rhoT, mu, E, res
     else:
