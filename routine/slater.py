@@ -78,7 +78,9 @@ def __embBasis_phsymm(lattice, rho, **kwargs):
     return basis
 
 def embHam(lattice, basis, vcor, local = True, **kwargs):
+    log.info("One-body part")
     Int1e, Int1e_energy = __embHam1e(lattice, basis, vcor, **kwargs)
+    log.info("Two-body part")    
     Int2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
 
     nspin = basis.shape[0]
@@ -120,19 +122,24 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
     H1energy = np.empty((spin, 2*nscsites, 2*nscsites))
 
     for s in range(spin):
+        log.debug(0, "Spin Component %d of %d", s, spin)
         # Fock part first
+        log.debug(1, "transform Fock")
         H1[s] = transform_trans_inv(basis[s], lattice, latFock)
 
         # then add Vcor only in environment
         # need to substract impurity contribution
+        log.debug(1, "transform Vcor")
         H1[s] += transform_local(basis[s], lattice, vcor()[s])
         H1[s] -= transform_imp(basis[s], lattice, vcor()[s])
 
         # substract impurity Fock if necessary
         # i.e. rho_kl[2(ij||kl)-(il||jk)] where i,j,k,l are all impurity
         if ImpJK is not None:
+            log.debug(1, "transform impurity JK")            
             H1[s] -= transform_imp(basis[s], lattice, ImpJK)
-
+        
+        log.debug(1, "transform native H1")
         H1energy[s] = transform_imp_env(basis[s], lattice, latH1)
 
     return H1, H1energy

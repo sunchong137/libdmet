@@ -88,7 +88,7 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
             # otherwise choose between homo and lumo
             mu = 0.5 * (ew_sorted[nelec-1] + ew_sorted[nelec])
 
-        ewocc = 1. * (ew < mu0-thr_degenerate)
+        ewocc = 1. * (ew < mu - thr_degenerate)
         nremain_elec = nelec - np.sum(ewocc)
         if nremain_elec > 0:
             # fractional occupation

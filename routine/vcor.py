@@ -146,7 +146,7 @@ def VcorLocal(restricted, bogoliubov, nscsites):
     vcor.length = types.MethodType(lambda self: nV+nD, vcor)
     return vcor
 
-def VcorLocalPhSymm(bogoliubov, subA, subB):
+def VcorLocalPhSymm(U, bogoliubov, subA, subB):
     # with particle-hole symmetry, on two sublattices
     # specifically for t'=0 Hubbard model at half-filling
     # unrestricted potential is assumed
@@ -181,6 +181,8 @@ def VcorLocalPhSymm(bogoliubov, subA, subB):
                 V[2,i,j] = self.param[idx+nV]
                 if i != j:
                     V[2,j,i] = self.param[idx+nV] * sign(i,j)
+            V[0] += np.eye(nscsites) * (U/2)
+            V[1] += np.eye(nscsites) * (U/2)
             return V
 
         def gradient(self):
@@ -204,6 +206,8 @@ def VcorLocalPhSymm(bogoliubov, subA, subB):
             for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
                 V[0,i,j] = V[0,j,i] = self.param[idx]
                 V[1,i,j] = V[1,j,i] = -self.param[idx] * sign(i,j)
+            V[0] += np.eye(nscsites) * (U/2)
+            V[1] += np.eye(nscsites) * (U/2)
             return V
 
         def gradient(self):
