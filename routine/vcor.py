@@ -5,7 +5,6 @@
 import itertools as it
 import numpy as np
 import libdmet.utils.logger as log
-import types
 from scipy.optimize import minimize
 
 class Vcor(object):
@@ -146,84 +145,6 @@ def VcorLocal(restricted, bogoliubov, nscsites):
     vcor.length = types.MethodType(lambda self: nV+nD, vcor)
     return vcor
 
-def VcorLocalPhSymm(U, bogoliubov, subA, subB):
-    # with particle-hole symmetry, on two sublattices
-    # specifically for t'=0 Hubbard model at half-filling
-    # unrestricted potential is assumed
-    # the symmetry is
-    # VA_{ij} + (-)^{i+j}VB_{ij} = 0
-    # D_{ij} = (-)^{i+j}D_{ji}
-    # AA=+, AB=-, BB=+
-    subA, subB = set(subA), set(subB)
-    log.eassert(len(subA) == len(subB), "number of sites in two sublattices are equal")
-    nscsites = len(subA) * 2
-    log.eassert(subA | subB == set(range(nscsites)), "sublattice designation problematic")
-    nV = nscsites * (nscsites+1) / 2
-
-    vcor = Vcor()
-    vcor.grad = None
-
-    def sign(i,j):
-        if (i in subA) == (j in subA):
-            return 1
-        else:
-            return -1
-
-    if bogoliubov:
-        nD = nscsites * (nscsites+1) / 2
-        def evaluate(self):
-            log.eassert(self.param.shape == (nV+nD,), "wrong parameter shape, require %s", (nV+nD,))
-            V = np.zeros((3, nscsites, nscsites))
-            for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                V[0,i,j] = V[0,j,i] = self.param[idx]
-                V[1,i,j] = V[1,j,i] = -self.param[idx] * sign(i,j)
-            for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                V[2,i,j] = self.param[idx+nV]
-                if i != j:
-                    V[2,j,i] = self.param[idx+nV] * sign(i,j)
-            V[0] += np.eye(nscsites) * (U/2)
-            V[1] += np.eye(nscsites) * (U/2)
-            return V
-
-        def gradient(self):
-            if self.grad is None:
-                g = np.zeros((nV+nD, 3, nscsites, nscsites))
-                for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                    g[idx,0,i,j] = g[idx,0,j,i] = 1
-                    g[idx,1,i,j] = g[idx,1,j,i] = -sign(i,j)
-                for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                    g[idx+nV,2,i,j] = 1
-                    if i != j:
-                        g[idx+nV,2,j,i] = sign(i,j)
-                self.grad = g
-            return self.grad
-
-    else:
-        nD = 0
-        def evaluate(self):
-            log.eassert(self.param.shape == (nV,), "wrong parameter shape, require %s", (nV,))
-            V = np.zeros((2, nscsites, nscsites))
-            for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                V[0,i,j] = V[0,j,i] = self.param[idx]
-                V[1,i,j] = V[1,j,i] = -self.param[idx] * sign(i,j)
-            V[0] += np.eye(nscsites) * (U/2)
-            V[1] += np.eye(nscsites) * (U/2)
-            return V
-
-        def gradient(self):
-            if self.grad is None:
-                g = np.zeros((nV, 2, nscsites, nscsites))
-                for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                    g[idx,0,i,j] = g[idx,0,j,i] = 1
-                    g[idx,1,i,j] = g[idx,1,j,i] = -sign(i,j)
-                self.grad = g
-            return self.grad
-
-    vcor.evaluate = types.MethodType(evaluate, vcor)
-    vcor.gradient = types.MethodType(gradient, vcor)
-    vcor.length = types.MethodType(lambda self: nV+nD, vcor)
-    return vcor
-
 def VcorNonLocl(restricted, bogoliubov, ncells, nscsites):
     # need to replace __call__ function
     log.error("VcorNonLocal not implemented yet")
@@ -246,11 +167,6 @@ def test():
     vcor.update(np.asarray([1,2,3,4,5,6,7,8,9,10]))
     log.result("Vcor:\n%s", vcor())
     log.result("Gradient:\n%s", vcor.gradient())
-
-    log.result("Test particle-hole symmetric potential")
-    vcor = VcorLocalPhSymm(True, [0,3],[1,2])
-    vcor.update(np.asarray(range(1,21)))
-    log.result("Vcor:\n%s", vcor())
 
 if __name__ == "__main__":
     test()
