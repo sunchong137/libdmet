@@ -210,6 +210,8 @@ class Block(object):
         f.write("nroots 1\n")
         f.write("outputlevel %d\n" % self.outputlevel)
         f.write("prefix %s\n" % self.tmpDir)
+        if self.restart or self.optimized:
+            f.write("fullrestart\n")
         if self.bogoliubov:
             f.write("bogoliubov\n")
         if not self.spinAdapted:
