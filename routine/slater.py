@@ -5,6 +5,9 @@ import libdmet.utils.logger as log
 from slater_helper import *
 from tempfile import TemporaryFile
 from libdmet.system import integral
+from fit import minimize
+from mfd import assignocc
+from math import sqrt
 
 tmp = "/tmp"
 
@@ -80,7 +83,7 @@ def __embBasis_phsymm(lattice, rho, **kwargs):
 def embHam(lattice, basis, vcor, local = True, **kwargs):
     log.info("One-body part")
     Int1e, Int1e_energy = __embHam1e(lattice, basis, vcor, **kwargs)
-    log.info("Two-body part")    
+    log.info("Two-body part")
     Int2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
 
     nspin = basis.shape[0]
@@ -131,14 +134,17 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
         # need to substract impurity contribution
         log.debug(1, "transform Vcor")
         H1[s] += transform_local(basis[s], lattice, vcor()[s])
-        H1[s] -= transform_imp(basis[s], lattice, vcor()[s])
+
+        if not "fitting" in kwargs or not kwargs["fitting"]:
+            # for fitting purpose, we need H1 with vcor on impurity
+            H1[s] -= transform_imp(basis[s], lattice, vcor()[s])
 
         # substract impurity Fock if necessary
         # i.e. rho_kl[2(ij||kl)-(il||jk)] where i,j,k,l are all impurity
         if ImpJK is not None:
-            log.debug(1, "transform impurity JK")            
+            log.debug(1, "transform impurity JK")
             H1[s] -= transform_imp(basis[s], lattice, ImpJK)
-        
+
         log.debug(1, "transform native H1")
         H1energy[s] = transform_imp_env(basis[s], lattice, latH1)
 
@@ -167,3 +173,34 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
             H2[idx] = transform_4idx(lattice.getH2(), basis[s1][0], basis[s1][0], \
                 basis[s2][0], basis[s2][0])
     return H2
+
+def FitVcorEmb(rho, lattice, basis, vcor, beta):
+    spin = basis.shape[0]
+    nbasis = basis.shape[3]
+    nscsites = lattice.supercell.nsites
+    nelec = nscsites * spin
+
+    embH1 = np.empty((spin, nbasis, nbasis))
+    for s in range(spin):
+        embH1[s] = transform_trans_inv(basis[s], lattice, lattice.getFock(kspace = False))
+
+    ew = np.empty((spin, nbasis))
+    ev = np.empty((spin, nbasis, nbasis))
+    def errfunc(param):
+        vcor.update(param)
+        for s in range(spin):
+            embHeff = embH1[s] + transform_local(basis[s], lattice, vcor()[s])
+            ew[s], ev[s] = la.eigh(embHeff)
+        ewocc, _, _ = assignocc(ew, nelec, beta, 0.)
+        rho1 = np.empty_like(rho)
+        for s in range(spin):
+            rho1[s] = mdot(ev[s], np.diag(ewocc[s]), ev[s].T)
+
+        return la.norm(rho - rho1) / sqrt(spin)
+
+    param, err = minimize(errfunc, vcor.param)
+    vcor.update(param)
+    return vcor, err
+
+def FitVcorFull(rho, basis, LatH1, vcor0, local = True):
+    pass

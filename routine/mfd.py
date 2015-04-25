@@ -52,9 +52,6 @@ def DiagBdG(Fock, vcor, mu):
         ew[i], ev[i] = la.eigh(temp[i])
     return ew, ev
 
-def fermi(e, mu, beta):
-    return 1./(1.+np.exp(beta * (e-mu)))
-
 def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
     # ires: more results, eg. total energy, gap, ew, ev
     log.eassert(beta >= 0, "beta cannot be negative")
@@ -70,34 +67,7 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
     nelec = ew.size * occ # rhf: per spin  uhf: total nelec
 
     ew_sorted = np.sort(np.ravel(ew))
-    if beta < np.inf:
-        # finite temperature occupation, n is continuous
-        log.info("thermal occupation T=%10.5f", 1./beta)
-        opt = minimize(lambda x: (np.sum(fermi(ew, x, beta)) - nelec)**2, mu0, tol = 5e-6)
-        mu = opt.x
-        nerr = abs(np.sum(fermi(ew, mu, beta)) - nelec)
-        ewocc = fermi(ew, mu, beta)
-    else:
-        thr_degenerate = 1e-6
-        log.info("T=0, nelec is rounded to integer nelec = %d (original %.2f)", int(nelec), nelec)
-        nelec = int(nelec)
-        # we prefer not to change mu
-        if np.sum(ew < mu0-thr_degenerate) <= nelec and np.sum(ew <= mu0 + thr_degenerate) >= nelec:
-            mu = mu0
-        else:
-            # otherwise choose between homo and lumo
-            mu = 0.5 * (ew_sorted[nelec-1] + ew_sorted[nelec])
-
-        ewocc = 1. * (ew < mu - thr_degenerate)
-        nremain_elec = nelec - np.sum(ewocc)
-        if nremain_elec > 0:
-            # fractional occupation
-            remain_orb = np.logical_and(ew <= mu + thr_degenerate, ew >= mu - thr_degenerate)
-            nremain_orb = np.sum(remain_orb)
-            log.warning("degenerate HOMO-LUMO, assign fractional occupation\n"
-                "%d electrons assigned to %d orbitals", nremain_elec, nremain_orb)
-            ewocc += (float(nremain_elec) / nremain_orb) * remain_orb
-        nerr = 0.
+    ewocc, mu, nerr = assignocc(ew, nelec, beta, mu0)
 
     rho = np.empty_like(ev)
     rhoT = np.empty_like(rho)
@@ -134,3 +104,39 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
         return rhoT, mu, E, res
     else:
         return rhoT, mu, E
+
+def fermi(e, mu, beta):
+    return 1./(1.+np.exp(beta * (e-mu)))
+
+def assignocc(ew, nelec, beta, mu0):
+    ew_sorted = np.sort(np.ravel(ew))
+    if beta < np.inf:
+        log.info("thermal occupation T=%10.5f", 1./beta)
+        opt = minimize(lambda x: (np.sum(fermi(ew,x,beta)) - nelec)**2, mu0, tol = 5e-6)
+        mu = opt.x
+        nerr = abs(np.sum(fermi(ew, mu, beta)) - nelec)
+        ewocc = fermi(ew, mu, beta)
+    else:
+        thr_degenerate = 1e-6
+        if (nelec - int(nelec)) > 1e-5:
+            log.info("T=0, nelec is rounded to integer nelec = %d (original %.2f)", int(nelec), nelec)
+        nelec = int(nelec)
+        # we prefer not to change mu
+        if np.sum(ew < mu0-thr_degenerate) <= nelec and np.sum(ew <= mu0 + thr_degenerate) >= nelec:
+            mu = mu0
+        else:
+            # otherwise choose between homo and lumo
+            mu = 0.5 * (ew_sorted[nelec-1] + ew_sorted[nelec])
+
+        ewocc = 1. * (ew < mu - thr_degenerate)
+        nremain_elec = nelec - np.sum(ewocc)
+        if nremain_elec > 0:
+            # fractional occupation
+            remain_orb = np.logical_and(ew <= mu + thr_degenerate, ew >= mu - thr_degenerate)
+            nremain_orb = np.sum(remain_orb)
+            log.warning("degenerate HOMO-LUMO, assign fractional occupation\n"
+                "%d electrons assigned to %d orbitals", nremain_elec, nremain_orb)
+            ewocc += (float(nremain_elec) / nremain_orb) * remain_orb
+        nerr = 0.
+    return ewocc, mu, nerr
+
