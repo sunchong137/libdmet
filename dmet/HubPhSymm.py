@@ -37,7 +37,7 @@ def SolveImpHam(ImpHam, basis, M):
     solver.set_integral(ImpHam)
 
     truncation, energy, onepdm = solver.optimize()
-    return onepdm
+    return onepdm, energy
 
 def InitGuess(ImpSize, U, polar = None):
     subA, subB = BipartiteSquare(ImpSize)
