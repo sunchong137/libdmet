@@ -245,7 +245,7 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     for s in range(spin):
         rhoImp[s] = mdot(basis[s,0], rhoEmb[s], basis[s,0].T)
         nelec += np.trace(rhoImp[s])
-    nelec *= spin
+    nelec *= (2./spin)
 
     if spin == 1:
         Veff = ImpHam.H1["cd"] - H1e["cd"]
