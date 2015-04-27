@@ -58,6 +58,10 @@ def debug(level, msg, *args):
         __clock()
         flush("  DEBUG " + "  " * level, msg, *args, indent = clock * 19)
 
+def time():
+    stdout.write(datetime.now().strftime("%y %b %d %I:%M:%S") + "\n")
+    stdout.flush()
+
 def flush(msgtype, msg, *args, **kwargs):
     indent = 0
     if len(msg) > 0:
