@@ -236,3 +236,25 @@ def FitVcorTwoStep(rho, lattice, basis, vcor, beta, MaxIter1 = 300, MaxIter2 = 2
             MaxIter = MaxIter2)
     log.result("residue = %20.12f", err)
     return vcor_new, err
+
+def transformResults(rhoEmb, E, basis, ImpHam, H1e):
+    spin = rhoEmb.shape[0]
+    nscsites = basis.shape[2]
+    rhoImp = np.empty((spin, nscsites, nscsites))
+    nelec = 0
+    for s in range(spin):
+        rhoImp[s] = mdot(basis[s,0], rhoEmb[s], basis[s,0].T)
+        nelec += np.trace(rhoImp[s])
+    nelec *= spin
+
+    if spin == 1:
+        Veff = ImpHam.H1["cd"] - H1e["cd"]
+    else:
+        Veff = np.asarray([ImpHam.H1["cdA"] - H1e["cdA"], ImpHam.H1["cdB"] - H1e["cdB"]])
+    Efrag = E - np.sum(Veff * rhoEmb) / spin * 2
+    log.result("Local density matrix (impurity):")
+    for s in range(spin):
+        log.result("%s", rhoImp[s])
+    log.result("nelec per site (impurity) = %20.12f", nelec/nscsites)
+    log.result("Energy per site (impurity) = %20.12f", Efrag/nscsites)
+    return rhoImp, Efrag, nelec

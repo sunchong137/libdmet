@@ -2,6 +2,7 @@ from libdmet.system.lattice import ChainLattice, SquareLattice, CubicLattice, Ho
 from libdmet.system.hamiltonian import HubbardHamiltonian as Ham
 from libdmet.routine import vcor, slater
 from libdmet.routine.slater import FitVcorTwoStep as FitVcor
+from libdmet.routine.slater import transformResults
 from libdmet.routine.mfd import HF
 from libdmet.solver import block
 import libdmet.utils.logger as log
@@ -14,9 +15,10 @@ schedule = block.Schedule()
 
 def HartreeFock(Lat, v, U):
     rho, mu, E, res = HF(Lat, v, 0.5, False, mu0 = U/2, beta = np.inf, ires = True)
-    log.result("Local density matrix:\n%s\n%s", rho[0][0], rho[1][0])
-    log.result("Chemical potential = %20.12f\tEnergy = %20.12f", mu, E)
-    log.result("Gap = %20.12f" % res["gap"])
+    log.result("Local density matrix (mean-field):\n%s\n%s", rho[0][0], rho[1][0])
+    log.result("Chemical potential (mean-field) = %20.12f", mu)
+    log.result("Energy per site (mean-field) = %20.12f", E/Lat.supercell.nsites)
+    log.result("Gap (mean-field) = %20.12f" % res["gap"])
     return rho, mu
 
 def ConstructImpHam(Lat, rho, v):
