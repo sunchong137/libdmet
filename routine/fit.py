@@ -86,4 +86,8 @@ def minimize(fn, x0, MaxIter = 300, **kwargs):
         y = y_new
         log.debug(2, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
 
+    if multi:
+        p.close()
+        p.join()
+
     return x, y
