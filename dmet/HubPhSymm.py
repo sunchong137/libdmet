@@ -130,3 +130,16 @@ def VcorLocalPhSymm(U, bogoliubov, subA, subB):
     v.length = types.MethodType(lambda self: nV+nD, v)
     return v
 
+class IterHistory(object):
+    def __init__(self, Lat):
+        self.history = []
+        self.nscsites = Lat.supercell.nsites
+
+    def update(self, energy, err, nelec, dvcor, dc):
+        self.history.append([energy/self.nscsites, err, nelec/self.nscsites, dvcor, dc.nDim, dc.iNext])
+        log.section("\nDMET Progress\n")
+        log.result("  Iter         Energy               RdmErr         " \
+            "       Nelec                 dVcor      DIIS")
+        for idx, item in enumerate(self.history):
+            log.result(" %3d %20.12f %20.12f %20.12f %20.12f  %2d %2d", idx, *item)
+        log.result("")

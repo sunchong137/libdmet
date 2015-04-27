@@ -25,8 +25,11 @@ dc = FDiisContext(DiisDim)
 
 conv = False
 
+history = dmet.IterHistory(Lat)
+
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
+
     log.section("\nsolving mean-field problem\n")
     log.result("Vcor =\n%s", vcor.get())
     rho, mu = dmet.HartreeFock(Lat, vcor, U)
@@ -39,7 +42,9 @@ for iter in range(MaxIter):
 
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, vcor, np.inf)
-    if la.norm(vcor.get() - vcor_new.get()) < 1e-4:
+    history.update(EnergyImp, err, nelecImp, np.max(abs(vcor.get() - vcor_new.get())), dc)
+
+    if np.max(abs(vcor.get() - vcor_new.get())) < 1e-5:
         conv = True
         break
     # DIIS
@@ -47,3 +52,8 @@ for iter in range(MaxIter):
         skipDiis = (iter < 4) and (la.norm(vcor_new.param - vcor.param) > 0.01)
         pvcor, _, _ = dc.Apply(vcor_new.param, vcor_new.param - vcor.param, Skip = skipDiis)
         vcor.update(pvcor)
+
+if conv:
+    log.result("DMET converged")
+else:
+    log.result("DMET cannot converge")
