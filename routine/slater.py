@@ -8,6 +8,7 @@ from libdmet.system import integral
 from fit import minimize
 from mfd import assignocc, HF
 from math import sqrt
+from copy import deepcopy
 
 tmp = "/tmp"
 
@@ -44,13 +45,12 @@ def __embBasis_proj(lattice, rho, **kwargs):
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
     spin = rho.shape[0]
-    rhobig = lattice.expand(rho[0])
     basis = np.zeros((spin, ncells, nscsites, nscsites * 2))
     for s in range(spin):
         A = MatSqrt(rho[s,0])
-        B1 = np.swapaxes(rho[s,1:], 0, 1).reshape((nscsites, -1))
-        B1 = np.dot(la.inv(A), B1).T
-        B1 = normalizeBasis(B1)
+        #B1 = np.swapaxes(rho[s,1:], 0, 1).reshape((nscsites, -1))
+        #B1 = np.dot(la.inv(A), B1).T
+        #B1 = normalizeBasis(B1)
         B = np.swapaxes(np.tensordot(la.inv(A), rho[s], axes = (1,1)), 0, 1)[1:]
         B = np.swapaxes(B, 1, 2)
         B = normalizeBasis1(B)
@@ -122,14 +122,14 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
     ImpJK = lattice.getImpJK()
     spin = basis.shape[0]
     H1 = np.empty((spin, 2*nscsites, 2*nscsites))
+    H11 = np.empty((spin, 2*nscsites, 2*nscsites))
     H1energy = np.empty((spin, 2*nscsites, 2*nscsites))
 
     for s in range(spin):
         log.debug(0, "Spin Component %d of %d", s, spin)
         # Fock part first
         log.debug(1, "transform Fock")
-        H1[s] = transform_trans_inv(basis[s], lattice, latFock)
-
+        H1[s] = transform_trans_inv_sparse(basis[s], lattice, latFock)
         # then add Vcor only in environment
         # need to substract impurity contribution
         log.debug(1, "transform Vcor")
@@ -182,10 +182,11 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
 
     embH1 = np.empty((spin, nbasis, nbasis))
     for s in range(spin):
-        embH1[s] = transform_trans_inv(basis[s], lattice, lattice.getFock(kspace = False))
+        embH1[s] = transform_trans_inv_sparse(basis[s], lattice, lattice.getFock(kspace = False))
 
     ew = np.empty((spin, nbasis))
     ev = np.empty((spin, nbasis, nbasis))
+
     def errfunc(param):
         vcor.update(param)
         for s in range(spin):
@@ -205,18 +206,33 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
 def FitVcorFull(rho, lattice, basis, vcor, beta, MaxIter = 20, **kwargs):
     spin = basis.shape[0]
     nbasis = basis.shape[3]
-    rho1 = np.empty_like(rho)
+    rho1 = np.empty((spin, nbasis, nbasis))
 
     def errfunc(param):
         vcor.update(param)
+        verbose = log.verbose
         log.verbose = "RESULT"
         rhoT, _, _ = HF(lattice, vcor, 0.5, spin == 1, mu0 = 0., beta = beta)
-        log.verbose = "DEBUG2"
+        log.verbose = verbose
         for s in range(spin):
-            rho1[s] = transform_trans_inv(basis[s], lattice, rhoT[s])
+            rho1[s] = transform_trans_inv_sparse(basis[s], lattice, rhoT[s], thr = 1e-6)
         return la.norm(rho - rho1) / sqrt(spin)
 
     param, err = minimize(errfunc, vcor.param, MaxIter, **kwargs)
     vcor.update(param)
     return vcor, err
 
+def FitVcorTwoStep(rho, lattice, basis, vcor, beta, MaxIter1 = 300, MaxIter2 = 20):
+    vcor_new = deepcopy(vcor)
+    log.result("Using two-step vcor fitting")
+    if MaxIter1 > 0:
+        log.info("Impurity model stage  max %d steps", MaxIter1)
+        vcor_new, err = FitVcorEmb(rho, lattice, basis, vcor_new, beta, \
+            MaxIter = MaxIter1, serial = True)
+        log.info("residue = %20.12f", err)
+    if MaxIter2 > 0:
+        log.info("Full lattice stage  max %d steps", MaxIter2)
+        vcor_new, err = FitVcorFull(rho, lattice, basis, vcor_new, beta, \
+            MaxIter = MaxIter2)
+    log.result("residue = %20.12f", err)
+    return vcor_new, err

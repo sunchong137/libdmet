@@ -9,3 +9,6 @@ def mdot(*args):
     for a in args[1:]:
       r = np.dot(r, a)
     return r
+
+def find(x, l):
+    return [i for i, v in enumerate(l) if v == x]

@@ -22,7 +22,7 @@ def minimize(fn, x0, MaxIter = 300, **kwargs):
 
     def grad(x):
         g = np.zeros_like(x)
-        step = 1e-6
+        step = 1e-5
         def gix(ix):
             dx = np.zeros_like(x)
             dx[ix] = step
@@ -57,6 +57,10 @@ def minimize(fn, x0, MaxIter = 300, **kwargs):
             break
 
         g = grad(x)
+
+        if la.norm(g) < 1e-5:
+            break
+
         dx = GetDir(y, g)
 
         LineSearchFn = lambda step: fn(x - step * dx)
@@ -79,15 +83,11 @@ def minimize(fn, x0, MaxIter = 300, **kwargs):
         dx *= step
         y_new = fn(x - dx)
 
-        if y_new > y * 1.5 or la.norm(dx) < 1e-6:
+        if y_new > y * 1.5 or abs(y - y_new) < 1e-7 or la.norm(dx) < 1e-6:
             break
 
         x -= dx
         y = y_new
         log.debug(2, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
-
-    if multi:
-        p.close()
-        p.join()
 
     return x, y

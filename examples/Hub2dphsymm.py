@@ -24,9 +24,5 @@ for iter in range(MaxIter):
     rho, mu = dmet.HartreeFock(Lat, vcor, U)
     ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
     onepdm, E = dmet.SolveImpHam(ImpHam, basis, M)
-    log.verbose = "DEBUG2"
-    vcor_new = deepcopy(vcor)
-    vcor_new, _ = dmet.slater.FitVcorEmb(onepdm, Lat, basis, vcor_new, np.inf, serial = True)
-    vcor_new, _ = dmet.slater.FitVcorFull(onepdm, Lat, basis, vcor_new, np.inf)
-    log.verbose = "INFO"
+    vcor_new, err = dmet.FitVcor(onepdm, Lat, basis, vcor, np.inf)
     vcor = vcor_new

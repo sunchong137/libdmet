@@ -1,6 +1,7 @@
 from libdmet.system.lattice import ChainLattice, SquareLattice, CubicLattice, HoneycombLattice, BipartiteSquare
 from libdmet.system.hamiltonian import HubbardHamiltonian as Ham
 from libdmet.routine import vcor, slater
+from libdmet.routine.slater import FitVcorTwoStep as FitVcor
 from libdmet.routine.mfd import HF
 from libdmet.solver import block
 import libdmet.utils.logger as log
