@@ -204,7 +204,7 @@ class Block(object):
             self.integral = args[0]
         elif len(args) == 4:
             # norb, H0, H1, H2
-            self.integral = integral.Integral(norb, self.spinRestricted, self.bogoliubov, H0, H1, H2)
+            self.integral = integral.Integral(args[0], self.spinRestricted, self.bogoliubov, *args[1:])
         else:
             log.error("input either an integral object, or (norb, H0, H1, H2)")
         self.integral_initialized = True
@@ -383,8 +383,11 @@ class Block(object):
             startPath = self.tmpShared
 
         # just copy configure file
-        sub.check_call(Block.mpipernode + ["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
+        sub.check_call(["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
             os.path.join(startPath, "dmrg.conf.%03d" % (self.count))])
+        with open(os.path.join(startPath, "dmrg.conf.%03d" % (self.count)), "a") as f:
+            f.write("fullrestart\n")
+
         intFile = os.path.join(startPath, "FCIDUMP")
         integral.dump(intFile, self.integral, Block.intFormat)
         if Block.nnode > 1:
