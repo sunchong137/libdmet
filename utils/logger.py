@@ -5,7 +5,7 @@ from datetime import datetime
 Logger
 """
 
-Level = dict(zip("FATAL ERR RESULT WARNING INFO DEBUG0 DEBUG1 DEBUG2".split(), range(8)))
+Level = dict(zip("FATAL ERR SECTION RESULT WARNING INFO DEBUG0 DEBUG1 DEBUG2".split(), range(8)))
 
 stdout = sys.stdout
 verbose = "INFO"
@@ -34,6 +34,11 @@ def eassert(cond, msg, *args):
         error(msg, *args)
         raise Exception
 
+def section(msg, *args):
+    if __verbose() >= Level['SECTION']:
+        __clock()
+        flush("####### ", msg, *args, indent = clock * 19)
+
 def result(msg, *args):
     if __verbose() >= Level['RESULT']:
         __clock()
@@ -59,7 +64,7 @@ def debug(level, msg, *args):
         flush("  DEBUG " + "  " * level, msg, *args, indent = clock * 19)
 
 def time():
-    stdout.write(datetime.now().strftime("%y %b %d %I:%M:%S") + "\n")
+    stdout.write(datetime.now().strftime("%y %b %d %H:%M:%S") + "\n")
     stdout.flush()
 
 def flush(msgtype, msg, *args, **kwargs):
@@ -78,7 +83,7 @@ def flush(msgtype, msg, *args, **kwargs):
 
 def __clock():
     if clock:
-        stdout.write(datetime.now().strftime("%y %b %d %I:%M:%S") + " ")
+        stdout.write(datetime.now().strftime("%y %b %d %H:%M:%S") + " ")
 
 info("libDMET ---- A Period DMET Code\n\tby. Bo-Xiao Zheng\n\t<boxiao.zheng@gmail.com>")
 
