@@ -174,7 +174,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
                 basis[s2][0], basis[s2][0])
     return H2
 
-def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300):
+def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
     spin = basis.shape[0]
     nbasis = basis.shape[3]
     nscsites = lattice.supercell.nsites
@@ -198,11 +198,11 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300):
 
         return la.norm(rho - rho1) / sqrt(spin)
 
-    param, err = minimize(errfunc, vcor.param, MaxIter)
+    param, err = minimize(errfunc, vcor.param, MaxIter, **kwargs)
     vcor.update(param)
     return vcor, err
 
-def FitVcorFull(rho, lattice, basis, vcor, beta, MaxIter = 20):
+def FitVcorFull(rho, lattice, basis, vcor, beta, MaxIter = 20, **kwargs):
     spin = basis.shape[0]
     nbasis = basis.shape[3]
     rho1 = np.empty_like(rho)
@@ -216,7 +216,7 @@ def FitVcorFull(rho, lattice, basis, vcor, beta, MaxIter = 20):
             rho1[s] = transform_trans_inv(basis[s], lattice, rhoT[s])
         return la.norm(rho - rho1) / sqrt(spin)
 
-    param, err = minimize(errfunc, vcor.param, MaxIter)
+    param, err = minimize(errfunc, vcor.param, MaxIter, **kwargs)
     vcor.update(param)
     return vcor, err
 
