@@ -6,7 +6,7 @@ from slater_helper import *
 from tempfile import TemporaryFile
 from libdmet.system import integral
 from fit import minimize
-from mfd import assignocc
+from mfd import assignocc, HF
 from math import sqrt
 
 tmp = "/tmp"
@@ -133,11 +133,11 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
         # then add Vcor only in environment
         # need to substract impurity contribution
         log.debug(1, "transform Vcor")
-        H1[s] += transform_local(basis[s], lattice, vcor()[s])
+        H1[s] += transform_local(basis[s], lattice, vcor.get()[s])
 
         if not "fitting" in kwargs or not kwargs["fitting"]:
             # for fitting purpose, we need H1 with vcor on impurity
-            H1[s] -= transform_imp(basis[s], lattice, vcor()[s])
+            H1[s] -= transform_imp(basis[s], lattice, vcor.get()[s])
 
         # substract impurity Fock if necessary
         # i.e. rho_kl[2(ij||kl)-(il||jk)] where i,j,k,l are all impurity
@@ -174,7 +174,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
                 basis[s2][0], basis[s2][0])
     return H2
 
-def FitVcorEmb(rho, lattice, basis, vcor, beta):
+def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300):
     spin = basis.shape[0]
     nbasis = basis.shape[3]
     nscsites = lattice.supercell.nsites
@@ -189,7 +189,7 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta):
     def errfunc(param):
         vcor.update(param)
         for s in range(spin):
-            embHeff = embH1[s] + transform_local(basis[s], lattice, vcor()[s])
+            embHeff = embH1[s] + transform_local(basis[s], lattice, vcor.get()[s])
             ew[s], ev[s] = la.eigh(embHeff)
         ewocc, _, _ = assignocc(ew, nelec, beta, 0.)
         rho1 = np.empty_like(rho)
@@ -198,9 +198,25 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta):
 
         return la.norm(rho - rho1) / sqrt(spin)
 
-    param, err = minimize(errfunc, vcor.param)
+    param, err = minimize(errfunc, vcor.param, MaxIter)
     vcor.update(param)
     return vcor, err
 
-def FitVcorFull(rho, basis, LatH1, vcor0, local = True):
-    pass
+def FitVcorFull(rho, lattice, basis, vcor, beta, MaxIter = 20):
+    spin = basis.shape[0]
+    nbasis = basis.shape[3]
+    rho1 = np.empty_like(rho)
+
+    def errfunc(param):
+        vcor.update(param)
+        log.verbose = "RESULT"
+        rhoT, _, _ = HF(lattice, vcor, 0.5, spin == 1, mu0 = 0., beta = beta)
+        log.verbose = "DEBUG2"
+        for s in range(spin):
+            rho1[s] = transform_trans_inv(basis[s], lattice, rhoT[s])
+        return la.norm(rho - rho1) / sqrt(spin)
+
+    param, err = minimize(errfunc, vcor.param, MaxIter)
+    vcor.update(param)
+    return vcor, err
+

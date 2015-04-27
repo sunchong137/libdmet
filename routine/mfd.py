@@ -24,7 +24,7 @@ def DiagRHF(Fock, vcor):
     ew = np.empty((ncells, nscsites))
     ev = np.empty((ncells, nscsites, nscsites), dtype = complex)
     for i in range(ncells):
-        ew[i], ev[i] = la.eigh(Fock[i] + vcor(i, True)[0])
+        ew[i], ev[i] = la.eigh(Fock[i] + vcor.get(i, True)[0])
     return ew, ev
 
 def DiagUHF(Fock, vcor):
@@ -33,8 +33,8 @@ def DiagUHF(Fock, vcor):
     ew = np.empty((2, ncells, nscsites))
     ev = np.empty((2, ncells, nscsites, nscsites), dtype = complex)
     for i in range(ncells):
-        ew[0][i], ev[0][i] = la.eigh(Fock[i] + vcor(i, True)[0])
-        ew[1][i], ev[1][i] = la.eigh(Fock[i] + vcor(i, True)[1])
+        ew[0][i], ev[0][i] = la.eigh(Fock[i] + vcor.get(i, True)[0])
+        ew[1][i], ev[1][i] = la.eigh(Fock[i] + vcor.get(i, True)[1])
     return ew, ev
 
 def DiagBdG(Fock, vcor, mu):
@@ -45,10 +45,10 @@ def DiagBdG(Fock, vcor, mu):
     temp = np.empty(nscsites * 2, nscsites * 2)
 
     for i in range(ncells):
-        temp[:nscsites, :nscsites] = Fock[0][i] + vcor(i, True)[0] - mu * np.eye(nscsites)
-        temp[nscsites:, nscsites:] = -H1[1][i] - vcor(i, True)[1] + mu * np.eye(nscsites)
-        temp[:nscsites, nscsites:] = vcor(i, True)[2]
-        temp[nscsites:, :nscsites] = vcor(i, True)[2].T
+        temp[:nscsites, :nscsites] = Fock[0][i] + vcor.get(i, True)[0] - mu * np.eye(nscsites)
+        temp[nscsites:, nscsites:] = -H1[1][i] - vcor.get(i, True)[1] + mu * np.eye(nscsites)
+        temp[:nscsites, nscsites:] = vcor.get(i, True)[2]
+        temp[nscsites:, :nscsites] = vcor.get(i, True)[2].T
         ew[i], ev[i] = la.eigh(temp[i])
     return ew, ev
 
@@ -82,9 +82,9 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
 
     FockT, H1T = lattice.getFock(kspace = False), lattice.getH1(kspace = False)
     if vcor.islocal():
-        vcorT = vcor(0, kspace = False)
+        vcorT = vcor.get(0, kspace = False)
     else:
-        vcorT = np.asarray(map(lambda i: vcor(i, kspace = False), range(lattice.ncells)))
+        vcorT = np.asarray(map(lambda i: vcor.get(i, kspace = False), range(lattice.ncells)))
     if rhoT.shape[0] == 1:
         E = np.sum((FockT+H1T)*rhoT[0])
         if vcor.islocal():

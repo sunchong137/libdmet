@@ -139,6 +139,19 @@ class Schedule(object):
 
         return text
 
+def readpdm(filename):
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    nsites = int(lines[0])
+    pdm = np.zeros((nsites, nsites))
+
+    for line in lines[1:]:
+        tokens = line.split(" ")
+        pdm[int(tokens[0]), int(tokens[1])] = float(tokens[2])
+
+    return pdm
+
 class Block(object):
 
     execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../block"))
@@ -285,19 +298,6 @@ class Block(object):
         return tuple(results)
 
     def onepdm(self):
-        def readpdm(filename):
-            with open(filename, "r") as f:
-                lines = f.readlines()
-
-            nsites = int(lines[0])
-            pdm = np.zeros((nsites, nsites))
-
-            for line in lines[1:]:
-                tokens = line.split(" ")
-                pdm[int(tokens[0]), int(tokens[1])] = float(tokens[2])
-
-            return pdm
-
         if self.spinRestricted:
             rho = readpdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
         else:

@@ -19,7 +19,7 @@ class Vcor(object):
     def islocal(self):
         return True
 
-    def __call__(self, i = 0, kspace = True):
+    def get(self, i = 0, kspace = True):
         log.eassert(self.value is not None, "Vcor not initialized yet")
         if kspace or i == 0:
             return self.value
@@ -43,7 +43,7 @@ def VcorGuess(obj_v, v0):
 
     def fn(x):
         obj_v.update(x)
-        return np.sum((obj_v() - v0) ** 2)
+        return np.sum((obj_v.get() - v0) ** 2)
 
     res = minimize(fn, np.zeros(obj_v.length()))
     log.check(fn(res.x) < 1e-6, "symmetrization imposed on initial guess")
@@ -61,7 +61,7 @@ def VcorLocal(restricted, bogoliubov, nscsites):
     else:
         nD = 0
 
-    vcor = Vcor()
+    vcor = Vcor.get()
     vcor.grad = None
 
     if restricted and not bogoliubov:
@@ -153,19 +153,19 @@ def test():
     log.result("Test resctricted potential")
     vcor = VcorLocal(True, False, 4)
     vcor.update(np.asarray([2,1,0,-1,3,4,2,1,2,3]))
-    log.result("Vcor:\n%s", vcor())
+    log.result("Vcor:\n%s", vcor.get())
     log.result("Gradient:\n%s", vcor.gradient())
 
     log.result("Test unresctricted potential")
     vcor = VcorLocal(False, False, 2)
     vcor.update(np.asarray([2,1,0,-1,3,4]))
-    log.result("Vcor:\n%s", vcor())
+    log.result("Vcor:\n%s", vcor.get())
     log.result("Gradient:\n%s", vcor.gradient())
 
     log.result("Test unresctricted Bogoliubov potential")
     vcor = VcorLocal(False, True, 2)
     vcor.update(np.asarray([1,2,3,4,5,6,7,8,9,10]))
-    log.result("Vcor:\n%s", vcor())
+    log.result("Vcor:\n%s", vcor.get())
     log.result("Gradient:\n%s", vcor.gradient())
 
 if __name__ == "__main__":
