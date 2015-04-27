@@ -19,19 +19,20 @@ def HartreeFock(Lat, v, U):
     return rho, mu
 
 def ConstructImpHam(Lat, rho, v):
-    log.result("Making embedding basis")    
+    log.result("Making embedding basis")
     basis = slater.embBasis(Lat, rho, local = True)
-    log.result("Constructing impurity Hamiltonian")    
+    log.result("Constructing impurity Hamiltonian")
     ImpHam, H1e = slater.embHam(Lat, basis, v, local = True)
 
     return ImpHam, H1e, basis
 
 def SolveImpHam(ImpHam, basis, M):
     if not solver.sys_initialized:
-        solver.set_system(ImpHam.norb, 0, False, False, False)     
+        solver.set_system(ImpHam.norb, 0, False, False, False)
     if not solver.optimized:
         schedule.gen_initial(minM = 100, maxM = M)
     else:
+        schedule.maxiter = 16
         schedule.gen_restart(M)
     solver.set_schedule(schedule)
     solver.set_integral(ImpHam)
