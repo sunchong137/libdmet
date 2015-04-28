@@ -74,6 +74,15 @@ def transform_imp_env(basis, lattice, H):
     res = 0.5 * (res + res.T)
     return res
 
+def transform_scalar(basis, lattice, s):
+    # for example, chemical potential
+    ncells = lattice.ncells
+    nbasis = basis.shape[2]
+    res = np.zeros((nbasis, nbasis))
+    for i in range(ncells):
+        res += np.dot(basis[i].T, basis[i]) # does this actually give I?
+    res *= s
+
 def transform_4idx(vijkl, ip, jq, kr, ls):
     return np.swapaxes(np.tensordot(np.swapaxes(np.tensordot(np.swapaxes(np.tensordot(jq, \
         np.swapaxes(np.tensordot(ip, vijkl, axes = (0,0)),0,1), \

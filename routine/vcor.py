@@ -35,115 +35,18 @@ class Vcor(object):
     def length(self):
         log.error("function len() is not implemented")
 
-def VcorGuess(obj_v, v0):
-    log.eassert(obj_v.islocal(), "This routine is for local vcor")
-    log.eassert(v0.shape == obj_v.gradient().shape[1:], \
-        "The initial guess should have shape %s, rather than %s",
-        v0.shape, obj_v.gradient().shape[1:])
+    def assign(self, v0):
+        log.eassert(self.islocal(), "This routine is for local vcor only")
+        log.eassert(v0.shape == self.gradient().shape[1:], \
+            "The initial guess should have shape %s, rather than %s",
+            v0.shape, self.gradient().shape[1:])
 
-    def fn(x):
-        obj_v.update(x)
-        return np.sum((obj_v.get() - v0) ** 2)
+        def fn(x):
+            self.update(x)
+            return np.sum((self.get() - v0) ** 2)
 
-    res = minimize(fn, np.zeros(obj_v.length()))
-    log.check(fn(res.x) < 1e-6, "symmetrization imposed on initial guess")
-
-def VcorLocal(restricted, bogoliubov, nscsites):
-    if restricted:
-        nV = nscsites * (nscsites + 1) / 2
-    else:
-        nV = nscsites * (nscsites + 1)
-
-    if bogoliubov and restricted:
-        nD = nscsites * (nscsites + 1) / 2
-    elif bogoliubov and not restricted:
-        nD = nscsites * nscsites
-    else:
-        nD = 0
-
-    vcor = Vcor.get()
-    vcor.grad = None
-
-    if restricted and not bogoliubov:
-        def evaluate(self):
-            log.eassert(self.param.shape == (nV,), "wrong parameter, require %s", (nV,))
-            V = np.zeros((1, nscsites, nscsites))
-            for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                V[0,i,j] = V[0,j,i] = self.param[idx]
-            return V
-
-        def gradient(self):
-            if self.grad is None:
-                g = np.zeros((nV, 1, nscsites, nscsites))
-                for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                    g[idx,0,i,j] = g[idx,0,j,i] = 1
-                self.grad = g
-            return self.grad
-
-    elif not restricted and not bogoliubov:
-        def evaluate(self):
-            log.eassert(self.param.shape == (nV,), "wrong parameter shape, require %s", (nV,))
-            V = np.zeros((2, nscsites, nscsites))
-            for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                V[0,i,j] = V[0,j,i] = self.param[idx]
-                V[1,i,j] = V[1,j,i] = self.param[idx + nV/2]
-            return V
-
-        def gradient(self):
-            if self.grad is None:
-                g = np.zeros((nV, 2, nscsites, nscsites))
-                for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                    g[idx,0,i,j] = g[idx,0,j,i] = 1
-                    g[idx+nV/2,1,i,j] = g[idx+nV/2,1,j,i] = 1
-                self.grad = g
-            return self.grad
-
-    elif restricted and bogoliubov:
-        def evaluate(self):
-            log.eassert(self.param.shape == (nV+nD,), "wrong parameter shape, require %s", (nV+nD,))
-            V = np.zeros((3, nscsites, nscsites))
-            for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                V[0,i,j] = V[0,j,i] = self.param[idx]
-                V[1,i,j] = V[1,j,i] = self.param[idx]
-                V[2,i,j] = V[2,j,i] = self.param[idx+nV]
-            return V
-
-        def gradient(self):
-            if self.grad is None:
-                g = np.zeros((nV+nD, 3, nscsites, nscsites))
-                for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                    g[idx,0,i,j] = g[idx,0,j,i] = 1
-                    g[idx,1,i,j] = g[idx,1,j,i] = 1
-                    g[idx+nV,2,i,j] = g[idx+nV,2,j,i] = 1
-                self.grad = g
-            return self.grad
-
-    else:
-        def evaluate(self):
-            log.eassert(self.param.shape == (nV+nD,), "wrong parameter shape, require %s", (nV+nD,))
-            V = np.zeros((3, nscsites, nscsites))
-            for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                V[0,i,j] = V[0,j,i] = self.param[idx]
-                V[1,i,j] = V[1,j,i] = self.param[idx+nV/2]
-            for idx, (i,j) in enumerate(it.product(range(nscsites), repeat = 2)):
-                V[2,i,j] = self.param[idx+nV]
-            return V
-
-        def gradient(self):
-            if self.grad is None:
-                g = np.zeros((nV+nD, 3, nscsites, nscsites))
-                for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
-                    g[idx,0,i,j] = g[idx,0,j,i] = 1
-                    g[idx+nV/2,1,i,j] = g[idx+nV/2,1,j,i] = 1
-                for idx, (i,j) in enumerate(it.product(range(nscsites), repeat = 2)):
-                    g[idx+nV,2,i,j] = 1
-                self.grad = g
-            return self.grad
-
-    vcor.evaluate = types.MethodType(evaluate, vcor)
-    vcor.gradient = types.MethodType(gradient, vcor)
-    vcor.length = types.MethodType(lambda self: nV+nD, vcor)
-    return vcor
+        res = minimize(fn, np.zeros(self.length()), tol = 1e-10)
+        log.check(fn(res.x) < 1e-6, "symmetrization imposed on initial guess")
 
 def VcorNonLocl(restricted, bogoliubov, ncells, nscsites):
     # need to replace __call__ function
