@@ -203,7 +203,7 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
     vcor.update(param)
     return vcor, err
 
-def FitVcorFull(rho, lattice, basis, vcor, beta, MaxIter = 20, **kwargs):
+def FitVcorFull(rho, lattice, basis, vcor, beta, filling, MaxIter = 20, **kwargs):
     spin = basis.shape[0]
     nbasis = basis.shape[3]
     rho1 = np.empty((spin, nbasis, nbasis))
@@ -212,7 +212,7 @@ def FitVcorFull(rho, lattice, basis, vcor, beta, MaxIter = 20, **kwargs):
         vcor.update(param)
         verbose = log.verbose
         log.verbose = "RESULT"
-        rhoT, _, _ = HF(lattice, vcor, 0.5, spin == 1, mu0 = 0., beta = beta)
+        rhoT, _, _ = HF(lattice, vcor, filling, spin == 1, mu0 = 0., beta = beta)
         log.verbose = verbose
         for s in range(spin):
             rho1[s] = transform_trans_inv_sparse(basis[s], lattice, rhoT[s], thr = 1e-6)
@@ -222,7 +222,7 @@ def FitVcorFull(rho, lattice, basis, vcor, beta, MaxIter = 20, **kwargs):
     vcor.update(param)
     return vcor, err
 
-def FitVcorTwoStep(rho, lattice, basis, vcor, beta, MaxIter1 = 300, MaxIter2 = 20):
+def FitVcorTwoStep(rho, lattice, basis, vcor, beta, filling, MaxIter1 = 300, MaxIter2 = 20):
     vcor_new = deepcopy(vcor)
     log.result("Using two-step vcor fitting")
     if MaxIter1 > 0:
@@ -233,7 +233,7 @@ def FitVcorTwoStep(rho, lattice, basis, vcor, beta, MaxIter1 = 300, MaxIter2 = 2
     if MaxIter2 > 0:
         log.info("Full lattice stage  max %d steps", MaxIter2)
         vcor_new, err = FitVcorFull(rho, lattice, basis, vcor_new, beta, \
-            MaxIter = MaxIter2)
+            filling, MaxIter = MaxIter2)
     log.result("residue = %20.12f", err)
     return vcor_new, err
 
