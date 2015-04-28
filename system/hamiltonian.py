@@ -42,7 +42,7 @@ def HubbardHamiltonian(lattice, U, tlist = [1.]):
     H1 = np.zeros((ncells, nscsites, nscsites))
 
     for order, t in enumerate(tlist):
-        if abs(t < 1e-7):
+        if abs(t) < 1e-7:
             continue
         log.eassert(order < len(lattice.neighborDist),
             "%dth near neighbor distance unspecified in Lattice object", order+1)
