@@ -2,8 +2,8 @@ from libdmet.system.lattice import ChainLattice, SquareLattice, CubicLattice, Ho
 from libdmet.system.hamiltonian import HubbardHamiltonian as Ham
 from libdmet.routine import vcor, slater
 from libdmet.routine.slater import FitVcorTwoStep as FitVcor
-from libdmet.routine.slater import transformResults
 from libdmet.routine.mfd import HF
+from libdmet.routine.diis import FDiisContext
 from libdmet.solver import block
 import libdmet.utils.logger as log
 import types
@@ -29,7 +29,7 @@ def ConstructImpHam(Lat, rho, v):
 
     return ImpHam, H1e, basis
 
-def SolveImpHam(ImpHam, basis, M):
+def SolveImpHam(ImpHam, M):
     if not solver.sys_initialized:
         solver.set_system(ImpHam.norb, 0, False, False, False)
     if not solver.optimized:
@@ -42,6 +42,19 @@ def SolveImpHam(ImpHam, basis, M):
 
     truncation, energy, onepdm = solver.optimize()
     return onepdm, energy
+
+def transformResults(rhoEmb, E, basis, ImpHam, H1e):
+    spin = rhoEmb.shape[0]
+    nscsites = basis.shape[2]
+    rhoImp, Efrag, nelec = slater.transformResults(rhoEmb, E, basis, ImpHam, H1e)
+
+    log.result("Local density matrix (impurity):")
+    for s in range(spin):
+        log.result("%s", rhoImp[s])
+    log.result("nelec per site (impurity) = %20.12f", nelec/nscsites)
+    log.result("Energy per site (impurity) = %20.12f", Efrag/nscsites)
+
+    return rhoImp, Efrag/nscsites, nelec/nscsites
 
 def InitGuess(ImpSize, U, polar = None):
     subA, subB = BipartiteSquare(ImpSize)
@@ -131,12 +144,11 @@ def VcorLocalPhSymm(U, bogoliubov, subA, subB):
     return v
 
 class IterHistory(object):
-    def __init__(self, Lat):
+    def __init__(self):
         self.history = []
-        self.nscsites = Lat.supercell.nsites
 
     def update(self, energy, err, nelec, dvcor, dc):
-        self.history.append([energy/self.nscsites, err, nelec/self.nscsites, dvcor, dc.nDim, dc.iNext])
+        self.history.append([energy, err, nelec, dvcor, dc.nDim, dc.iNext])
         log.section("\nDMET Progress\n")
         log.result("  Iter         Energy               RdmErr         " \
             "       Nelec                 dVcor      DIIS")

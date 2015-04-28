@@ -247,14 +247,12 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
         nelec += np.trace(rhoImp[s])
     nelec *= (2./spin)
 
-    if spin == 1:
-        Veff = ImpHam.H1["cd"] - H1e["cd"]
+    if E is not None:
+        if spin == 1:
+            Veff = ImpHam.H1["cd"] - H1e["cd"]
+        else:
+            Veff = np.asarray([ImpHam.H1["cdA"] - H1e["cdA"], ImpHam.H1["cdB"] - H1e["cdB"]])
+        Efrag = E - np.sum(Veff * rhoEmb) / spin * 2
     else:
-        Veff = np.asarray([ImpHam.H1["cdA"] - H1e["cdA"], ImpHam.H1["cdB"] - H1e["cdB"]])
-    Efrag = E - np.sum(Veff * rhoEmb) / spin * 2
-    log.result("Local density matrix (impurity):")
-    for s in range(spin):
-        log.result("%s", rhoImp[s])
-    log.result("nelec per site (impurity) = %20.12f", nelec/nscsites)
-    log.result("Energy per site (impurity) = %20.12f", Efrag/nscsites)
+        Efrag = None
     return rhoImp, Efrag, nelec
