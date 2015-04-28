@@ -4,7 +4,7 @@ from libdmet.solver import block
 import numpy as np
 import numpy.linalg as la
 
-block.Block.nproc = 4
+block.Block.set_nproc(4)
 log.verbose = "RESULT"
 
 U = 4

@@ -164,6 +164,13 @@ class Block(object):
         "dmrg.out.*", "RI*"]
     mpipernode = ["mpirun", "-npernode", "1"]
 
+    @classmethod
+    def set_nproc(cls, nproc, nnode = 1):
+        cls.nproc = nproc
+        cls.nnode = nnode
+        log.info("Block interface  running with %d nodes, %d processors per node", \
+            cls.nnode, cls.nproc)
+
     def __init__(self, tmp = "/tmp", shared = None):
         self.sys_initialized = False
         self.schedule_initialized = False
@@ -174,7 +181,7 @@ class Block(object):
         self.warmup_method = "local_2site"
         self.outputlevel = 0
         self.restart = False
-        log.info("Block interface  running with %d nodes, %d processors per node", Block.nnode, Block.nproc)
+
         log.debug(0, "Using Block version %s", Block.execPath)
         self.createTmp(tmp)
 

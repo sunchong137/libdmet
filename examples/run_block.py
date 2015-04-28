@@ -6,7 +6,7 @@ from libdmet.system import integral
 log.clock = True
 log.verbose = "INFO"
 
-block.Block.nproc = 4
+block.Block.set_nproc(4)
 
 # a Hubbard example
 solver = block.Block()
