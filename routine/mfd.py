@@ -119,7 +119,7 @@ def assignocc(ew, nelec, beta, mu0):
     else:
         thr_degenerate = 1e-6
         if (nelec - int(nelec)) > 1e-5:
-            log.info("T=0, nelec is rounded to integer nelec = %d (original %.2f)", int(nelec), nelec)
+            log.warning("T=0, nelec is rounded to integer nelec = %d (original %.2f)", int(nelec), nelec)
         nelec = int(nelec)
         # we prefer not to change mu
         if np.sum(ew < mu0-thr_degenerate) <= nelec and np.sum(ew <= mu0 + thr_degenerate) >= nelec:
