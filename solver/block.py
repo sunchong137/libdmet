@@ -80,7 +80,7 @@ class Schedule(object):
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
 
-        self.twodot_to_onedot = 2
+        self.twodot_to_onedot = 0
         self.maxiter = 2
 
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
@@ -307,6 +307,7 @@ class Block(object):
     def onepdm(self):
         if self.spinRestricted:
             rho = readpdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
+            rho = rho.reshape((1, self.integral.norb, self.integral.norb))
         else:
             rho0 = readpdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
             rho = np.empty((2, self.integral.norb, self.integral.norb))
@@ -353,8 +354,8 @@ class Block(object):
 
     def optimize(self, onepdm = True):
         log.eassert(self.sys_initialized and self.integral_initialized and self.schedule_initialized, \
-                "components for optimization are not ready\nsys_init = %s\nint_init = %s\nschedule_init = %s" \
-                % (self.sys_initialized, self.integral_initialized, self.schedule_initialized))
+            "components for optimization are not ready\nsys_init = %s\nint_init = %s\nschedule_init = %s", \
+            self.sys_initialized, self.integral_initialized, self.schedule_initialized)
 
         if self.optimized:
             return self.restart_optimize(onepdm)
@@ -375,8 +376,21 @@ class Block(object):
         return self.just_run(onepdm, dry_run = False)
 
 
-    def extrapolate(self, rdm = True, evaluate = False):
-        log.error("extrapolate not implemented yet")
+    def extrapolate(self, Ms, onepdm = True):
+        log.eassert(self.sys_initialized and self.integral_initialized, \
+            "components for optimization are not ready\nsys_init = %s\nint_init = %s", \
+            self.sys_initialized, self.integral_initialized)
+        results = []
+        if not self.optimized or self.restart:
+            self.schedule = Schedule()
+            self.schedule.gen_initial(Ms[0]/2, Ms[0])
+            self.schedule_initialized = True
+            results.append(self.optimize(onepdm = onepdm))
+        else:
+            results.append(self.restart_optimize(self, onepdm = onepdm, M = Ms[0]))
+        for M in Ms[1:]:
+            self.schedule.gen_extrapolate(M)
+            results.append(self.just_run(onepdm = onepdm, dry_run = False))
 
     def evaluate(self, H0, H1, H2, op = "unknown operator"):
         log.eassert(self.optimized, "No wavefunction available")
