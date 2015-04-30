@@ -89,7 +89,7 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, t
             rhoEmb2, EnergyEmb2 = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, delta1)
             return rhoEmb2, EnergyEmb2, ImpHam, delta1
 
-def InitGuess(ImpSize, U, Filling, polar = None):
+def AFInitGuess(ImpSize, U, Filling, polar = None):
     subA, subB = BipartiteSquare(ImpSize)
     nscsites = len(subA) + len(subB)    
     v = VcorLocal(False, False, nscsites)

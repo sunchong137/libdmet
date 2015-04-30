@@ -26,7 +26,7 @@ Lat = dmet.SquareLattice(*(LatSize + ImpSize))
 Ham = dmet.Ham(Lat, U)
 Lat.setHam(Ham)
 
-vcor = dmet.InitGuess(ImpSize, U, Filling)
+vcor = dmet.AFInitGuess(ImpSize, U, Filling)
 Mu = U * Filling
 dc = dmet.FDiisContext(DiisDim)
 
