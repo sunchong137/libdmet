@@ -2,6 +2,28 @@ from HubPhSymm import *
 from libdmet.routine.slater_helper import transform_imp
 import numpy as np
 
+def RHartreeFock(Lat, v, filling, mu0):
+    rho, mu, E, res = HF(Lat, v, filling, True, mu0 = mu0, beta = np.inf, ires = True)
+    log.result("Local density matrix (mean-field):\n%s", rho[0][0])
+    log.result("Chemical potential (mean-field) = %20.12f", mu)
+    log.result("Energy per site (mean-field) = %20.12f", E/Lat.supercell.nsites)
+    log.result("Gap (mean-field) = %20.12f" % res["gap"])
+    return rho, mu
+
+def RSolveImpHam(ImpHam, M):
+    if not solver.sys_initialized:
+        solver.set_system(ImpHam.norb, 0, True, False, True)
+    if not solver.optimized:
+        schedule.gen_initial(minM = 100, maxM = M)
+    else:
+        schedule.maxiter = 16
+        schedule.gen_restart(M)
+    solver.set_schedule(schedule)
+    solver.set_integral(ImpHam)
+
+    truncation, energy, onepdm = solver.optimize()
+    return onepdm, energy
+
 def HartreeFock(Lat, v, filling, mu0):
     rho, mu, E, res = HF(Lat, v, filling, False, mu0 = mu0, beta = np.inf, ires = True)
     log.result("Local density matrix (mean-field):\n%s\n%s", rho[0][0], rho[1][0])

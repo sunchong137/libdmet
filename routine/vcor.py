@@ -39,7 +39,7 @@ class Vcor(object):
         log.eassert(self.islocal(), "This routine is for local vcor only")
         log.eassert(v0.shape == self.gradient().shape[1:], \
             "The initial guess should have shape %s, rather than %s",
-            v0.shape, self.gradient().shape[1:])
+            self.gradient().shape[1:], v0.shape)
 
         def fn(x):
             self.update(x)

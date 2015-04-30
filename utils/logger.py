@@ -5,7 +5,7 @@ from datetime import datetime
 Logger
 """
 
-Level = dict(zip("FATAL ERR SECTION RESULT WARNING INFO DEBUG0 DEBUG1 DEBUG2".split(), range(8)))
+Level = dict(zip("FATAL ERR SECTION RESULT WARNING INFO DEBUG0 DEBUG1 DEBUG2".split(), range(9)))
 
 stdout = sys.stdout
 verbose = "INFO"

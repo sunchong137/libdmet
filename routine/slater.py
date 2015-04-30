@@ -89,7 +89,7 @@ def embHam(lattice, basis, vcor, local = True, **kwargs):
     nspin = basis.shape[0]
     nbasis = basis.shape[3]
     if nspin == 1:
-        return integral.Integral(nbasis, True, False, 0, {"cd": Int1e}, {"ccdd": Int2e}), {"cd": Int1e_energy}
+        return integral.Integral(nbasis, True, False, 0, {"cd": Int1e[0]}, {"ccdd": Int2e[0]}), {"cd": Int1e_energy[0]}
     else:
         if "mmap" in kwargs.keys() and kwargs["mmap"]:
             H2 = {
