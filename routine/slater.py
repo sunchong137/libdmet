@@ -3,14 +3,14 @@ import numpy.linalg as la
 import itertools as it
 import libdmet.utils.logger as log
 from slater_helper import *
-from tempfile import TemporaryFile
+from tempfile import NamedTemporaryFile
 from libdmet.system import integral
 from fit import minimize
 from mfd import assignocc, HF
 from math import sqrt
 from copy import deepcopy
 
-tmp = "/tmp"
+TmpDir = "/tmp"
 
 def MatSqrt(M):
     log.eassert(la.norm(M - M.T.conj()) < 1e-10, "matrix must be symmetric")
@@ -32,6 +32,7 @@ def normalizeBasis1(b):
     # array in blocks
     ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
     log.debug(1, "basis overlap is\n%s", ovlp)
+    log.debug(0, "basis norm is\n%s", np.diag(ovlp))
     norms = np.diag(1./np.sqrt(np.diag(ovlp)))
     return np.tensordot(b, norms, axes = (2,0))
 
@@ -117,13 +118,13 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
     log.eassert(vcor.islocal(), "nonlocal correlation potential cannot be treated in this routine")
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
+    nbasis = basis.shape[3]
     latFock = lattice.getFock(kspace = False)
     latH1 = lattice.getH1(kspace = False)
     ImpJK = lattice.getImpJK()
     spin = basis.shape[0]
-    H1 = np.empty((spin, 2*nscsites, 2*nscsites))
-    H11 = np.empty((spin, 2*nscsites, 2*nscsites))
-    H1energy = np.empty((spin, 2*nscsites, 2*nscsites))
+    H1 = np.empty((spin, nbasis, nbasis))
+    H1energy = np.empty((spin, nbasis, nbasis))
 
     for s in range(spin):
         log.debug(0, "Spin Component %d of %d", s, spin)
@@ -160,6 +161,8 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
             dtype = float, mode = 'w+', shape = (spin*(spin+1)/2, nbasis, nbasis, nbasis, nbasis))
     else:
         H2 = np.zeros((spin*(spin+1)/2, nbasis, nbasis, nbasis, nbasis))
+
+    log.info("H2 memory allocated size = %d MB", H2.size*8. / 1024 / 1024)
 
     if local:
         for s in range(spin):

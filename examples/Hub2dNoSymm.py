@@ -42,9 +42,6 @@ rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
 
-    if iter >= TraceStart: # we want to avoid spiral increase of vcor and mu
-        vcor = dmet.addDiag(vcor, Mu - Mu_new)
-
     log.section("\nconstructing impurity problem\n")
     ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
     log.section("\nsolving impurity problem\n")
