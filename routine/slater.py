@@ -134,6 +134,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
     spin = basis.shape[0]
 
     if "mmap" in kwargs.keys() and kwargs["mmap"]:
+        log.debug(0, "Use memory map for 2-electron integral")
         H2 = np.memmap(NamedTemporaryFile(dir = TmpDir), \
             dtype = float, mode = 'w+', shape = (spin*(spin+1)/2, nbasis, nbasis, nbasis, nbasis))
     else:

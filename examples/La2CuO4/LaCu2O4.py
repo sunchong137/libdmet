@@ -43,7 +43,7 @@ doping = 0
 Filling = 10.5/22 - 0.5 * doping
 
 # then lattice and impurity sizes
-LatSize = np.asarray([12, 12])
+LatSize = np.asarray([8, 8])
 ImpSize = np.asarray([1, 1])
 
 Lat = dmet.buildLattice(LatSize, ImpSize, Cell, Atoms, AtomicBasis)
@@ -51,7 +51,7 @@ Ham = dmet.buildHamiltonian("integrals", Lat, 2)
 Lat.setHam(Ham)
 
 vcor = dmet.VcorLocal(False, False, Lat.supercell.nsites)
-vcor = dmet.AFInitGuessOrbs(vcor, Lat, AForbs, PMorbs, shift = 0.4, polar = 0.4)
+dmet.AFInitGuessOrbs(vcor, Lat, AForbs, PMorbs, shift = 0.4, polar = 0.4)
 Mu = 0. # I don't know what is Mu
 
 dc = dmet.FDiisContext(DiisDim)
@@ -65,3 +65,12 @@ log.result("Vcor =\n%s", vcor.get())
 log.result("Mu (guess) = %20.12f", Mu)
 rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
 dmet.reportOccupation(Lat, rho)
+
+from libdmet.utils.misc import find
+
+for iter in range(MaxIter):
+    log.section("\nDMET Iteration %d\n", iter)
+    log.section("\nconstructing impurity problem\n")
+    log.verbose = "DEBUG0"
+    log.result("Making embedding basis")
+    ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)

@@ -21,11 +21,11 @@ def HartreeFock(Lat, v, U):
     log.result("Gap (mean-field) = %20.12f" % res["gap"])
     return rho, mu
 
-def ConstructImpHam(Lat, rho, v):
+def ConstructImpHam(Lat, rho, v, **kwargs):
     log.result("Making embedding basis")
     basis = slater.embBasis(Lat, rho, local = True)
     log.result("Constructing impurity Hamiltonian")
-    ImpHam, H1e = slater.embHam(Lat, basis, v, local = True)
+    ImpHam, H1e = slater.embHam(Lat, basis, v, local = True, **kwargs)
 
     return ImpHam, H1e, basis
 
