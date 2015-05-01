@@ -9,8 +9,6 @@ import pyscf.lib.logger as pyscflogger
 import libdmet.utils.logger as log
 from libdmet.system import integral
 from libdmet.utils.misc import mdot
-#import time
-#import os
 
 pyscflogger.flush = lambda *args: log.result(*args[1:])
 pyscflogger.QUIET = 10
