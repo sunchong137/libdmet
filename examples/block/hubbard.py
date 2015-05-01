@@ -13,10 +13,14 @@ solver.set_system(8, 0, False, False, True)
 Int1e = -np.eye(8, k = 1)
 Int1e[0, 7] = -1
 Int1e += Int1e.T
-Int2e = np.zeros((8,8,8,8))
+
+
+Int2e = np.zeros((1,8,8,8,8))
 
 for i in range(8):
-    Int2e[i,i,i,i] = 6
+    Int2e[0,i,i,i,i] = 6
+
+Int1e = Int1e[np.newaxis, :]
 
 solver.set_integral(8, 0, {"cd": Int1e}, {"ccdd": Int2e})
 
@@ -30,7 +34,7 @@ solver.optimize()
 log.result("E = %20.12f", solver.evaluate(0, {"cd": Int1e}, {"ccdd": Int2e}, op = "Hamiltonian"))
 
 for i in range(8):
-    Int2e[i,i,i,i] = 8
+    Int2e[0,i,i,i,i] = 8
 
 solver.integral.H2["ccdd"] = Int2e
 

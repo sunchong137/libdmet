@@ -58,10 +58,10 @@ def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu):
     old_dmu = ImpHam.H0 / (2 * nscsites)
     dmu1 = dmu - old_dmu
     if ImpHam.restricted:
-        ImpHam.H1["cd"] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
+        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
     else:
-        ImpHam.H1["cdA"] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
-        ImpHam.H1["cdB"] -= transform_imp(basis[1], lattice, dmu1 * np.eye(nscsites))
+        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
+        ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu1 * np.eye(nscsites))
     ImpHam.H0 += dmu1 * nscsites * 2
     return SolveImpHam(ImpHam, M)
 

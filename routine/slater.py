@@ -87,32 +87,9 @@ def embHam(lattice, basis, vcor, local = True, **kwargs):
     log.info("Two-body part")
     Int2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
 
-    nspin = basis.shape[0]
+    spin = basis.shape[0]
     nbasis = basis.shape[3]
-    if nspin == 1:
-        return integral.Integral(nbasis, True, False, 0, {"cd": Int1e[0]}, {"ccdd": Int2e[0]}), {"cd": Int1e_energy[0]}
-    else:
-        if "mmap" in kwargs.keys() and kwargs["mmap"]:
-            H2 = {
-                "ccddA": np.memmap(NamedTemporaryFile(dir = TmpDir), \
-                    dtype = float, mode = 'w+', shape = (nbasis, nbasis, nbasis, nbasis)),
-                "ccddB": np.memmap(NamedTemporaryFile(dir = TmpDir), \
-                    dtype = float, mode = 'w+', shape = (nbasis, nbasis, nbasis, nbasis)),
-                "ccddAB": np.memmap(NamedTemporaryFile(dir = TmpDir), \
-                    dtype = float, mode = 'w+', shape = (nbasis, nbasis, nbasis, nbasis)),
-            }
-        else:
-            H2 = {
-                "ccddA": np.empty((nbasis, nbasis, nbasis, nbasis)),
-                "ccddB": np.empty((nbasis, nbasis, nbasis, nbasis)),
-                "ccddAB": np.empty((nbasis, nbasis, nbasis, nbasis)),
-            }
-        H2["ccddA"][:] = Int2e[0][:]
-        H2["ccddAB"][:] = Int2e[1][:]
-        H2["ccddB"][:] = Int2e[2][:]
-
-        return integral.Integral(nbasis, False, False, 0, {"cdA": Int1e[0], "cdB": Int1e[1]}, H2),\
-            {"cdA": Int1e_energy[0], "cdB": Int1e_energy[1]}
+    return integral.Integral(nbasis, spin == 1, False, 0, {"cd": Int1e}, {"ccdd": Int2e}), {"cd": Int1e_energy}
 
 def __embHam1e(lattice, basis, vcor, **kwargs):
     log.eassert(vcor.islocal(), "nonlocal correlation potential cannot be treated in this routine")
@@ -251,10 +228,7 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     nelec *= (2./spin)
 
     if E is not None:
-        if spin == 1:
-            Veff = ImpHam.H1["cd"] - H1e["cd"]
-        else:
-            Veff = np.asarray([ImpHam.H1["cdA"] - H1e["cdA"], ImpHam.H1["cdB"] - H1e["cdB"]])
+        Veff = ImpHam.H1["cd"] - H1e["cd"]
         Efrag = E - np.sum(Veff * rhoEmb) / spin * 2
     else:
         Efrag = None

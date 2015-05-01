@@ -38,7 +38,7 @@ def dumpFCIDUMP(filename, integral, thr = 1e-8):
         if abs(val) > thr:
             fout.write("%20.16f%4d%4d%4d%4d\n" % (val, i+1, j+1, k+1, l+1))
 
-    def insert_ccdd(fout, matrix, symm_herm = True, symm_spin = True):
+    def insert_ccdd(fout, matrix, t, symm_herm = True, symm_spin = True):
         if symm_herm:
             p = integral.pairSymm()
         else:
@@ -46,31 +46,31 @@ def dumpFCIDUMP(filename, integral, thr = 1e-8):
 
         if symm_spin:
             for (i,j), (k,l) in list(it.combinations_with_replacement(p[::-1], 2))[::-1]:
-                writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+                writeInt(fout, matrix[t,i,j,k,l], i, j, k, l)
         else:
             for (i,j), (k,l) in it.product(p, repeat = 2):
-                writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+                writeInt(fout, matrix[t,i,j,k,l], i, j, k, l)
 
-    def insert_cccd(fout, matrix):
+    def insert_cccd(fout, matrix, t):
         for (i,j), (k,l) in it.product(integral.pairAntiSymm(), integral.pairNoSymm()):
-            writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+            writeInt(fout, matrix[t,i,j,k,l], i, j, k, l)
 
-    def insert_cccc(fout, matrix, symm_spin = True):
+    def insert_cccc(fout, matrix, t, symm_spin = True):
         if symm_spin:
             for (i,j), (k,l) in list(it.combinations_with_replacement(integral.pairAntiSymm()[::-1], 2))[::-1]:
-                writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+                writeInt(fout, matrix[t,i,j,k,l], i, j, k, l)
 
         else:
             for (i,j), (k,l) in it.product(integral.pairAntiSymm(), repeat = 2):
-                writeInt(fout, matrix[i,j,k,l], i, j, k, l)
+                writeInt(fout, matrix[t,i,j,k,l], i, j, k, l)
 
-    def insert_2dArray(fout, matrix, symm_herm = True):
+    def insert_2dArray(fout, matrix, t, symm_herm = True):
         if symm_herm:
             for i,j in integral.pairSymm():
-                writeInt(fout, matrix[i,j], i, j)
+                writeInt(fout, matrix[t,i,j], i, j)
         else:
             for i,j in integral.pairNoSymm():
-                writeInt(fout, matrix[i,j], i, j)
+                writeInt(fout, matrix[t,i,j], i, j)
 
     def insert_H0(fout, val = 0):
         fout.write("%20.16f%4d%4d%4d%4d\n" % (val, 0, 0, 0, 0)) # cannot be ignored even if smaller than thr
@@ -82,51 +82,51 @@ def dumpFCIDUMP(filename, integral, thr = 1e-8):
 
     f.write("\n".join(header) + "\n")
     if integral.restricted and not integral.bogoliubov:
-        insert_ccdd(f, integral.H2["ccdd"])
-        insert_2dArray(f, integral.H1["cd"])
+        insert_ccdd(f, integral.H2["ccdd"], 0)
+        insert_2dArray(f, integral.H1["cd"], 0)
         insert_H0(f, integral.H0)
     elif not integral.restricted and not integral.bogoliubov:
-        insert_ccdd(f, integral.H2["ccddA"])
+        insert_ccdd(f, integral.H2["ccdd"], 0)
         insert_H0(f, 0)
-        insert_ccdd(f, integral.H2["ccddB"])
+        insert_ccdd(f, integral.H2["ccdd"], 1)
         insert_H0(f, 0)
-        insert_ccdd(f, integral.H2["ccddAB"], symm_spin = False)
+        insert_ccdd(f, integral.H2["ccdd"], 2, symm_spin = False)
         insert_H0(f, 0)
-        insert_2dArray(f, integral.H1["cdA"])
+        insert_2dArray(f, integral.H1["cd"], 0)
         insert_H0(f, 0)
-        insert_2dArray(f, integral.H1["cdB"])
+        insert_2dArray(f, integral.H1["cd"], 1)
         insert_H0(f, 0)
         insert_H0(f, integral.H0)
     elif integral.restricted and integral.bogoliubov:
-        insert_ccdd(f, integral.H2["ccdd"])
+        insert_ccdd(f, integral.H2["ccdd"], 0)
         insert_H0(f, 0)
-        insert_cccd(f, integral.H2["cccd"])
+        insert_cccd(f, integral.H2["cccd"], 0)
         insert_H0(f, 0)
-        insert_cccc(f, integral.H2["cccc"])
+        insert_cccc(f, integral.H2["cccc"], 0)
         insert_H0(f, 0)
-        insert_2dArray(f, integral.H1["cd"])
+        insert_2dArray(f, integral.H1["cd"], 0)
         insert_H0(f,0)
-        insert_2dArray(f, integral.H1["cc"])
+        insert_2dArray(f, integral.H1["cc"], 0)
         insert_H0(f,0)
         insert_H0(f, integral.H0)
     else:
-        insert_ccdd(f, integral.H2["ccddA"], symm_herm = False)
+        insert_ccdd(f, integral.H2["ccdd"], 0, symm_herm = False)
         insert_H0(f, 0)
-        insert_ccdd(f, integral.H2["ccddB"], symm_herm = False)
+        insert_ccdd(f, integral.H2["ccdd"], 1, symm_herm = False)
         insert_H0(f, 0)
-        insert_ccdd(f, integral.H2["ccddAB"], symm_herm = False, symm_spin = False)
+        insert_ccdd(f, integral.H2["ccdd"], 2, symm_herm = False, symm_spin = False)
         insert_H0(f, 0)
-        insert_cccd(f, integral.H2["cccdA"])
+        insert_cccd(f, integral.H2["cccd"], 0)
         insert_H0(f, 0)
-        insert_cccd(f, integral.H2["cccdB"])
+        insert_cccd(f, integral.H2["cccd"], 1)
         insert_H0(f, 0)
-        insert_cccc(f, integral.H2["cccc"], symm_spin = False)
+        insert_cccc(f, integral.H2["cccc"], 0, symm_spin = False)
         insert_H0(f, 0)
-        insert_2dArray(f, integral.H1["cdA"])
+        insert_2dArray(f, integral.H1["cd"], 0)
         insert_H0(f, 0)
-        insert_2dArray(f, integral.H1["cdB"])
+        insert_2dArray(f, integral.H1["cd"], 1)
         insert_H0(f, 0)
-        insert_2dArray(f, integral.H1["cc"], symm_herm = False)
+        insert_2dArray(f, integral.H1["cc"], 0, symm_herm = False)
         insert_H0(f, 0)
         insert_H0(f, integral.H0)
 
@@ -147,28 +147,26 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
         log.eassert(restricted != IUHF, "spin restriction is not consistent")
         if restricted and not bogoliubov:
             H0 = 0
-            H1 = {"cd": np.zeros((norb, norb))}
-            H2 = {"ccdd": np.zeros((norb, norb, norb, norb))}
+            H1 = {"cd": np.zeros((1, norb, norb))}
+            H2 = {"ccdd": np.zeros((1, norb, norb, norb, norb))}
             lines = f.readlines()
             for line in lines:
                 tokens = line.split()
                 val = float(tokens[0])
                 i,j,k,l = [int(x) - 1 for x in tokens[1:]]
                 if k >= 0 and l >= 0:
-                    H2["ccdd"][i,j,k,l] = H2["ccdd"][j,i,k,l] = H2["ccdd"][i,j,l,k] = \
-                        H2["ccdd"][j,i,l,k] = H2["ccdd"][k,l,i,j] = H2["ccdd"][k,l,j,i] = \
-                        H2["ccdd"][l,k,i,j] = H2["ccdd"][l,k,j,i] = val
+                    H2["ccdd"][0,i,j,k,l] = H2["ccdd"][0,j,i,k,l] = H2["ccdd"][0,i,j,l,k] = \
+                        H2["ccdd"][0,j,i,l,k] = H2["ccdd"][0,k,l,i,j] = H2["ccdd"][0,k,l,j,i] = \
+                        H2["ccdd"][0,l,k,i,j] = H2["ccdd"][0,l,k,j,i] = val
                 elif i >= 0 and j >= 0:
-                    H1["cd"][i,j] = H1["cd"][j,i] = val
+                    H1["cd"][0,i,j] = H1["cd"][0,j,i] = val
                 else:
                     H0 += val
         elif not restricted and not bogoliubov:
             H0 = 0
-            H1 = {"cdA": np.zeros((norb, norb)), "cdB": np.zeros((norbs, norbs))}
+            H1 = {"cd": np.zeros((2,norb, norb))}
             H2 = {
-                "ccddA": np.zeros((norb, norb, norb, norb)),
-                "ccddB": np.zeros((norb, norb, norb, norb)),
-                "ccddAB": np.zeros((norb, norb, norb, norb))
+                "ccdd": np.zeros((3,norb, norb, norb, norb)),
             }
             lines = f.readlines()
             section = 0
@@ -180,25 +178,24 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
                     section += 1
                     H0 += val
                 elif section == 0 or section == 1:
-                    key = "ccdd" + ["A", "B"][section]
-                    H2[key][i,j,k,l] = H2[key][j,i,k,l] = H2[key][i,j,l,k] = \
-                        H2[key][j,i,l,k] = H2[key][k,l,i,j] = H2[key][k,l,j,i] = \
-                        H2[key][l,k,i,j] = H2[key][l,k,j,i] = val
+                    key = "ccdd"
+                    H2[key][section,i,j,k,l] = H2[key][section,j,i,k,l] = H2[key][section,i,j,l,k] = \
+                        H2[key][section,j,i,l,k] = H2[key][section,k,l,i,j] = H2[key][section,k,l,j,i] = \
+                        H2[key][section,l,k,i,j] = H2[key][section,l,k,j,i] = val
                 elif section == 2:
-                    key = "ccddAB"
-                    H2[key][i,j,k,l] = H2[key][j,i,k,l] = H2[key][i,j,l,k] = \
-                        H2[key][j,i,l,k] = val # cannot swap ij <-> kl
+                    key = "ccdd"
+                    H2[key][2,i,j,k,l] = H2[key][2,j,i,k,l] = H2[key][2,i,j,l,k] = \
+                        H2[key][2,j,i,l,k] = val # cannot swap ij <-> kl
                 elif section == 3 or section == 4:
                     log.eassert(k == -1 and l == -1, "Integral Syntax unrecognized")
-                    key = "cd" + ["A", "B"][section-3]
-                    H1[key][i,j] = H1[key][j,i] = val
+                    H1["cd"][section-3,i,j] = H1["cd"][section-3,j,i] = val
         elif restricted and bogoliubov:
             H0 = 0
-            H1 = {"cd": np.zeros((norb, norb)), "cc": np.zeros((norb, norb))}
+            H1 = {"cd": np.zeros((1,norb, norb)), "cc": np.zeros((1,norb, norb))}
             H2 = {
-                "ccdd": np.zeros((norb, norb, norb, norb)),
-                "cccd": np.zeros((norb, norb, norb, norb)),
-                "cccc": np.zeros((norb, norb, norb, norb))
+                "ccdd": np.zeros((1,norb, norb, norb, norb)),
+                "cccd": np.zeros((1,norb, norb, norb, norb)),
+                "cccc": np.zeros((1,norb, norb, norb, norb))
             }
             lines = f.readlines()
             section = 0
@@ -210,31 +207,27 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
                   section += 1
                   H0 += val
               elif section == 0:
-                  H2["ccdd"][i,j,k,l] = H2["ccdd"][j,i,k,l] = H2["ccdd"][i,j,l,k] = \
-                    H2["ccdd"][j,i,l,k] = H2["ccdd"][k,l,i,j] = H2["ccdd"][k,l,j,i] = \
-                    H2["ccdd"][l,k,i,j] = H2["ccdd"][l,k,j,i] = val
+                  H2["ccdd"][0,i,j,k,l] = H2["ccdd"][0,j,i,k,l] = H2["ccdd"][0,i,j,l,k] = \
+                    H2["ccdd"][0,j,i,l,k] = H2["ccdd"][0,k,l,i,j] = H2["ccdd"][0,k,l,j,i] = \
+                    H2["ccdd"][0,l,k,i,j] = H2["ccdd"][0,l,k,j,i] = val
               elif section == 1:
-                  H2["cccd"][i,j,k,l] = val
-                  H2["cccd"][j,i,k,l] = -val
+                  H2["cccd"][0,i,j,k,l] = val
+                  H2["cccd"][0,j,i,k,l] = -val
               elif section == 2:
-                  H2["cccc"][i,j,k,l] = H2["cccc"][j,i,l,k] = \
-                      H2["cccc"][k,l,i,j] = H2["cccc"][l,k,j,i] = val
-                  H2["cccc"][j,i,k,l] = H2["cccc"][i,j,l,k] = \
-                      H2["cccc"][k,l,j,i] = H2["cccc"][l,k,i,j] = -val
+                  H2["cccc"][0,i,j,k,l] = H2["cccc"][0,j,i,l,k] = \
+                      H2["cccc"][0,k,l,i,j] = H2["cccc"][0,l,k,j,i] = val
+                  H2["cccc"][0,j,i,k,l] = H2["cccc"][0,i,j,l,k] = \
+                      H2["cccc"][0,k,l,j,i] = H2["cccc"][0,l,k,i,j] = -val
         else: # bogoliubov, not restricted
             H0 = 0
             H1 = {
-                "cdA": np.zeros((norb, norb)),
-                "cdB": np.zeros((norb, norb)),
-                "cc": np.zeros((norb, norb))
+                "cd": np.zeros((2,norb, norb)),
+                "cc": np.zeros((1,norb, norb))
             }
             H2 = {
-                "ccddA": np.zeros((norb, norb, norb, norb)),
-                "ccddB": np.zeros((norb, norb, norb, norb)),
-                "ccddAB": np.zeros((norb, norb, norb, norb)),
-                "cccdA": np.zeros((norb, norb, norb, norb)),
-                "cccdB": np.zeros((norb, norb, norb, norb)),
-                "cccc": np.zeros((norb, norb, norb, norb))
+                "ccdd": np.zeros((3,norb, norb, norb, norb)),
+                "cccd": np.zeros((2,norb, norb, norb, norb)),
+                "cccc": np.zeros((1,norb, norb, norb, norb))
             }
             lines = f.readlines()
             section = 0
@@ -246,25 +239,21 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
                     section += 1
                     H0 += val
                 if section == 0 or section == 1:
-                    key = "ccdd" + ["A", "B"][section]
-                    H2[key][i,j,k,l] = H2[key][k,l,i,j] = val
+                    H2["ccdd"][section, i,j,k,l] = H2["ccdd"][section,k,l,i,j] = val
                 elif section == 2:
-                    H2["ccddAB"][i,j,k,l] = val
+                    H2["ccdd"][2,i,j,k,l] = val
                 elif section == 3 or section == 4: # cccdA/cccdB
-                    key = "cccd" + ["A", "B"][section-3]
-                    H2[key][i,j,k,l] = val
-                    H2[key][j,i,k,l] = -val
+                    H2["cccd"][section-3,i,j,k,l] = val
+                    H2["cccd"][section-3,j,i,k,l] = -val
                 elif section == 5:
-                    key = "cccc"
-                    H2[key][i,j,k,l] = H2[j,i,l,k] = val
-                    H2[key][j,i,k,l] = H2[i,j,l,k] = -val
+                    H2["cccc"][0,i,j,k,l] = H2["cccc"][0,j,i,l,k] = val
+                    H2["cccc"][0,j,i,k,l] = H2["cccc"][0,i,j,l,k] = -val
                 elif section == 6 or section == 7:
                     log.eassert(k == -1 and l == -1, "Integral Syntax unrecognized")
-                    key = "cd" + ["A", "B"][section-6]
-                    H1[key][i,j] = H1[key][j,i] = val
+                    H1["cd"][section-6,i,j] = H1["cd"][section-6,j,i] = val
                 elif section == 8:
                     log.eassert(k == -1 and l == -1, "Integral Syntax unrecognized")
-                    H1["cc"][i,j] = val
+                    H1["cc"][0,i,j] = val
     return Integral(norb, restricted, bogoliubov, H0, H1, H2)
 
 def dumpHDF5(filename, integral):
@@ -309,35 +298,38 @@ def readMMAP(filename, norb, restricted, bogoliubov, copy = False):
 
 
     if restricted and not bogoliubov:
-        H1 = {"cd": bind("cd", (norb, norb))}
-        H2 = {"ccdd": bind("ccdd", (norb, norb, norb, norb))}
-    elif not restricted and not bogoliubov:
-        H1 = {"cdA": bind("cdA", (norb, norb)), "cdB": bind("cdB", (norb, norb))}
+        H1 = {
+            "cd": bind("cd", (1,norb, norb))
+        }
         H2 = {
-            "ccddA": bind("ccddA", (norb, norb, norb, norb)),
-            "ccddB": bind("ccddB", (norb, norb, norb, norb)),
-            "ccddAB": bind("ccddAB", (norb, norb, norb, norb)),
+            "ccdd": bind("ccdd", (1,norb, norb, norb, norb))
+        }
+    elif not restricted and not bogoliubov:
+        H1 = {
+            "cd": bind("cd", (2,norb, norb))
+        }
+        H2 = {
+            "ccdd": bind("ccdd", (3,norb, norb, norb, norb)),
         }
     elif restricted and bogoliubov:
-        H1 = {"cd": bind("cd", (norb, norb)), "cc": bind("cc", (norb, norb))}
+        H1 = {
+            "cd": bind("cd", (1,norb, norb)),
+            "cc": bind("cc", (1,norb, norb))
+        }
         H2 = {
-            "ccdd": bind("ccdd", (norb, norb, norb, norb)),
-            "cccd": bind("cccd", (norb, norb, norb, norb)),
-            "cccc": bind("cccc", (norb, norb, norb, norb)),
+            "ccdd": bind("ccdd", (1,norb, norb, norb, norb)),
+            "cccd": bind("cccd", (1,norb, norb, norb, norb)),
+            "cccc": bind("cccc", (1,norb, norb, norb, norb)),
         }
     else:
         H1 = {
-            "cdA": bind("cdA", (norb, norb)),
-            "cdB": bind("cdB", (norb, norb)),
-            "cc": bind("cc", (norb, norb)),
+            "cd": bind("cd", (2,norb, norb)),
+            "cc": bind("cc", (1,norb, norb)),
         }
         H2 = {
-            "ccddA": bind("ccddA", (norb, norb, norb, norb)),
-            "ccddB": bind("ccddB", (norb, norb, norb, norb)),
-            "ccddAB": bind("ccddAB", (norb, norb, norb, norb)),
-            "cccdA": bind("cccdA", (norb, norb, norb, norb)),
-            "cccdB": bind("cccdB", (norb, norb, norb, norb)),
-            "cccc": bind("cccc", (norb, norb, norb, norb)),
+            "ccdd": bind("ccdd", (3,norb, norb, norb, norb)),
+            "cccd": bind("cccd", (2,norb, norb, norb, norb)),
+            "cccc": bind("cccc", (1,norb, norb, norb, norb)),
         }
     H0 = bind("H0", (1,))[0]
 
