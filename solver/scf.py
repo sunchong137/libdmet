@@ -64,7 +64,7 @@ class UIHF(UHF):
             f = adiis.update(s1e, dm, np.array(f))
         return f
 
-    def energy_elec(self, h1e, vhf, dm):
+    def energy_elec(self, dm, h1e, vhf):
         e1 = np.sum(h1e * dm)
         e_coul = 0.5 * np.sum(vhf * dm)
         log.debug(1, self, "E_coul = %.15f", e_coul)
