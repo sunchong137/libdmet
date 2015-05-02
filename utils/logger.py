@@ -85,7 +85,7 @@ def __clock():
     if clock:
         stdout.write(datetime.now().strftime("%y %b %d %H:%M:%S") + " ")
 
-section("libDMET ---- A Period DMET Code\n\tby. Bo-Xiao Zheng\n\t<boxiao.zheng@gmail.com>")
+section("libDMET ---- A Period DMET Library\n\tby. Bo-Xiao Zheng\n\t<boxiao.zheng@gmail.com>")
 
 def test():
     result("Logger Levels: %s", Level)
