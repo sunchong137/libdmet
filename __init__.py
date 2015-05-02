@@ -2,9 +2,7 @@ __version__ = "0.1"
 __author__ = "Bo-Xiao Zheng <boxiao.zheng@gmail.com>"
 
 __doc__ = """
-libdmet %s
-
+libDMET   version %s
+A periodic DMET library
 by %s
 """ % (__version__, __author__)
-
-import libdmet.dmet as dmet

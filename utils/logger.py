@@ -1,5 +1,6 @@
 import sys
 from datetime import datetime
+import libdmet
 
 """
 Logger
@@ -85,7 +86,7 @@ def __clock():
     if clock:
         stdout.write(datetime.now().strftime("%y %b %d %H:%M:%S") + " ")
 
-section("libDMET ---- A Period DMET Library\n\tby. Bo-Xiao Zheng\n\t<boxiao.zheng@gmail.com>")
+section("%s", libdmet.__doc__)
 
 def test():
     result("Logger Levels: %s", Level)
