@@ -1,9 +1,10 @@
 import libdmet.utils.logger as log
 import libdmet.dmet.abinitio as dmet
-from libdmet.solver import block
+from libdmet.solver import block, scf
 import numpy as np
 import numpy.linalg as la
 import itertools as it
+from libdmet.routine.slater_helper import transform_trans_inv_sparse
 
 block.Block.set_nproc(4)
 log.verbose = "INFO"
@@ -66,7 +67,7 @@ log.result("Mu (guess) = %20.12f", Mu)
 rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
 dmet.reportOccupation(Lat, rho)
 
-from libdmet.utils.misc import find
+scfsolver = scf.SCF()
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
@@ -74,3 +75,20 @@ for iter in range(MaxIter):
     log.verbose = "DEBUG0"
     log.result("Making embedding basis")
     ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
+    scfsolver.set_system(176, 0, False, False)
+    scfsolver.set_integral(ImpHam)
+    # using original density matrix as initial guess
+    RdmGuess = np.empty((2,176,176))
+    for s in range(2):
+        RdmGuess[s] = transform_trans_inv_sparse(basis[s], Lat, rho[s], thr = 1e-6)
+    log.verbose = "DEBUG1"
+    with open("rdmHF.npy", "r") as f:
+        RdmGuess = np.load(f)
+    E_HF, rhoHF = scfsolver.HF(tol = 1e-5, InitGuess = RdmGuess)
+    with open("rdmHF.npy", "w") as f:
+        np.save(f, rhoHF)
+    E_MP2, rhoMP2 = scfsolver.MP2()
+    with open("rdmMP2.npy", "w") as f:
+        np.save(f, rhoMP2)
+    log.verbose = "INFO"
+

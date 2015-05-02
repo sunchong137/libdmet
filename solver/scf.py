@@ -67,7 +67,7 @@ class UIHF(UHF):
     def energy_elec(self, dm, h1e, vhf):
         e1 = np.sum(h1e * dm)
         e_coul = 0.5 * np.sum(vhf * dm)
-        log.debug(1, self, "E_coul = %.15f", e_coul)
+        log.debug(1, "E_coul = %.15f", e_coul)
         return e1 + e_coul, e_coul
 
     def get_hcore(self, *args):
@@ -77,23 +77,31 @@ class UIHF(UHF):
         return self.ovlp
 
 def incore_transform(eri_, c):
-    eri = [None,] * 3
-    eri[0] = np.tensordot(c[0][0], eri_[0], (0, 0))
-    eri[0] = np.swapaxes(np.tensordot(c[1][0], eri[0], (0, 1)), 0, 1)
-    eri[0] = np.swapaxes(np.tensordot(eri[0], c[2][0], (2, 0)), 2, 3)
-    eri[0] = np.tensordot(eri[0], c[3][0], (3, 0))
-    eri[1] = np.tensordot(c[0][1], eri_[1], (0, 0))
-    eri[1] = np.swapaxes(np.tensordot(c[1][1], eri[1], (0, 1)), 0, 1)
-    eri[1] = np.swapaxes(np.tensordot(eri[1], c[2][1], (2, 0)), 2, 3)
-    eri[1] = np.tensordot(eri[1], c[3][1], (3, 0))
-    eri[2] = np.tensordot(c[0][0], eri_[2], (0, 0))
-    eri[2] = np.swapaxes(np.tensordot(c[1][0], eri[2], (0, 1)), 0, 1)
-    eri[2] = np.swapaxes(np.tensordot(eri[2], c[2][1], (2, 0)), 2, 3)
-    eri[2] = np.tensordot(eri[2], c[3][1], (3, 0))
-    return np.asarray(eri)
+    log.debug(1, "Int2e component 0")
+    print eri_[0].shape
+    eriA = np.tensordot(c[0][0], eri_[0], (0, 0))
+    print eriA.shape
+    eriA = np.swapaxes(np.tensordot(c[1][0], eriA, (0, 1)), 0, 1)
+    print eriA.shape
+    eriA = np.swapaxes(np.tensordot(eriA, c[2][0], (2, 0)), 2, 3)
+    print eriA.shape
+    eriA = np.tensordot(eriA, c[3][0], (3, 0))
+    print eriA.shape
+    log.debug(1, "Int2e component 1")
+    eriB = np.tensordot(c[0][1], eri_[1], (0, 0))
+    eriB = np.swapaxes(np.tensordot(c[1][1], eriB, (0, 1)), 0, 1)
+    eriB = np.swapaxes(np.tensordot(eriB, c[2][1], (2, 0)), 2, 3)
+    eriB = np.tensordot(eriB, c[3][1], (3, 0))
+    log.debug(1, "Int2e component 2")
+    eriAB = np.tensordot(c[0][0], eri_[2], (0, 0))
+    eriAB = np.swapaxes(np.tensordot(c[1][0], eriAB, (0, 1)), 0, 1)
+    eriAB = np.swapaxes(np.tensordot(eriAB, c[2][1], (2, 0)), 2, 3)
+    eriAB = np.tensordot(eriAB, c[3][1], (3, 0))
+    return np.asarray([eriA, eriB, eriAB])
 
 
 def kernel(mp, mo_coeff, mo_energy, nocc):
+    log.debug(0, "transforming integral for MP2")
     ovov = mp.ao2mo(mo_coeff, nocc)
     nmo = mo_coeff[0].shape[1]
     nvir = (nmo - nocc[0], nmo - nocc[1])
@@ -108,6 +116,7 @@ def kernel(mp, mo_coeff, mo_energy, nocc):
     ])
     E = 0.
     for s in range(2): # for 2 pure spins
+        log.debug(0, "computing amplitudes: spin component %d of 2", s)
         for i in range(nocc[s]):
             # three-index intermediate
             d_jba = (epsilon_ia[s].reshape(-1,1) + epsilon_ia[s,i].reshape(1,-1)).ravel()
@@ -143,7 +152,6 @@ class UMP2(MP2):
         return self.E, self.t2
 
     def ao2mo(self, mo_coeff, nocc):
-        log.debug(0, "transforming integral for MP2")
         nmo = mo_coeff[0].shape[1]
         nvir = (nmo - nocc[0], nmo - nocc[1])
         co = np.asarray([mo_coeff[0][:, :nocc[0]], mo_coeff[1][:, :nocc[1]]])
