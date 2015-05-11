@@ -162,6 +162,7 @@ class Block(object):
     restartFiles = ["RestartReorder.dat", "Rotation*", "StateInfo*", "statefile*", "wave*"]
     tempFiles = ["Spin*", "Overlap*", "dmrg.e", "spatial*", "onepdm.*", "twopdm.*", "pairmat.*", \
         "dmrg.out.*", "RI*"]
+    env_slurm = "SLURM_JOBID" in os.environ
     mpipernode = ["mpirun", "-npernode", "1"]
 
     @classmethod
@@ -271,9 +272,14 @@ class Block(object):
         log.info("BLOCK call No. %d", self.count)
         log.debug(0, "Written to file %s", outputfile)
         with open(outputfile, "w", buffering = 1) as f:
-            sub.check_call(["mpirun", "-np", "%d" % (Block.nproc * Block.nnode), \
-                os.path.join(Block.execPath, "block.spin_adapted"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
-                stdout = f)
+            if Block.env_slurm:
+                sub.check_call(" ".join(["srun", \
+                    os.path.join(Block.execPath, "block.spin_adapted"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)]), \
+                    stdout = f, shell = True)
+            else:
+                sub.check_call(["mpirun", "-np", "%d" % (Block.nproc * Block.nnode), \
+                    os.path.join(Block.execPath, "block.spin_adapted"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
+                    stdout = f)
         log.result("BLOCK sweep summary")
         log.result(grep("Sweep Energy", outputfile))
         self.count += 1
@@ -283,9 +289,14 @@ class Block(object):
         log.info("OH call No. %d", self.count)
         log.debug(0, "Written to file %s", outputfile)
         with open(outputfile, "w", buffering = 1) as f:
-            sub.check_call(["mpirun", "-np", "1", \
-                os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
-                stdout = f)
+            if Block.env_slurm:            
+                sub.check_call(" ".join(["srun", "-n", "1", \
+                    os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)]), \
+                    stdout = f, shell = True)
+            else:
+                sub.check_call(["mpirun", "-np", "1", \
+                    os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
+                    stdout = f)
         self.count += 1
 
     def extractE(self, text):
