@@ -29,9 +29,11 @@ def ConstructImpHam(Lat, rho, v, **kwargs):
 
     return ImpHam, H1e, basis
 
-def SolveImpHam(ImpHam, M):
+def SolveImpHam(ImpHam, M, nelec = None):
+    if nelec is None:
+        nelec = ImpHam.norb
     if not solver.sys_initialized:
-        solver.set_system(ImpHam.norb, 0, False, False, False)
+        solver.set_system(nelec, 0, False, False, False)
     if not solver.optimized:
         schedule.gen_initial(minM = 100, maxM = M)
     else:

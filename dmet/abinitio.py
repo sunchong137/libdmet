@@ -25,6 +25,30 @@ def buildLattice(latSize, impSize, cellSize, atoms, basis):
     lat = Lat.Lattice(sc, latSize / impSize)
     return lat
 
+def ConstructImpHam(Lat, rho, v, matching = True, **kwargs):
+    log.result("Making embedding basis")
+    basis = slater.embBasis(Lat, rho, local = True)
+
+    if matching and basis.shape[0] == 2: 
+        log.result("Rotate bath orbitals to match alpha and beta basis")
+        nscsites = Lat.supercell.nsites
+        bathA = basis[0, :, :, nscsites:]
+        bathB = basis[1, :, :, nscsites:]
+        S = np.tensordot(bathA, bathB, axes = ((0,1), (0,1)))
+        # S=A^T*B svd of S is UGV^T then we let A'=AU, B'=BV
+        # yields A'^T*B'=G diagonal and optimally overlapped
+        u, gamma, vt = la.svd(S)
+        log.result("overlap statistics:\n larger than 0.9: %3d  smaller than 0.9: %3d\n"
+            " average: %10.6f  min: %10.6f", \
+            np.sum(gamma > 0.9), np.sum(gamma < 0.9), np.average(gamma), np.min(gamma))
+        basis[0, :, :, nscsites:] = np.tensordot(bathA, u, axes = (2, 0))
+        basis[1, :, :, nscsites:] = np.tensordot(bathB, vt, axes = (2, 1)) # because of V.T
+
+    log.result("Constructing impurity Hamiltonian")
+    ImpHam, H1e = slater.embHam(Lat, basis, v, local = True, **kwargs)
+
+    return ImpHam, H1e, basis
+
 def __read_bin(dirname, name, shape):
     if os.path.exists(os.path.join(dirname, name + ".npy")):
         temp = np.load(os.path.join(dirname, name + ".npy"))
