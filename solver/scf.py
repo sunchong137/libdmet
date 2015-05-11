@@ -78,15 +78,10 @@ class UIHF(UHF):
 
 def incore_transform(eri_, c):
     log.debug(1, "Int2e component 0")
-    print eri_[0].shape
     eriA = np.tensordot(c[0][0], eri_[0], (0, 0))
-    print eriA.shape
     eriA = np.swapaxes(np.tensordot(c[1][0], eriA, (0, 1)), 0, 1)
-    print eriA.shape
     eriA = np.swapaxes(np.tensordot(eriA, c[2][0], (2, 0)), 2, 3)
-    print eriA.shape
     eriA = np.tensordot(eriA, c[3][0], (3, 0))
-    print eriA.shape
     log.debug(1, "Int2e component 1")
     eriB = np.tensordot(c[0][1], eri_[1], (0, 0))
     eriB = np.swapaxes(np.tensordot(c[1][1], eriB, (0, 1)), 0, 1)
