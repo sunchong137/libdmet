@@ -8,6 +8,7 @@ log.verbose = "INFO"
 block.Block.set_nproc(4)
 
 solver = block.Block()
+solver.createTmp()
 solver.set_system(16, 0, False, True, False)
 
 solver.integral = integral.read("../../block/dmrg_tests/bcs/DMETDUMP", \

@@ -5,6 +5,7 @@ import numpy as np
 import numpy.linalg as la
 
 block.Block.set_nproc(4)
+dmet.solver.createTmp()
 log.verbose = "DEBUG2"
 dmet.SolveImpHam = dmet.RSolveImpHam
 

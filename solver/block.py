@@ -171,6 +171,7 @@ class Block(object):
         cls.nnode = nnode
         log.info("Block interface  running with %d nodes, %d processors per node", \
             cls.nnode, cls.nproc)
+        log.info("Block running on nodes:\n%s", sub.check_output(Block.mpipernode + ["hostname"]).replace("\n", "\t"))
 
     def __init__(self, tmp = "/tmp", shared = None):
         self.sys_initialized = False
@@ -184,9 +185,9 @@ class Block(object):
         self.restart = False
 
         log.debug(0, "Using Block version %s", Block.execPath)
-        self.createTmp(tmp)
 
     def createTmp(self, tmp = "/tmp"):
+        sub.check_call(["mkdir", "-p", tmp])
         self.tmpDir = mkdtemp(prefix = "BLOCK", dir = tmp)
         log.info("Block working dir %s", self.tmpDir)
         if Block.nnode > 1:

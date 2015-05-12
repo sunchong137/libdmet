@@ -8,6 +8,7 @@ log.verbose = "INFO"
 block.Block.set_nproc(4)
 
 solver = block.Block()
+solver.createTmp()
 solver.set_system(8, 0, False, False, True)
 
 Int1e = -np.eye(8, k = 1)

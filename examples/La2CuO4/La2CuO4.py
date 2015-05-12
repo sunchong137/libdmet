@@ -7,7 +7,8 @@ import itertools as it
 from libdmet.system import integral
 
 block.Block.set_nproc(16)
-log.verbose = "INFO"
+dmet.solver.createTmp("/scratch/boxiao/DMETTemp")
+log.verbose = "DEBUG0"
 
 # control variables
 MaxIter = 1
