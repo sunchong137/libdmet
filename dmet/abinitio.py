@@ -188,7 +188,7 @@ def buildActiveHam(Ham, c, a):
     H0 += 0.5 * np.sum(cRdm * (v[0] + v[1]))
     # active one-body: bare + effective from core Fock
     H1 = {
-        "cd": np.asarray(map(lambda s: mdot(a.T, v[s] + Ham.H1["cd"][s], a), np.range(spin)))
+        "cd": np.asarray(map(lambda s: mdot(a.T, v[s] + Ham.H1["cd"][s], a), range(spin)))
     }
     # transform active two-body part
     aSO = np.asarray((a, a))
@@ -209,12 +209,15 @@ def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, thrRdm = 5e-3):
     E_HF, rhoHF = scfsolver.HF(tol = 1e-5, MaxIter = 20, InitGuess = rhoHF)
     # then MP2
     E_MP2, rhoMP2 = scfsolver.MP2()
+    log.info("Setting up active space")
     core, active = selectActiveSpace(rhoMP2, thrRdm)
     # FIXME additional localization for active?
     # two ways: 1. location-based localization 2. integral based localization
     # build active space Hamiltonian
+    log.debug(0, "build active space Hamiltonian")
     actHam = buildActiveHam(ImpHam, core, active)
     # solve active space Hamiltonian
+    log.debug(0, "solve active space Hamiltonian with BLOCK")
     actRdm, E = SolveImpHam(actHam, M, nelec = nelec - core.shape[1] * 2)
     coreRdm = np.dot(core, core.T)
     rdm = np.asarray(map(lambda s: mdot(active, actRdm[s], active.T) + coreRdm, range(spin)))
