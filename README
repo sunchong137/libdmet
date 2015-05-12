@@ -1,0 +1,4 @@
+Dependencies:
+
+pyscf   https://github.com/sunqm/pyscf
+pathos  https://github.com/uqfoundation/pathos
