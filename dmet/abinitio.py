@@ -3,7 +3,13 @@ import numpy as np
 import numpy.linalg as la
 from libdmet.system.hamiltonian import HamNonInt
 import libdmet.system.lattice as Lat
+import libdmet.system.integral as integral
 import os
+from libdmet.solver import scf
+from libdmet.routine.slater_helper import transform_trans_inv_sparse
+from libdmet.utils.misc import mdot
+
+scfsolver = scf.SCF()
 
 def buildUnitCell(size, atoms, basis):
     sites = []
@@ -149,3 +155,68 @@ def reportOccupation(lattice, rho, names = None):
 
     results.append("\n".join(lines))
     log.result("\n".join(results))
+
+def selectActiveSpace(rho, thrRdm):
+    if rho.shape[0] == 2:
+        rho_mix = 0.5 * (rho[0] + rho[1])
+    else:
+        rho_mix = rho
+    natocc, natorb = la.eigh(rho_mix)
+    ncore = np.sum(natocc > 1 - thrRdm)
+    nvirt = np.sum(natocc < thrRdm)
+    nactive = rho.shape[1] - ncore - nvirt
+    log.info("Ncore = %d  Nvirt = %d  Nactive = %d", ncore, nvirt, nactive)
+    return natorb[:, -ncore:], natorb[:, nvirt: -ncore] # core and active orbitals
+
+def buildActiveHam(Ham, c, a):
+    spin = Ham.H1["cd"].shape[0]
+    if spin == 1:
+        log.error("Active space Hamiltonian with restricted Hamiltonian not implemented yet")
+
+    cRdm = np.dot(c, c.T)
+    # core-core one-body
+    H0 = np.sum(cRdm * (Ham.H1["cd"][0] + Ham.H1["cd"][1]))
+    # core-fock
+    vj00 = np.tensordot(cRdm, Ham.H2["ccdd"][0], ((0,1), (0,1)))
+    vj11 = np.tensordot(cRdm, Ham.H2["ccdd"][1], ((0,1), (0,1)))
+    vj10 = np.tensordot(cRdm, Ham.H2["ccdd"][2], ((0,1), (0,1)))
+    vj01 = np.tensordot(cRdm, Ham.H2["ccdd"][2], ((1,0), (3,2)))
+    vk00 = np.tensordot(cRdm, Ham.H2["ccdd"][0], ((0,1), (0,3)))
+    vk11 = np.tensordot(cRdm, Ham.H2["ccdd"][1], ((0,1), (0,3)))
+    v = np.asarray([vj00 + vj01 - vk00, vj11 + vj10 - vk11])
+    # core-core two-body
+    H0 += 0.5 * np.sum(cRdm * (v[0] + v[1]))
+    # active one-body: bare + effective from core Fock
+    H1 = {
+        "cd": np.asarray(map(lambda s: mdot(a.T, v[s] + Ham.H1["cd"][s], a), np.range(spin)))
+    }
+    # transform active two-body part
+    aSO = np.asarray((a, a))
+    H2 = {
+        "ccdd": scf.incore_transform(Ham.H2["ccdd"], (aSO, aSO, aSO, aSO))
+    }
+    return integral.Integral(a.shape[1], False, False, H0, H1, H2)
+
+def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, thrRdm = 5e-3):
+    spin = ImpHam.H1["cd"].shape[0]
+    if nelec is None:
+        nelec = ImpHam.norb
+    scfsolver.set_system(nelec, 0, False, spin == 1)
+    scfsolver.set_integral(ImpHam)
+    # using non-Interacting density matrix as initial guess
+    rhoHF = np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], Lat, rhoNonInt[s]), range(spin)))
+    # do Hartree-Fock
+    E_HF, rhoHF = scfsolver.HF(tol = 1e-5, MaxIter = 20, InitGuess = rhoHF)
+    # then MP2
+    E_MP2, rhoMP2 = scfsolver.MP2()
+    core, active = selectActiveSpace(rhoMP2, thrRdm)
+    # FIXME additional localization for active?
+    # two ways: 1. location-based localization 2. integral based localization
+    # build active space Hamiltonian
+    actHam = buildActiveHam(ImpHam, core, active)
+    # solve active space Hamiltonian
+    actRdm, E = SolveImpHam(actHam, M, nelec = nelec - core.shape[1] * 2)
+    coreRdm = np.dot(core, core.T)
+    rdm = np.asarray(map(lambda s: mdot(active, actRdm[s], active.T) + coreRdm, range(spin)))
+    return rdm, E
+

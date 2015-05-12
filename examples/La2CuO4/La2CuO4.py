@@ -1,12 +1,12 @@
 import libdmet.utils.logger as log
 import libdmet.dmet.abinitio as dmet
-from libdmet.solver import block, scf
+from libdmet.solver import block
 import numpy as np
 import numpy.linalg as la
 import itertools as it
-from libdmet.routine.slater_helper import transform_trans_inv_sparse
+from libdmet.system import integral
 
-block.Block.set_nproc(4)
+block.Block.set_nproc(16)
 log.verbose = "INFO"
 
 # control variables
@@ -14,6 +14,10 @@ MaxIter = 1
 DiisStart = 6
 TraceStart = 4
 DiisDim = 8
+
+# for solvers
+thrNatOrb = 5e-3
+M = 600
 
 # first define lattice shape, atoms and basis
 Dim = 2
@@ -67,28 +71,12 @@ log.result("Mu (guess) = %20.12f", Mu)
 rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
 dmet.reportOccupation(Lat, rho)
 
-scfsolver = scf.SCF()
-
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
     log.section("\nconstructing impurity problem\n")
-    log.verbose = "DEBUG0"
     log.result("Making embedding basis")
-    ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
-    scfsolver.set_system(176, 0, False, False)
-    scfsolver.set_integral(ImpHam)
-    # using original density matrix as initial guess
-    RdmGuess = np.empty((2,176,176))
-    for s in range(2):
-        RdmGuess[s] = transform_trans_inv_sparse(basis[s], Lat, rho[s], thr = 1e-6)
-    log.verbose = "DEBUG1"
-    with open("rdmHF.npy", "r") as f:
-        RdmGuess = np.load(f)
-    E_HF, rhoHF = scfsolver.HF(tol = 1e-5, InitGuess = RdmGuess)
-    with open("rdmHF.npy", "w") as f:
-        np.save(f, rhoHF)
-    E_MP2, rhoMP2 = scfsolver.MP2()
-    with open("rdmMP2.npy", "w") as f:
-        np.save(f, rhoMP2)
-    log.verbose = "INFO"
-
+    ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor, matching = True)
+    log.section("\nsolving impurity problem\n")
+    rhoEmb, EnergyEmb = dmet.SolveImpCAS(ImpHam, M, Lat, basis, rho, thrRdm = thrNatOrb)
+    with open("rdmCAS.npy", "w") as f:
+        np.save(f, rhoEmb)
