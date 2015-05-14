@@ -128,7 +128,7 @@ def AFInitGuessOrbs(v, lattice, AForbs, PMorbs, shift = 0., polar = 0.5):
     return v
 
 def reportOccupation(lattice, rho, names = None):
-    rhoImp = map(np.diag, rho[:,0])
+    rhoImp = map(np.diag, rho)
     charge = (rhoImp[0] + rhoImp[1]) / 2
     spin = (rhoImp[0] - rhoImp[1]) / 2
     nscsites = lattice.supercell.nsites
@@ -142,8 +142,13 @@ def reportOccupation(lattice, rho, names = None):
     lines = ["%-3s   ", "charge", "spin  "]
     atom = names[0].split("_")[0]
     lines[0] = lines[0] % atom
+    totalc, totals = 0., 0.
     for i, (name, index) in enumerate(zip(names, indices)):
         if atom != name.split("_")[0]:
+            lines[0] += "%10s" % "total"
+            lines[1] += "%10.5f" % totalc
+            lines[2] += "%10.5f" % totals
+            totalc, totals = 0., 0.
             results.append("\n".join(lines))
             lines = ["%-3s   ", "charge", "spin  "]
             atom = name.split("_")[0]
@@ -152,7 +157,12 @@ def reportOccupation(lattice, rho, names = None):
         lines[0] += "%10s" % name.split("_")[1]
         lines[1] += "%10.5f" % charge[index]
         lines[2] += "%10.5f" % spin[index]
+        totalc += charge[index]
+        totals += spin[index]
 
+    lines[0] += "%10s" % "total"
+    lines[1] += "%10.5f" % totalc
+    lines[2] += "%10.5f" % totals
     results.append("\n".join(lines))
     log.result("\n".join(results))
 

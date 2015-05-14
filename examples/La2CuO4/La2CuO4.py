@@ -8,10 +8,10 @@ from libdmet.system import integral
 
 block.Block.set_nproc(16)
 dmet.solver.createTmp("/scratch/boxiao/DMETTemp")
-log.verbose = "DEBUG0"
+log.verbose = "DEBUG2"
 
 # control variables
-MaxIter = 1
+MaxIter = 20
 DiisStart = 6
 TraceStart = 4
 DiisDim = 8
@@ -70,7 +70,7 @@ log.section("\nsolving mean-field problem\n")
 log.result("Vcor =\n%s", vcor.get())
 log.result("Mu (guess) = %20.12f", Mu)
 rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
-dmet.reportOccupation(Lat, rho)
+dmet.reportOccupation(Lat, rho[:,0])
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
@@ -79,5 +79,39 @@ for iter in range(MaxIter):
     ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor, matching = True)
     log.section("\nsolving impurity problem\n")
     rhoEmb, EnergyEmb = dmet.SolveImpCAS(ImpHam, M, Lat, basis, rho, thrRdm = thrNatOrb)
-    with open("rdmCAS.npy", "w") as f:
-        np.save(f, rhoEmb)
+    #with open("rdmCAS.npy", "w") as f:
+    #    np.save(f, rhoEmb)
+    #with open("rdmCAS.npy", "r") as f:
+    #    rhoEmb = np.load(f)
+    #with open("rdmHF.npy", "r") as f:
+    #    rhoHF = np.load(f)
+    #with open("rdmMP2.npy", "r") as f:
+    #    rhoMP2 = np.load(f)
+    #EnergyEmb = -787.0246678858
+    rhoImp, EnergyImp, nelecImp = dmet.transformResults(rhoEmb, EnergyEmb, basis, ImpHam, H1e)
+    dmet.reportOccupation(Lat, rhoImp)
+    
+    log.section("\nfitting correlation potential\n")
+    vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, vcor, np.inf, Filling, MaxIter1 = 60, MaxIter2 = 0)
+
+    log.section("\nsolving mean-field problem\n")
+    log.result("Vcor =\n%s", vcor_new.get())
+    log.result("Mu (guess) = %20.12f", Mu)
+    rho, Mu_new = dmet.HartreeFock(Lat, vcor_new, Filling, Mu)
+    Mu = Mu_new
+
+    history.update(EnergyImp, err, nelecImp, np.max(abs(vcor.get() - vcor_new.get())), dc)
+    
+    if np.max(abs(vcor.get() - vcor_new.get())) < 1e-5:
+        conv = True
+        break
+
+    if not conv:
+        skipDiis = (iter < DiisStart) and (la.norm(vcor_new.param - vcor.param) > 0.01)
+        pvcor, _, _ = dc.Apply(vcor_new.param, vcor_new.param - vcor.param, Skip = skipDiis)
+        vcor.update(pvcor)
+
+if conv:
+    log.result("DMET converged")
+else:
+    log.result("DMET cannot converge")
