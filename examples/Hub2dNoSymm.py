@@ -43,6 +43,11 @@ rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
 
+    log.section("\nsolving mean-field problem\n")
+    log.result("Vcor =\n%s", vcor.get())
+    log.result("Mu (guess) = %20.12f", Mu)
+
+    rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
     log.section("\nconstructing impurity problem\n")
     ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
     log.section("\nsolving impurity problem\n")
@@ -54,11 +59,11 @@ for iter in range(MaxIter):
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, vcor, np.inf, Filling, MaxIter2 = 0)
 
-    log.section("\nsolving mean-field problem\n")
-    log.result("Vcor =\n%s", vcor_new.get())
-    log.result("Mu (guess) = %20.12f", Mu)
+    log.section("\nfitting chemical potential\n")
     rho, Mu_new = dmet.HartreeFock(Lat, vcor_new, Filling, Mu)
+    log.result("dMu = %20.12f", Mu_new - Mu)
     if iter >= TraceStart: # we want to avoid spiral increase of vcor and mu
+        log.result("dMu applied to vcor")
         vcor_new = dmet.addDiag(vcor_new, Mu - Mu_new)
     else:
         Mu = Mu_new
