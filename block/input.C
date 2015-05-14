@@ -1316,10 +1316,16 @@ void SpinAdapted::Input::readorbitalsfile(string& orbitalfile, OneElectronArray&
         pout << "Fiedler-vector orbital ordering: ";
       }
     } else if (m_reorderType == GAOPT) {
+      
+      ifstream gaconfFile;
+
       if (mpigetrank() == 0) {
-        pout << "GAOPT orbital ordering for BCS calculation not implemented";
+        if (m_gaconffile != "default") gaconfFile.open(m_gaconffile.c_str(), ios::in);
+        m_reorder = get_fiedler_bcs(orbitalfile);
       }
-      abort();      
+        //to provide as initial guess to gaopt
+        m_reorder = getgaorder_bcs(gaconfFile, orbitalfile, m_reorder);      
+        pout << "Genetic algorithm orbital ordering: ";
     } else if (m_reorderType == MANUAL) {
       if (mpigetrank() == 0) {
         ifstream reorderFile(m_reorderfile.c_str());
@@ -1572,6 +1578,12 @@ std::vector<int> SpinAdapted::Input::getgaorder(ifstream& gaconfFile, string& or
 {
   ifstream dumpFile; dumpFile.open(orbitalfile.c_str());
    return genetic::gaordering(gaconfFile, dumpFile, fiedlerorder).Gen().Sequence();
+}
+
+std::vector<int> SpinAdapted::Input::getgaorder_bcs(ifstream& gaconfFile, string& orbitalfile, std::vector<int>& fiedlerorder)
+{
+   ifstream dumpFile; dumpFile.open(orbitalfile.c_str());
+   return genetic::gaordering_bcs(gaconfFile, dumpFile, fiedlerorder).Gen().Sequence();
 }
 
 #ifdef MOLPRO
