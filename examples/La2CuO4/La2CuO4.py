@@ -93,9 +93,11 @@ for iter in range(MaxIter):
     
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, vcor, np.inf, Filling, MaxIter1 = 60, MaxIter2 = 0)
-
+    with open("vcor.npy", "w") as f:
+        np.save(f, vcor_new.param)
     log.section("\nsolving mean-field problem\n")
     log.result("Vcor =\n%s", vcor_new.get())
+
     log.result("Mu (guess) = %20.12f", Mu)
     rho, Mu_new = dmet.HartreeFock(Lat, vcor_new, Filling, Mu)
     Mu = Mu_new
