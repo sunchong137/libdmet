@@ -6,11 +6,11 @@ import numpy.linalg as la
 import itertools as it
 from libdmet.system import integral
 
-block.Block.set_nproc(16)
-dmet.solver.createTmp("/scratch/boxiao/DMETTemp")
-log.verbose = "DEBUG2"
-
-# control variables
+block.Block.set_nproc(8,2)
+dmet.solver.createTmp(tmp = "/scratch/boxiao/DMETTemp", shared = "/scratch/gpfs/boxiao/DMETTemp")
+log.verbose = "DEBUG2"   
+                         
+# control variables      
 MaxIter = 20
 DiisStart = 6
 TraceStart = 4

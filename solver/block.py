@@ -173,7 +173,7 @@ class Block(object):
             cls.nnode, cls.nproc)
         log.info("Block running on nodes:\n%s", sub.check_output(Block.mpipernode + ["hostname"]).replace("\n", "\t"))
 
-    def __init__(self, tmp = "/tmp", shared = None):
+    def __init__(self):
         self.sys_initialized = False
         self.schedule_initialized = False
         self.integral_initialized = False
@@ -186,12 +186,13 @@ class Block(object):
 
         log.debug(0, "Using Block version %s", Block.execPath)
 
-    def createTmp(self, tmp = "/tmp"):
+    def createTmp(self, tmp = "/tmp", shared = None):
         sub.check_call(["mkdir", "-p", tmp])
         self.tmpDir = mkdtemp(prefix = "BLOCK", dir = tmp)
         log.info("Block working dir %s", self.tmpDir)
         if Block.nnode > 1:
             log.eassert(shared is not None, "when running on multiple nodes, a shared tmporary folder is required")
+            sub.check_call(["mkdir", "-p", shared])
             self.tmpShared = mkdtemp(prefix = "BLOCK", dir = shared)
             sub.check_call(Block.mpipernode + ["mkdir", "-p", self.tmpDir])
             log.info("Block shared dir %s", self.tmpShared)
