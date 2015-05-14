@@ -4,3 +4,6 @@
 *.a
 block/OH
 block/block.spin_adapted
+*.aux
+*.dvi
+*.log

@@ -1,5 +1,125 @@
 \documentclass[]{article}
+\usepackage[left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage[]{amsmath}
 
 \begin{document}
-A mysterious
+A mysterious getDir() function is used in the fitting part, we have the objective function $y=f(x)$ and gradient $g=grad(x)$, then the direction is solved by solving the linear equation $Ax=b$.
+\begin{equation}
+  \left( 
+  \begin{array}[c]{c}
+    g\\
+    0.1yI
+  \end{array}
+  \right)
+    dx
+  =\left( 
+  \begin{array}[c]{c}
+    y\\
+    0
+  \end{array}
+  \right)
+\end{equation}
+Note the coefficient matrix is $n+1$ by $n$, so the linear equations are overdetermined, and solved with least square $\min_x||b-Ax||^2$. We are not going to discuss why this direction is
+chosen, but when large impurity is used, $g$ can be quite large, and the least square routine takes forever. We are here to discuss how to compute $dx$ efficiently.
+
+The analytic expression for $dx$ is
+\begin{equation}
+  dx=(A^TA)^{-1}A^Tb
+\end{equation}
+Due to the simple form of $A$ and $b$, we can evaluate the expression. Since
+\begin{equation}
+  A^TA=\left( 
+  \begin{array}[c]{cc}
+    g^T&0.1yI
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{c}
+    g\\
+    0.1yI
+  \end{array}
+  \right)=g^Tg+0.01y^2I=0.01y^2(100g^Tg/y^2+I)
+\end{equation}
+And $A^Tb=g^Ty$, we have
+\begin{equation}
+  dx=100y^{-2}(100g^Tg/y^2+I)^{-1}g^Ty=100(100g^Tg/y^2+I)^{-1}g^T/y=10(h^Th+I)^{-1}h^T
+\end{equation}
+where $h=10g/y$. Now we just need to evaluate $(h^Th+I)^{-1}$. Generally, if we can diagonalize a matrix $M=U\Lambda U^T$, then
+\begin{equation}
+  (M+I)^{-1}=U(I+\Lambda)^{-1}U^T
+\end{equation}
+can be easily evaluated. In our case, diagonalizing $h^Th$ is particularly straightforward,
+\begin{equation}
+  h^Th=\left( 
+  \begin{array}[c]{cc}
+    \tilde{h}^T&V^T
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{cc}
+    \lambda&0\\
+    0&0
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{c}
+    h\\
+    V
+  \end{array}
+  \right)
+\end{equation}
+where $\tilde{h}=h/||h||$ is simply the normalized vector of $h$, and $V$ the complimentary space which forms a orthogonal matrix with $\tilde{h}$. And $\lambda=||h||^2=hh^T$.
+Therefore
+\begin{equation}
+  \begin{split}
+  (h^Th+I)^{-1}&=\left( 
+  \begin{array}[c]{cc}
+    \tilde{h}^T&V^T
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{cc}
+    (\lambda+1)^{-1}&0\\
+    0&I
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{c}
+    h\\
+    V
+  \end{array}
+  \right)\\
+  &=\left( 
+  \begin{array}[c]{cc}
+    \tilde{h}^T&V^T
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{cc}
+    1&0\\
+    0&I
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{c}
+    h\\
+    V
+  \end{array}
+  \right)
+  -\left( 
+  \begin{array}[c]{cc}
+    \tilde{h}^T&V^T
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{cc}
+    1-(1+\lambda)^{-1}&0\\
+    0&0
+  \end{array}
+  \right)\left( 
+  \begin{array}[c]{c}
+    h\\
+    V
+  \end{array}
+  \right)\\
+  &=I-\tilde{h}^T[1-(1+\lambda)^{-1}]\tilde{h}=I-(1+\lambda)^{-1}h^Th
+  \end{split}
+\end{equation}
+Further, we have
+\begin{equation}
+  dx=10[I-(1+\lambda)^{-1}h^Th]h^T=\frac{10}{1+\lambda}h^T
+\end{equation}
+
 \end{document}
