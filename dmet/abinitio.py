@@ -166,7 +166,7 @@ def reportOccupation(lattice, rho, names = None):
     results.append("\n".join(lines))
     log.result("\n".join(results))
 
-def selectActiveSpace(rho, thrRdm):
+def selectActiveSpace(rho, thrRdm, nact = None):
     if rho.shape[0] == 2:
         rho_mix = 0.5 * (rho[0] + rho[1])
     else:
@@ -175,6 +175,11 @@ def selectActiveSpace(rho, thrRdm):
     ncore = np.sum(natocc > 1 - thrRdm)
     nvirt = np.sum(natocc < thrRdm)
     nactive = rho.shape[1] - ncore - nvirt
+    if nact is not None and nactive != nact:
+        log.warning("Imposing number of active orbitals: Using %d rather than %d", nact, nactive)
+        ncore += (nactive - nact) / 2
+        nactive = nact
+        nvirt = rho.shape[1] - ncore - nactive
     log.info("Ncore = %d  Nvirt = %d  Nactive = %d", ncore, nvirt, nactive)
     return natorb[:, -ncore:], natorb[:, nvirt: -ncore] # core and active orbitals
 
@@ -220,7 +225,10 @@ def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, thrRdm = 5e-3):
     # then MP2
     E_MP2, rhoMP2 = scfsolver.MP2()
     log.info("Setting up active space")
-    core, active = selectActiveSpace(rhoMP2, thrRdm)
+    if solver.optimized:
+        core, active = selectActiveSpace(rhoMP2, thrRdm, nact = solver.integral.norb)
+    else:
+        core, active = selectActiveSpace(rhoMP2, thrRdm)
     # FIXME additional localization for active?
     # two ways: 1. location-based localization 2. integral based localization
     # build active space Hamiltonian
