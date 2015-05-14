@@ -23,8 +23,8 @@ def transform_trans_inv_sparse(basis, lattice, H, symmetric = True, thr = 1e-7):
     ncells = lattice.ncells
     nbasis = basis.shape[2]
     res = np.zeros((nbasis, nbasis))
-    mask_basis = find(True, map(lambda basis: la.norm(basis) > thr, basis))
-    mask_H = find(True, map(lambda basis: la.norm(basis) > thr, H))
+    mask_basis = find(True, map(lambda a: la.norm(a) > thr, basis))
+    mask_H = find(True, map(lambda a: la.norm(a) > thr, H))
     if symmetric:
         for i in mask_basis:
             res += mdot(basis[i].T, H[0], basis[i])
@@ -54,9 +54,20 @@ def transform_local_sparse(basis, lattice, H, thr = 1e-7):
     ncells = lattice.ncells
     nbasis = basis.shape[2]
     res = np.zeros((nbasis, nbasis))
-    mask_basis = find(True, map(lambda basis: la.norm(basis) > thr, basis))
+    mask_basis = find(True, map(lambda a: la.norm(a) > thr, basis))
     for i in mask_basis:
         res += mdot(basis[i].T, H, basis[i])
+    return res
+
+def transform_local_sparseH(basis, lattice, H, thr = 1e-7):
+    ncells = lattice.ncells
+    nbasis = basis.shape[2]
+    res = np.zeros((nbasis, nbasis))
+    mask_H = np.nonzero(abs(H) > thr)
+    mask_H = zip(*map(lambda a: a.tolist(), mask_H))
+    for j,k in mask_H:
+        #for i in range(ncells):
+        res += np.dot(basis[:,j].T, basis[:,k]) *  H[j,k]
     return res
 
 def transform_imp(basis, lattice, H):
