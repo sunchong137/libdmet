@@ -5,7 +5,7 @@ from scipy.optimize import fmin
 from scipy.linalg import lstsq
 
 
-def minimize(fn, x0, MaxIter = 300, **kwargs):
+def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
     nx = x0.shape[0]
     if "serial" in kwargs.keys() and kwargs["serial"]:
         multi = False
@@ -32,16 +32,22 @@ def minimize(fn, x0, MaxIter = 300, **kwargs):
         else:
             g = np.asarray(map(gix, range(nx)))
         return g
+    if fgrad is None:
+        fgrad = grad
 
+    #def GetDir(y, g):
+    #    g2 = np.empty((1+nx, nx))
+    #    g2[0] = g
+    #    g2[1:] = 0.1 * y * np.eye(nx)
+    #    y2 = np.zeros(1+nx)
+    #    y2[0] = y
+    #    dx2, fitresid, rank, sigma = lstsq(g2, y2)
+    #    return dx2
+    
     def GetDir(y, g):
-        g2 = np.empty((1+nx, nx))
-        g2[0] = g
-        g2[1:] = 0.1 * y * np.eye(nx)
-        y2 = np.zeros(1+nx)
-        y2[0] = y
-        dx2, fitresid, rank, sigma = lstsq(g2, y2)
-        dx = dx2[:nx]
-        return dx
+        h = 10 * g / y
+        h2 = np.sum(h*h)
+        return h * 10 / (1+h2)
 
     x = x0
 
@@ -55,9 +61,7 @@ def minimize(fn, x0, MaxIter = 300, **kwargs):
     for iter in range(MaxIter):
         if (y < 1e-6 and iter != 0):
             break
-
-        g = grad(x)
-
+        g = fgrad(x)
         if la.norm(g) < 1e-5:
             break
 
