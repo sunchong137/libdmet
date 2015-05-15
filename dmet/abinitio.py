@@ -212,7 +212,7 @@ def buildActiveHam(Ham, c, a):
     }
     return integral.Integral(a.shape[1], False, False, H0, H1, H2)
 
-def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, thrRdm = 5e-3):
+def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3):
     spin = ImpHam.H1["cd"].shape[0]
     if nelec is None:
         nelec = ImpHam.norb
@@ -227,6 +227,8 @@ def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, thrRdm = 5e-3):
     log.info("Setting up active space")
     if solver.optimized:
         core, active = selectActiveSpace(rhoMP2, thrRdm, nact = solver.integral.norb)
+    elif nact is not None:
+        core, active = selectActiveSpace(rhoMP2, thrRdm, nact = nact)        
     else:
         core, active = selectActiveSpace(rhoMP2, thrRdm)
     # FIXME additional localization for active?
