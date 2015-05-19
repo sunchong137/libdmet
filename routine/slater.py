@@ -215,14 +215,15 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
                 dV_dparam[ip, s] = transform_local_sparseH(basis[s], lattice, vcor.gradient()[ip,s])
         # now only indices kl
         return np.tensordot(dV_dparam, dnorm_dV, axes = ((1,2,3), (0,1,2)))
-
+    
+    err_begin = errfunc(vcor.param)
     if beta == np.inf:
         log.info("Using analytic gradient")
-        param, err = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
+        param, err_end = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
     else:
-        param, err = minimize(errfunc, vcor.param, MaxIter, **kwargs)
+        param, err_end = minimize(errfunc, vcor.param, MaxIter, **kwargs)
     vcor.update(param)
-    return vcor, err
+    return vcor, err_begin, err_end
 
 def FitVcorFull(rho, lattice, basis, vcor, beta, filling, MaxIter = 20, **kwargs):
     spin = basis.shape[0]
@@ -238,25 +239,27 @@ def FitVcorFull(rho, lattice, basis, vcor, beta, filling, MaxIter = 20, **kwargs
         for s in range(spin):
             rho1[s] = transform_trans_inv_sparse(basis[s], lattice, rhoT[s], thr = 1e-6)
         return la.norm(rho - rho1) / sqrt(spin)
-
-    param, err = minimize(errfunc, vcor.param, MaxIter, **kwargs)
+    
+    err_begin = errfunc(vcor.param)
+    param, err_end = minimize(errfunc, vcor.param, MaxIter, **kwargs)
     vcor.update(param)
-    return vcor, err
+    return vcor, err_begin, err_end
 
 def FitVcorTwoStep(rho, lattice, basis, vcor, beta, filling, MaxIter1 = 300, MaxIter2 = 20):
     vcor_new = deepcopy(vcor)
     log.result("Using two-step vcor fitting")
     if MaxIter1 > 0:
         log.info("Impurity model stage  max %d steps", MaxIter1)
-        vcor_new, err = FitVcorEmb(rho, lattice, basis, vcor_new, beta, \
+        vcor_new, err_begin, err_end = FitVcorEmb(rho, lattice, basis, vcor_new, beta, \
             MaxIter = MaxIter1, serial = True)
-        log.info("residue = %20.12f", err)
+        log.result("residue(begin) = %20.12f", err_begin)
+        log.info("residue(end) = %20.12f", err_end)
     if MaxIter2 > 0:
         log.info("Full lattice stage  max %d steps", MaxIter2)
-        vcor_new, err = FitVcorFull(rho, lattice, basis, vcor_new, beta, \
+        vcor_new, _, err_end = FitVcorFull(rho, lattice, basis, vcor_new, beta, \
             filling, MaxIter = MaxIter2)
-    log.result("residue = %20.12f", err)
-    return vcor_new, err
+    log.result("residue(end) = %20.12f", err_end)
+    return vcor_new, err_begin
 
 def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     spin = rhoEmb.shape[0]
