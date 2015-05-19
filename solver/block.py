@@ -34,7 +34,7 @@ class Schedule(object):
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
 
-        self.twodot_to_onedot = self.arraySweep[-1] + 2
+        self.twodot_to_onedot = self.arraySweep[-1] + 6
 
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
@@ -57,7 +57,7 @@ class Schedule(object):
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
 
-        self.twodot_to_onedot = self.arraySweep[-1] + 2
+        self.twodot_to_onedot = self.arraySweep[-1] + 6
 
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
