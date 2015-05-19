@@ -25,7 +25,7 @@ class Schedule(object):
         self.arrayNoise = deepcopy(self.arrayTol)
 
         self.arrayM.append(maxM)
-        self.arraySweep.append(self.arraySweep[-1] + 2)
+        self.arraySweep.append(self.arraySweep[-1] + 4)
         self.arrayTol.append(self.arrayTol[-1])
         self.arrayNoise.append(0)
 
@@ -34,7 +34,7 @@ class Schedule(object):
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
 
-        self.twodot_to_onedot = self.arraySweep[-1] + 6
+        self.twodot_to_onedot = self.arraySweep[-1] + 4
 
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
@@ -48,7 +48,7 @@ class Schedule(object):
     def gen_restart(self, M):
         log.debug(1, "Generate default schedule with restart calculation M = %d, maxiter = %d", M, self.maxiter)
         self.arrayM = [M, M]
-        self.arraySweep = [0, 2]
+        self.arraySweep = [0, 4]
         self.arrayTol = [self.sweeptol * 0.1] * 2
         self.arrayNoise = [self.sweeptol * 0.1, 0]
 
@@ -57,7 +57,7 @@ class Schedule(object):
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
 
-        self.twodot_to_onedot = self.arraySweep[-1] + 6
+        self.twodot_to_onedot = self.arraySweep[-1] + 4
 
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
