@@ -158,6 +158,9 @@ class Block(object):
     nproc = 1
     nnode = 1
     intFormat = "FCIDUMP"
+    reorder = True
+
+    # these should not be changed
     basicFiles = ["dmrg.conf.*", "FCIDUMP"]
     restartFiles = ["RestartReorder.dat", "Rotation*", "StateInfo*", "statefile*", "wave*"]
     tempFiles = ["Spin*", "Overlap*", "dmrg.e", "spatial*", "onepdm.*", "twopdm.*", "pairmat.*", \
@@ -239,6 +242,8 @@ class Block(object):
             f.write("bogoliubov\n")
         if not self.spinAdapted:
             f.write("nonspinadapted\n")
+        if not Block.reorder:
+            f.write("noreorder\n")
 
     def copy_restartfile(self, src, cleanup = True):
         files = Block.restartFiles
