@@ -253,12 +253,12 @@ def FitVcorTwoStep(rho, lattice, basis, vcor, beta, filling, MaxIter1 = 300, Max
         vcor_new, err_begin, err_end = FitVcorEmb(rho, lattice, basis, vcor_new, beta, \
             MaxIter = MaxIter1, serial = True)
         log.result("residue(begin) = %20.12f", err_begin)
-        log.info("residue(end) = %20.12f", err_end)
+        log.info("residue(end)   = %20.12f", err_end)
     if MaxIter2 > 0:
         log.info("Full lattice stage  max %d steps", MaxIter2)
         vcor_new, _, err_end = FitVcorFull(rho, lattice, basis, vcor_new, beta, \
             filling, MaxIter = MaxIter2)
-    log.result("residue(end) = %20.12f", err_end)
+    log.result("residue(end)   = %20.12f", err_end)
     return vcor_new, err_begin
 
 def transformResults(rhoEmb, E, basis, ImpHam, H1e):
