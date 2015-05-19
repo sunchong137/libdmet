@@ -8,7 +8,7 @@ from copy import deepcopy
 import subprocess as sub
 
 class Schedule(object):
-    def __init__(self, maxiter = 30, sweeptol = 1e-8):
+    def __init__(self, maxiter = 30, sweeptol = 1e-7):
         self.initialized = False
         self.twodot_to_onedot = None
         self.maxiter = maxiter
