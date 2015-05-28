@@ -8,6 +8,16 @@ import itertools as it
 import libdmet.utils.logger as log
 import libdmet.system.hamiltonian as ham
 
+def Frac2Real(cellsize, coord):
+    assert(len(cellsize.shape) == 2 and cellsize.shape[0] == cellsize.shape[1])
+    assert(len(coord.shape) == 1)
+    return np.dot(coord, cellsize)
+
+def Real2Frac(cellsize, coord):
+    assert(len(cellsize.shape) == 2 and cellsize.shape[0] == cellsize.shape[1])
+    assert(len(coord.shape) == 1)
+    return np.dot(coord, la.inv(cellsize))
+
 def ChainLattice(length, scsites):
     log.eassert(length % scsites == 0, "incompatible lattice size and supercell size")
     uc = UnitCell(np.eye(1), [(np.array([0]), "X")])
