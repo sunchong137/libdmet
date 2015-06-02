@@ -31,10 +31,62 @@ def normalizeBasis(b):
 def normalizeBasis1(b):
     # array in blocks
     ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
-    log.debug(1, "basis overlap is\n%s", ovlp)
     log.debug(0, "basis norm is\n%s", np.diag(ovlp))
     norms = np.diag(1./np.sqrt(np.diag(ovlp)))
     return np.tensordot(b, norms, axes = (2,0))
+
+def orthonormalizeBasis(b):
+    nbasis = b.shape[2]
+    ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
+    log.debug(1, "basis overlap is\n%s", ovlp)
+    if np.allclose(ovlp - np.diag(np.diag(ovlp)), 0.):
+        return normalizeBasis1(b)
+    else:
+        ew, ev = la.eigh(ovlp)
+        ew = ew[::-1]
+        ev = ev[:, ::-1]
+        b = np.tensordot(b, ev, axes = (2, 0))
+        b = np.tensordot(b, np.diag(ew**(-0.5)), axes = (2, 0))
+        return b
+
+def getNonDiagBlocks(mat):
+    log.eassert(la.norm(mat - mat.T) < 1e-10, "Input matrix is not symmetric")
+    nonzero = np.asarray(np.nonzero(abs(mat - np.diag(np.diag(mat))) > 1e-12)).T
+    nonzero = nonzero[:nonzero.shape[0]/2].tolist()
+    blocks = []
+    for pair in nonzero:
+        found = False
+        for b in blocks:
+            if pair[0] in b:
+                b.add(pair[1])
+                found = True
+            elif pair[1] in b:
+                b.add(pair[0])
+                found = True
+        if not found:
+            blocks.append(set(pair))
+    return map(lambda b: sorted(list(b)), blocks)
+
+    
+
+def orthonormalizeBasisPHsymm(b):
+    nbasis = b.shape[2]
+    ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
+    log.debug(1, "basis overlap is\n%s", ovlp)
+    if np.allclose(ovlp - np.eye(nbasis), 0.):
+        return normalizeBasis1(b)
+    else:
+        blocks = getNonDiagBlocks(ovlp)
+        for block in blocks:
+            bsize = len(block) / 2
+            submat = ovlp[np.ix_(block, block)]
+            ew, ev = la.eigh(submat)
+            order = np.argsort(np.sum(ev[:bsize]**2, axis = 0))[::-1]
+            ew = ew[order]
+            ev = ev[:, order]
+            b[:,:,block] = np.tensordot(b[:,:,block], ev, axes = (2,0))
+            b[:,:,block] = np.tensordot(b[:,:,block], np.diag(ew**(-0.5)), axes = (2,0))
+        return b
 
 def embBasis(lattice, rho, local = True, **kwargs):
     if local:
@@ -54,7 +106,7 @@ def __embBasis_proj(lattice, rho, **kwargs):
         #B1 = normalizeBasis(B1)
         B = np.swapaxes(np.tensordot(la.inv(A), rho[s], axes = (1,1)), 0, 1)[1:]
         B = np.swapaxes(B, 1, 2)
-        B = normalizeBasis1(B)
+        B = orthonormalizeBasis(B)
         basis[s, 0, :, :nscsites] = np.eye(nscsites)
         basis[s, 1:, :, nscsites:] = B
     return basis
@@ -69,16 +121,17 @@ def __embBasis_phsymm(lattice, rho, **kwargs):
         A1 = MatSqrt(rho[s,0])
         AB1 = np.swapaxes(np.tensordot(la.inv(A1), rho[s], axes = (1,1)), 0, 1)
         AB1 = np.swapaxes(AB1, 1, 2)
-        AB1 = normalizeBasis1(AB1)
+        AB1 = orthonormalizeBasis(AB1)
         # hole
         rho_h = -rho[s]
         rho_h[0] += np.eye(nscsites)
         A2 = MatSqrt(rho_h[0])
         AB2 = np.swapaxes(np.tensordot(la.inv(A2), rho_h, axes = (1,1)), 0, 1)
         AB2 = np.swapaxes(AB2, 1, 2)
-        AB2 = normalizeBasis1(AB2)
+        AB2 = orthonormalizeBasis(AB2)
         basis[s,:,:,:nscsites] = AB1
         basis[s,:,:,nscsites:] = AB2
+        basis[s] = orthonormalizeBasisPHsymm(basis[s])
     return basis
 
 def embHam(lattice, basis, vcor, local = True, **kwargs):
@@ -149,10 +202,12 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         for i in range(H2.shape[0]):
             H2[i, :nscsites, :nscsites, :nscsites, :nscsites] = lattice.getH2()
     else:
-        for idx, (s1, s2) in enumerate(it.combinations_with_replacement(range(spin), 2)):
-            # notice the order aa,ab,bb
-            H2[idx] = transform_4idx(lattice.getH2(), basis[s1][0], basis[s1][0], \
-                basis[s2][0], basis[s2][0])
+        H2[0] = transform_4idx(lattice.getH2(), basis[0,0], basis[0,0], \
+                basis[0,0], basis[0,0])
+        H2[1] = transform_4idx(lattice.getH2(), basis[1,0], basis[1,0], \
+                basis[1,0], basis[1,0])
+        H2[2] = transform_4idx(lattice.getH2(), basis[0,0], basis[0,0], \
+                basis[1,0], basis[1,0])
     return H2
 
 def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):

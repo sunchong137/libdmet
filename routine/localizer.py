@@ -24,10 +24,10 @@ class Localizer(object):
         log.eassert(i != j, "rotation meaningless with i=j")
         # this works even for general cases where Int2e does not have symmetry
         delta = np.asarray([[cos(theta)-1, sin(theta)],[-sin(theta), cos(theta)-1]])
-        # four index part
+        # four index part O(1)
         g4 = self.Int2e[np.ix_([i,j],[i,j],[i,j],[i,j])]
         g4 = np.einsum("pi,qj,rk,sl,ijkl->pqrs", delta, delta, delta, delta, g4)
-        # three index part
+        # three index part O(n)
         g3_1 = self.Int2e[np.ix_(range(self.norbs), [i,j], [i,j], [i,j])]
         g3_1 = np.einsum("qj,rk,sl,pjkl->pqrs", delta, delta, delta, g3_1)
         g3_2 = self.Int2e[np.ix_([i,j], range(self.norbs), [i,j], [i,j])]
@@ -36,7 +36,7 @@ class Localizer(object):
         g3_3 = np.einsum("pi,qj,sl,ijrl->pqrs", delta, delta, delta, g3_3)
         g3_4 = self.Int2e[np.ix_([i,j], [i,j], [i,j], range(self.norbs))]
         g3_4 = np.einsum("pi,qj,rk,ijks->pqrs", delta, delta, delta, g3_4)
-        # two index part
+        # two index part O(n^2)
         g2_12 = self.Int2e[np.ix_(range(self.norbs), range(self.norbs), [i,j], [i,j])]
         g2_12 = np.einsum("rk,sl,pqkl->pqrs", delta, delta, g2_12)
         g2_13 = self.Int2e[np.ix_(range(self.norbs), [i,j], range(self.norbs), [i,j])]
@@ -49,7 +49,7 @@ class Localizer(object):
         g2_24 = np.einsum("pi,rk,iqks->pqrs", delta, delta, g2_24)
         g2_34 = self.Int2e[np.ix_([i,j], [i,j], range(self.norbs), range(self.norbs))]
         g2_34 = np.einsum("pi,qj,ijrs->pqrs", delta, delta, g2_34)
-        # one index part
+        # one index part O(n^3)
         g1_1 = self.Int2e[[i,j], :, :, :]
         g1_1 = np.einsum("pi,iqrs->pqrs", delta, g1_1)
         g1_2 = self.Int2e[:, [i,j], :, :]
@@ -95,23 +95,27 @@ class Localizer(object):
                 - self.Int2e[i,j,j,j] - self.Int2e[j,i,j,j] - self.Int2e[j,j,i,j] - self.Int2e[j,j,j,i]
         C = self.Int2e[i,i,j,j] + self.Int2e[i,j,i,j] + self.Int2e[i,j,j,i] + self.Int2e[j,i,i,j] \
                 + self.Int2e[j,i,j,i] + self.Int2e[j,j,i,i]
+
         def dL(theta):
             return 0.25 * ((cos(4*theta)-1) * (A-C) + sin(4*theta) * B)
         
         def get_theta():
-            alpha = atan(B/(A-C))
+            # solve dL/dtheta = 0, take theta that corresponds to maximum
+            if abs(A-C) > 1e-8:
+                alpha = atan(B/(A-C))
+            else:
+                alpha = pi/2
             if alpha > 0:
                 theta = [alpha*0.25, (alpha-pi)*0.25]
             else:
                 theta = [alpha*0.25, (alpha+pi)*0.25]
             vals = map(dL, theta)
             if vals[0] > vals[1]:
-                return theta[0]
+                return theta[0], vals[0]
             else:
-                return theta[1]
+                return theta[1], vals[1]
 
-        theta = get_theta()
-        return theta, dL(theta)
+        return get_theta()
 
     def getL(self):
         return np.sum(map(lambda i: self.Int2e[i,i,i,i], range(self.norbs)))
@@ -120,26 +124,32 @@ class Localizer(object):
         # Edmiston-Ruedenberg: maximizing self-energy
         # L = \sum_p (pp||pp)
         # each Jacobian step \theta between -pi/4 to pi/4
-        dL = thr * 1e3
         Iter = 0
         log.info("Edmiston-Ruedenberg localization")
         log.debug(0, "Iter        L            dL     (i , j)   theta/pi")
+        sweep = []
+        for i,j in it.combinations(range(self.norbs), 2):
+            sweep.append((i, j) + self.predictor(i, j))
+        sweep.sort(key = lambda x: x[3])
+        i, j, theta, dL = sweep[-1]
+        log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", Iter, self.getL(), dL, i, j, theta/pi)        
         while dL > thr:
+            self.transformInt(i,j,theta)
+            self.transformCoef(i,j,theta)
+            Iter += 1
             sweep = []
             for i,j in it.combinations(range(self.norbs), 2):
                 sweep.append((i, j) + self.predictor(i, j))
             sweep.sort(key = lambda x: x[3])
             i, j, theta, dL = sweep[-1]
-            log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", Iter, self.getL(), dL, i, j, theta/pi)
-            self.transformInt(i,j,theta)
-            self.transformCoef(i,j,theta)
-            Iter += 1
+            log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", Iter, self.getL(), dL, i, j, theta/pi)            
         log.info("Localization converged after %4d iterations", Iter)
 
 if __name__ == "__main__":
     log.verbose = "DEBUG0"
     np.random.seed(9)
-    s = np.random.rand(8,8,8,8)
+    norbs = 10
+    s = np.random.rand(norbs,norbs,norbs,norbs)
     s += np.swapaxes(s, 0, 1)
     s += np.swapaxes(s, 2, 3)
     s += np.swapaxes(np.swapaxes(s, 0, 2), 1, 3)

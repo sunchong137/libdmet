@@ -65,8 +65,8 @@ def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu):
     ImpHam.H0 += dmu1 * nscsites * 2
     return SolveImpHam(ImpHam, M)
 
-def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, thr = 1e-4):
-    rhoEmb, EnergyEmb = SolveImpHam(ImpHam, M)
+def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, thr = 1e-4, **kwargs):
+    rhoEmb, EnergyEmb = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, 0., **kwargs)
     nelec = transformResults(rhoEmb, None, basis, None, None)
     log.result("nelec = %20.12f (target is %20.12f)", nelec, filling*2)
     if abs(nelec/(filling*2) - 1.) < 1e-4:
@@ -75,7 +75,7 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, t
     else:
         delta *= -1. if (nelec > filling*2) else 1.
         log.result("chemical potential fitting:\nfinite difference dMu = %20.12f" % delta)
-        rhoEmb1, EnergyEmb1 = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, delta)
+        rhoEmb1, EnergyEmb1 = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, delta, **kwargs)
         nelec1 = transformResults(rhoEmb1, None, basis, None, None)
         log.result("nelec = %20.12f (target is %20.12f)", nelec1, filling*2)
         if abs(nelec1/(filling*2) - 1.) < 1e-4:
@@ -86,7 +86,7 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, t
             log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
             log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
             log.result("extrapolated to dMu = %20.12f", delta1)
-            rhoEmb2, EnergyEmb2 = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, delta1)
+            rhoEmb2, EnergyEmb2 = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, delta1, **kwargs)
             return rhoEmb2, EnergyEmb2, ImpHam, delta1
 
 def AFInitGuess(ImpSize, U, Filling, polar = None):

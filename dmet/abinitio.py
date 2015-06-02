@@ -31,30 +31,6 @@ def buildLattice(latSize, impSize, cellSize, atoms, basis):
     lat = Lat.Lattice(sc, latSize / impSize)
     return lat
 
-def ConstructImpHam(Lat, rho, v, matching = True, **kwargs):
-    log.result("Making embedding basis")
-    basis = slater.embBasis(Lat, rho, local = True)
-
-    if matching and basis.shape[0] == 2: 
-        log.result("Rotate bath orbitals to match alpha and beta basis")
-        nscsites = Lat.supercell.nsites
-        bathA = basis[0, :, :, nscsites:]
-        bathB = basis[1, :, :, nscsites:]
-        S = np.tensordot(bathA, bathB, axes = ((0,1), (0,1)))
-        # S=A^T*B svd of S is UGV^T then we let A'=AU, B'=BV
-        # yields A'^T*B'=G diagonal and optimally overlapped
-        u, gamma, vt = la.svd(S)
-        log.result("overlap statistics:\n larger than 0.9: %3d  smaller than 0.9: %3d\n"
-            " average: %10.6f  min: %10.6f", \
-            np.sum(gamma > 0.9), np.sum(gamma < 0.9), np.average(gamma), np.min(gamma))
-        basis[0, :, :, nscsites:] = np.tensordot(bathA, u, axes = (2, 0))
-        basis[1, :, :, nscsites:] = np.tensordot(bathB, vt, axes = (2, 1)) # because of V.T
-
-    log.result("Constructing impurity Hamiltonian")
-    ImpHam, H1e = slater.embHam(Lat, basis, v, local = True, **kwargs)
-
-    return ImpHam, H1e, basis
-
 def __read_bin(dirname, name, shape):
     if os.path.exists(os.path.join(dirname, name + ".npy")):
         temp = np.load(os.path.join(dirname, name + ".npy"))
@@ -212,6 +188,25 @@ def buildActiveHam(Ham, c, a):
     }
     return integral.Integral(a.shape[1], False, False, H0, H1, H2)
 
+def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu, rhoNonInt = None, nelec = None, nact = None, thrRdm = 5e-3):
+    # H = H1 + Vcor - Mu
+    # to keep H for mean-field Mu->Mu+dMu, Vcor->Vcor+dMu
+    # In impurity Ham, equivalent to substracting dMu from impurity, but not bath
+    # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
+    # alternatively, we can change ImpHam.H0 to compensate
+    nscsites = lattice.supercell.nsites
+    # FIXME this is not robust
+    old_dmu = ImpHam.H0 / (2 * nscsites)
+    dmu1 = dmu - old_dmu
+    if ImpHam.restricted:
+        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
+    else:
+        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
+        ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu1 * np.eye(nscsites))
+    ImpHam.H0 += dmu1 * nscsites * 2
+    return SolveImpHamCAS(ImpHam, M, lattice, basis, rhoNonInt, nelec, nact, thrRdm)
+ 
+
 def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3):
     spin = ImpHam.H1["cd"].shape[0]
     if nelec is None:
@@ -222,8 +217,11 @@ def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thr
     rhoHF = np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], Lat, rhoNonInt[s]), range(spin)))
     # do Hartree-Fock
     E_HF, rhoHF = scfsolver.HF(tol = 1e-5, MaxIter = 20, InitGuess = rhoHF)
+    nscsites = Lat.supercell.nsites
+    reportOccupation(Lat, rhoHF[:, :nscsites, :nscsites])
     # then MP2
     E_MP2, rhoMP2 = scfsolver.MP2()
+    reportOccupation(Lat, rhoMP2[:, :nscsites, :nscsites])
     log.info("Setting up active space")
     if solver.optimized:
         core, active = selectActiveSpace(rhoMP2, thrRdm, nact = solver.integral.norb)

@@ -8,6 +8,7 @@ from libdmet.solver import block
 import libdmet.utils.logger as log
 import types
 import numpy as np
+import numpy.linalg as la
 import itertools as it
 
 solver = block.Block()
@@ -21,9 +22,26 @@ def HartreeFock(Lat, v, U):
     log.result("Gap (mean-field) = %20.12f" % res["gap"])
     return rho, mu
 
-def ConstructImpHam(Lat, rho, v, **kwargs):
+def basisMatching(basis):
+    basisA, basisB = basis[0], basis[1]
+    S = np.tensordot(basisA, basisB, axes = ((0,1), (0,1)))
+    # S=A^T*B svd of S is UGV^T then we let A'=AU, B'=BV
+    # yields A'^T*B'=G diagonal and optimally overlapped
+    u, gamma, vt = la.svd(S)
+    log.result("overlap statistics:\n larger than 0.9: %3d  smaller than 0.9: %3d\n"
+            " average: %10.6f  min: %10.6f", \
+            np.sum(gamma > 0.9), np.sum(gamma < 0.9), np.average(gamma), np.min(gamma))
+    basisA = np.tensordot(basisA, u, axes = (2, 0))
+    basisB = np.tensordot(basisB, vt, axes = (2, 1))
+    return np.asarray([basisA, basisB])
+
+def ConstructImpHam(Lat, rho, v, matching = True, **kwargs):
     log.result("Making embedding basis")
     basis = slater.embBasis(Lat, rho, local = True)
+    if matching and basis.shape[0] == 2: 
+        log.result("Rotate bath orbitals to match alpha and beta basis")
+        nscsites = Lat.supercell.nsites
+        basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
     log.result("Constructing impurity Hamiltonian")
     ImpHam, H1e = slater.embHam(Lat, basis, v, local = True, **kwargs)
 
