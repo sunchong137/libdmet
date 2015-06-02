@@ -6,18 +6,18 @@
 import numpy as np
 import numpy.linalg as la
 import libdmet.utils.logger as log
-from math import cos, sin
+from math import cos, sin, atan, pi
 from copy import deepcopy
+import itertools as it
 
 class Localizer(object):
     
-    def __init__(self, Int2e, thr = 1e-6): # Int2e[i,j,k,l] = (ij||kl)
+    def __init__(self, Int2e): # Int2e[i,j,k,l] = (ij||kl)
         self.norbs = Int2e.shape[0]
         self.Int2e = deepcopy(Int2e)
         self.coefs = np.eye(self.norbs)
-        self.thr = thr
 
-    def transform(self, i, j, theta):
+    def transformInt(self, i, j, theta):
         # transform 2e integrals wrt Jacobi rotation J_ii = J_jj = cos\theta, J_ij = sin\theta, J_ij = -sin\theta
         # restrict to i < j
         # The scaling of this transformation is O(n^3)
@@ -75,23 +75,76 @@ class Localizer(object):
         self.Int2e[:, :, [i,j], :] += g1_3
         self.Int2e[:, :, :, [i,j]] += g1_4
 
-    def optimize(self):
+    def transformCoef(self, i, j, theta):
+        U = np.eye(self.norbs)
+        U[i,i] = U[j,j] = cos(theta)
+        U[i,j] = sin(theta)
+        U[j,i] = -sin(theta)
+        self.coefs = np.dot(U, self.coefs)
+
+    def predictor(self, i, j):
+        # for the rotation between orbitals i,j
+        # we restrict theta in -pi/4, +pi/4
+        # compute (i'i'||i'i')+(j'j'||j'j')-(ii||ii)-(jj||jj)
+        # i'=i*cos\theta+j*sin\theta
+        # j'=j*cos\theta-i*sin\theta
+        # (i'i'||i'i')+(j'j'||j'j') = [(ii||ii)+(jj||jj)][3/4+1/4*cos4\theta] + [(ii||ij)+...-(ij||jj)-...]*1/4*sin4\theta
+        # + [(ii||jj)+...][1/4-1/4*cos4\theta]
+        A = self.Int2e[i,i,i,i] + self.Int2e[j,j,j,j]
+        B = self.Int2e[i,i,i,j] + self.Int2e[i,i,j,i] + self.Int2e[i,j,i,i] + self.Int2e[j,i,i,i] \
+                - self.Int2e[i,j,j,j] - self.Int2e[j,i,j,j] - self.Int2e[j,j,i,j] - self.Int2e[j,j,j,i]
+        C = self.Int2e[i,i,j,j] + self.Int2e[i,j,i,j] + self.Int2e[i,j,j,i] + self.Int2e[j,i,i,j] \
+                + self.Int2e[j,i,j,i] + self.Int2e[j,j,i,i]
+        def dL(theta):
+            return 0.25 * ((cos(4*theta)-1) * (A-C) + sin(4*theta) * B)
+        
+        def get_theta():
+            alpha = atan(B/(A-C))
+            if alpha > 0:
+                theta = [alpha*0.25, (alpha-pi)*0.25]
+            else:
+                theta = [alpha*0.25, (alpha+pi)*0.25]
+            vals = map(dL, theta)
+            if vals[0] > vals[1]:
+                return theta[0]
+            else:
+                return theta[1]
+
+        theta = get_theta()
+        return theta, dL(theta)
+
+    def getL(self):
+        return np.sum(map(lambda i: self.Int2e[i,i,i,i], range(self.norbs)))
+
+    def optimize(self, thr = 1e-3):
         # Edmiston-Ruedenberg: maximizing self-energy
         # L = \sum_p (pp||pp)
         # each Jacobian step \theta between -pi/4 to pi/4
-        
-
+        dL = thr * 1e3
+        Iter = 0
+        log.info("Edmiston-Ruedenberg localization")
+        log.debug(0, "Iter        L            dL     (i , j)   theta/pi")
+        while dL > thr:
+            sweep = []
+            for i,j in it.combinations(range(self.norbs), 2):
+                sweep.append((i, j) + self.predictor(i, j))
+            sweep.sort(key = lambda x: x[3])
+            i, j, theta, dL = sweep[-1]
+            log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", Iter, self.getL(), dL, i, j, theta/pi)
+            self.transformInt(i,j,theta)
+            self.transformCoef(i,j,theta)
+            Iter += 1
+        log.info("Localization converged after %4d iterations", Iter)
 
 if __name__ == "__main__":
+    log.verbose = "DEBUG0"
+    np.random.seed(9)
     s = np.random.rand(8,8,8,8)
+    s += np.swapaxes(s, 0, 1)
+    s += np.swapaxes(s, 2, 3)
+    s += np.swapaxes(np.swapaxes(s, 0, 2), 1, 3)
     loc = Localizer(s)
-    i = 2
-    j = 7
-    theta = -0.3
-    loc.transform(i,j,theta)
-    R = np.eye(8)
-    R[i,i] = cos(theta)
-    R[j,j] = cos(theta)
-    R[i,j] = sin(theta)
-    R[j,i] = -sin(theta)
-    print la.norm(loc.Int2e - np.einsum("pi,qj,rk,sl,ijkl->pqrs", R, R, R, R, s))
+    loc.optimize()
+    R = loc.coefs
+    err = loc.Int2e - np.einsum("pi,qj,rk,sl,ijkl->pqrs", R, R, R, R, s)
+    log.check(np.allclose(err, 0), "Inconsistent coefficients and integrals, difference is %.2e", la.norm(err))
