@@ -1,4 +1,5 @@
 from Hubbard import *
+import Hubbard
 import numpy as np
 import numpy.linalg as la
 from libdmet.system.hamiltonian import HamNonInt
@@ -206,8 +207,9 @@ def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu, rhoNonInt = None, nel
     ImpHam.H0 += dmu1 * nscsites * 2
     return SolveImpHamCAS(ImpHam, M, lattice, basis, rhoNonInt, nelec, nact, thrRdm)
  
+Hubbard.__SolveImpHam_with_dmu = __SolveImpHam_with_dmu
 
-def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3):
+def SolveImpHamCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3):
     spin = ImpHam.H1["cd"].shape[0]
     if nelec is None:
         nelec = ImpHam.norb
