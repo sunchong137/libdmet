@@ -1,6 +1,7 @@
 from HubPhSymm import *
 from libdmet.routine.slater_helper import transform_imp
 import numpy as np
+from math import copysign
 
 def RHartreeFock(Lat, v, filling, mu0):
     rho, mu, E, res = HF(Lat, v, filling, True, mu0 = mu0, beta = np.inf, ires = True)
@@ -54,16 +55,20 @@ def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu):
     # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
     # alternatively, we can change ImpHam.H0 to compensate
     nscsites = lattice.supercell.nsites
-    # FIXME this is not robust
-    old_dmu = ImpHam.H0 / (2 * nscsites)
-    dmu1 = dmu - old_dmu
     if ImpHam.restricted:
-        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
+        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
     else:
-        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
-        ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu1 * np.eye(nscsites))
-    ImpHam.H0 += dmu1 * nscsites * 2
-    return SolveImpHam(ImpHam, M)
+        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
+        ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu * np.eye(nscsites))
+    ImpHam.H0 += dmu * nscsites * 2
+    result = SolveImpHam(ImpHam, M)
+    if ImpHam.restricted:
+        ImpHam.H1["cd"][0] += transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
+    else:
+        ImpHam.H1["cd"][0] += transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
+        ImpHam.H1["cd"][1] += transform_imp(basis[1], lattice, dmu * np.eye(nscsites))
+    ImpHam.H0 -= dmu * nscsites * 2
+    return result
 
 def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, thr = 1e-4, **kwargs):
     rhoEmb, EnergyEmb = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, 0., **kwargs)
@@ -83,6 +88,8 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, t
         else:
             nprime = (nelec1 - nelec) / delta
             delta1 = (filling*2 - nelec) / nprime
+            if abs(delta1) > 0.1:
+                delta1 = copysign(0.1, delta1)
             log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
             log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
             log.result("extrapolated to dMu = %20.12f", delta1)
