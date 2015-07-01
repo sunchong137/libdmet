@@ -149,6 +149,7 @@ def selectActiveSpace(rho, thrRdm, nact = None):
     else:
         rho_mix = rho
     natocc, natorb = la.eigh(rho_mix)
+    log.debug(0, "MP2 natural orbital occupation:\n%s", natocc)
     ncore = np.sum(natocc > 1 - thrRdm)
     nvirt = np.sum(natocc < thrRdm)
     nactive = rho.shape[1] - ncore - nvirt
@@ -228,6 +229,7 @@ def SolveImpHamCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, 
     reportOccupation(Lat, rhoHF[:, :nscsites, :nscsites])
     # then MP2
     E_MP2, rhoMP2 = scfsolver.MP2()
+    log.result("MP2 energy = %20.12f", E_HF + E_MP2)
     reportOccupation(Lat, rhoMP2[:, :nscsites, :nscsites])
     log.info("Setting up active space")
     if solver.optimized:
@@ -236,6 +238,8 @@ def SolveImpHamCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, 
         core, active = selectActiveSpace(rhoMP2, thrRdm, nact = nact)        
     else:
         core, active = selectActiveSpace(rhoMP2, thrRdm)
+    nelec_active = nelec - core.shape[1] * 2
+    log.info("Number of electrons in active space: %d", nelec_active)
     # FIXME additional localization for active?
     # two ways: 1. location-based localization 2. integral based localization
     # build active space Hamiltonian
@@ -243,8 +247,9 @@ def SolveImpHamCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, 
     actHam = buildActiveHam(ImpHam, core, active)
     # solve active space Hamiltonian
     log.debug(0, "solve active space Hamiltonian with BLOCK")
-    actRdm, E = SolveImpHam(actHam, M, nelec = nelec - core.shape[1] * 2)
-    coreRdm = np.dot(core, core.T)
-    rdm = np.asarray(map(lambda s: mdot(active, actRdm[s], active.T) + coreRdm, range(spin)))
-    return rdm, E
+    actRho, E = SolveImpHam(actHam, M, nelec = nelec_active)
+    coreRho = np.dot(core, core.T)
+    rho = np.asarray(map(lambda s: mdot(active, actRho[s], active.T) + coreRho, range(spin)))
+    reportOccupation(Lat, rho[:, :nscsites, :nscsites])
+    return rho, E
 

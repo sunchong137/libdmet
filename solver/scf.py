@@ -143,7 +143,7 @@ class UMP2(MP2):
 
         self.E, self.t2 = kernel(self, mo, mo_energy, nocc)
 
-        log.result("MP2 energy = %20.12f", self.E)
+        log.info("MP2 correlation energy = %20.12f", self.E)
         return self.E, self.t2
 
     def ao2mo(self, mo_coeff, nocc):
