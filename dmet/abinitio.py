@@ -196,21 +196,9 @@ def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu, rhoNonInt = None, nel
     # In impurity Ham, equivalent to substracting dMu from impurity, but not bath
     # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
     # alternatively, we can change ImpHam.H0 to compensate
-    nscsites = lattice.supercell.nsites
-    if ImpHam.restricted:
-        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
-    else:
-        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
-        ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu * np.eye(nscsites))
-    ImpHam.H0 += dmu * nscsites * 2
+    ImpHam = __apply_dmu(lattice, ImpHam, basis, dmu)
     result = SolveImpHamCAS(ImpHam, M, lattice, basis, rhoNonInt, nelec, nact, thrRdm)
-    # restore ImpHam.H1 and H0
-    if ImpHam.restricted:
-        ImpHam.H1["cd"][0] += transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
-    else:
-        ImpHam.H1["cd"][0] += transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
-        ImpHam.H1["cd"][1] += transform_imp(basis[1], lattice, dmu * np.eye(nscsites))
-    ImpHam.H0 -= dmu * nscsites * 2
+    ImpHam = __apply_dmu(lattice, ImpHam, basis, -dmu)    
     return result
  
 Hubbard.__SolveImpHam_with_dmu = __SolveImpHam_with_dmu

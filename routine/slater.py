@@ -67,8 +67,6 @@ def getNonDiagBlocks(mat):
             blocks.append(set(pair))
     return map(lambda b: sorted(list(b)), blocks)
 
-    
-
 def orthonormalizeBasisPHsymm(b):
     nbasis = b.shape[2]
     ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
