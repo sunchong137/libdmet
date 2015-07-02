@@ -192,10 +192,16 @@ class SCF(object):
         self.spinRestricted = spinRestricted
         self.mol = gto.Mole()
         self.mol.dump_input = lambda *args: 0 # do not dump input file
-        if log.Level[log.verbose] >= log.Level["DEBUG0"]:
+        if log.Level[log.verbose] >= log.Level["RESULT"]:
             self.mol.build(verbose = 4)
         else:
             self.mol.build(verbose = 2)
+        if log.Level[log.verbose] <= log.Level["INFO"]:
+            def __flush(object, *args):
+                if args[0].startswith["cycle"]:
+                    log.result(*args)
+            pyscflogger.flush = __flush
+            
         self.mol.nelectron = self.nelec
         self.mol.spin = self.spin
         self.sys_initialized = True
@@ -247,7 +253,7 @@ class SCF(object):
                 self.HF()
             log.check(self.mf.converged, "Hartree-Fock calculation has not converged")
             self.mp = UMP2(self.mf)
-            E = self.mp.run()
+            E, t2 = self.mp.run()
             rho = self.mp.onepdm() # this is rho in mo basis
             if not mo:
                 coefs = self.mf.mo_coeff
