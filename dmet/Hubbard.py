@@ -1,6 +1,7 @@
 from HubPhSymm import *
 from libdmet.routine.slater_helper import transform_imp
 import numpy as np
+from math import copysign
 
 def RHartreeFock(Lat, v, filling, mu0):
     rho, mu, E, res = HF(Lat, v, filling, True, mu0 = mu0, beta = np.inf, ires = True)
@@ -47,23 +48,26 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
 
         return rhoImp, Efrag/nscsites, nelec/nscsites
 
+def __apply_dmu(lattice, ImpHam, basis, dmu):
+    nscsites = lattice.supercell.nsites  
+    if ImpHam.restricted:
+        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
+    else:
+        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
+        ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu * np.eye(nscsites))
+    ImpHam.H0 += dmu * nscsites * 2
+    return ImpHam
+
 def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu):
     # H = H1 + Vcor - Mu
     # to keep H for mean-field Mu->Mu+dMu, Vcor->Vcor+dMu
     # In impurity Ham, equivalent to substracting dMu from impurity, but not bath
     # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
     # alternatively, we can change ImpHam.H0 to compensate
-    nscsites = lattice.supercell.nsites
-    # FIXME this is not robust
-    old_dmu = ImpHam.H0 / (2 * nscsites)
-    dmu1 = dmu - old_dmu
-    if ImpHam.restricted:
-        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
-    else:
-        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
-        ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu1 * np.eye(nscsites))
-    ImpHam.H0 += dmu1 * nscsites * 2
-    return SolveImpHam(ImpHam, M)
+    ImpHam = __apply_dmu(lattice, ImpHam, basis, dmu)
+    result = SolveImpHam(ImpHam, M)
+    ImpHam = __apply_dmu(lattice, ImpHam, basis, -dmu)
+    return result
 
 def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, thr = 1e-4, **kwargs):
     rhoEmb, EnergyEmb = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, 0., **kwargs)
@@ -79,14 +83,18 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, M, delta = 0.02, t
         nelec1 = transformResults(rhoEmb1, None, basis, None, None)
         log.result("nelec = %20.12f (target is %20.12f)", nelec1, filling*2)
         if abs(nelec1/(filling*2) - 1.) < 1e-4:
+            ImpHam = __apply_dmu(lattice, ImpHam, basis, delta)
             return rhoEmb1, EnergyEmb1, ImpHam, delta
         else:
             nprime = (nelec1 - nelec) / delta
             delta1 = (filling*2 - nelec) / nprime
+            if abs(delta1) > 0.1:
+                delta1 = copysign(0.1, delta1)
             log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
             log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
             log.result("extrapolated to dMu = %20.12f", delta1)
             rhoEmb2, EnergyEmb2 = __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, delta1, **kwargs)
+            ImpHam = __apply_dmu(lattice, ImpHam, basis, delta1)
             return rhoEmb2, EnergyEmb2, ImpHam, delta1
 
 def AFInitGuess(ImpSize, U, Filling, polar = None):

@@ -272,5 +272,24 @@ def test():
     log.result("%s", square.getFock(kspace = True))
     log.result("%s", square.getH2())
 
+class Indexer(object):
+    def __init__(self, size):
+        self.size = size
+        self.nsites = np.product(size)
+        self.sites = map(np.asarray, list(it.product(*map(range, self.size))))
+        self.sitedict = dict(zip(map(tuple, self.sites), range(self.nsites)))
+
+    def idx2pos(self, idx):
+        return self.sites[idx % self.nsites]
+
+    def pos2idx(self, pos):
+        return self.sitedict[tuple(pos % self.size)]
+
+    def add(self, i, j):
+        return self.pos2idx(self.idx2pos(i) + self.idx2pos(j))
+
+    def substract(self, i, j):
+        return self.pos2idx(self.idx2pos(i) - self.idx2pos(j))
+
 if __name__ == "__main__":
     test()

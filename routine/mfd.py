@@ -23,8 +23,12 @@ def DiagRHF(Fock, vcor):
     nscsites = Fock.shape[1]
     ew = np.empty((ncells, nscsites))
     ev = np.empty((ncells, nscsites, nscsites), dtype = complex)
-    for i in range(ncells):
-        ew[i], ev[i] = la.eigh(Fock[i] + vcor.get(i, True)[0])
+    if vcor is None:
+        for i in range(ncells):
+            ew[i], ev[i] = la.eigh(Fock[i])
+    else:
+        for i in range(ncells):
+            ew[i], ev[i] = la.eigh(Fock[i] + vcor.get(i, True)[0])
     return ew, ev
 
 def DiagUHF(Fock, vcor):
@@ -32,9 +36,14 @@ def DiagUHF(Fock, vcor):
     nscsites = Fock.shape[1]
     ew = np.empty((2, ncells, nscsites))
     ev = np.empty((2, ncells, nscsites, nscsites), dtype = complex)
-    for i in range(ncells):
-        ew[0][i], ev[0][i] = la.eigh(Fock[i] + vcor.get(i, True)[0])
-        ew[1][i], ev[1][i] = la.eigh(Fock[i] + vcor.get(i, True)[1])
+    if vcor is None:
+        for i in range(ncells):
+            ew[0][i], ev[0][i] = la.eigh(Fock[i])
+            ew[1][i], ev[1][i] = la.eigh(Fock[i])
+    else:
+        for i in range(ncells):
+            ew[0][i], ev[0][i] = la.eigh(Fock[i] + vcor.get(i, True)[0])
+            ew[1][i], ev[1][i] = la.eigh(Fock[i] + vcor.get(i, True)[1])
     return ew, ev
 
 def DiagBdG(Fock, vcor, mu):

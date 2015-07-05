@@ -1,4 +1,5 @@
 from Hubbard import *
+import Hubbard
 import numpy as np
 import numpy.linalg as la
 from libdmet.system.hamiltonian import HamNonInt
@@ -148,6 +149,7 @@ def selectActiveSpace(rho, thrRdm, nact = None):
     else:
         rho_mix = rho
     natocc, natorb = la.eigh(rho_mix)
+    log.debug(0, "MP2 natural orbital occupation:\n%s", natocc)
     ncore = np.sum(natocc > 1 - thrRdm)
     nvirt = np.sum(natocc < thrRdm)
     nactive = rho.shape[1] - ncore - nvirt
@@ -194,20 +196,14 @@ def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu, rhoNonInt = None, nel
     # In impurity Ham, equivalent to substracting dMu from impurity, but not bath
     # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
     # alternatively, we can change ImpHam.H0 to compensate
-    nscsites = lattice.supercell.nsites
-    # FIXME this is not robust
-    old_dmu = ImpHam.H0 / (2 * nscsites)
-    dmu1 = dmu - old_dmu
-    if ImpHam.restricted:
-        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
-    else:
-        ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu1 * np.eye(nscsites))
-        ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu1 * np.eye(nscsites))
-    ImpHam.H0 += dmu1 * nscsites * 2
-    return SolveImpHamCAS(ImpHam, M, lattice, basis, rhoNonInt, nelec, nact, thrRdm)
+    ImpHam = __apply_dmu(lattice, ImpHam, basis, dmu)
+    result = SolveImpHamCAS(ImpHam, M, lattice, basis, rhoNonInt, nelec, nact, thrRdm)
+    ImpHam = __apply_dmu(lattice, ImpHam, basis, -dmu)    
+    return result
  
+Hubbard.__SolveImpHam_with_dmu = __SolveImpHam_with_dmu
 
-def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3):
+def SolveImpHamCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3):
     spin = ImpHam.H1["cd"].shape[0]
     if nelec is None:
         nelec = ImpHam.norb
@@ -221,6 +217,7 @@ def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thr
     reportOccupation(Lat, rhoHF[:, :nscsites, :nscsites])
     # then MP2
     E_MP2, rhoMP2 = scfsolver.MP2()
+    log.result("MP2 energy = %20.12f", E_HF + E_MP2)
     reportOccupation(Lat, rhoMP2[:, :nscsites, :nscsites])
     log.info("Setting up active space")
     if solver.optimized:
@@ -229,6 +226,8 @@ def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thr
         core, active = selectActiveSpace(rhoMP2, thrRdm, nact = nact)        
     else:
         core, active = selectActiveSpace(rhoMP2, thrRdm)
+    nelec_active = nelec - core.shape[1] * 2
+    log.info("Number of electrons in active space: %d", nelec_active)
     # FIXME additional localization for active?
     # two ways: 1. location-based localization 2. integral based localization
     # build active space Hamiltonian
@@ -236,8 +235,9 @@ def SolveImpCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thr
     actHam = buildActiveHam(ImpHam, core, active)
     # solve active space Hamiltonian
     log.debug(0, "solve active space Hamiltonian with BLOCK")
-    actRdm, E = SolveImpHam(actHam, M, nelec = nelec - core.shape[1] * 2)
-    coreRdm = np.dot(core, core.T)
-    rdm = np.asarray(map(lambda s: mdot(active, actRdm[s], active.T) + coreRdm, range(spin)))
-    return rdm, E
+    actRho, E = SolveImpHam(actHam, M, nelec = nelec_active)
+    coreRho = np.dot(core, core.T)
+    rho = np.asarray(map(lambda s: mdot(active, actRho[s], active.T) + coreRho, range(spin)))
+    reportOccupation(Lat, rho[:, :nscsites, :nscsites])
+    return rho, E
 
