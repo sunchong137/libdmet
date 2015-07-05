@@ -12,7 +12,7 @@ log.verbose = "WARNING"
 U = 4
 LatSize = [12, 12]
 ImpSize = [4, 4]
-Filling = 0.4
+Filling = 0.3
 MaxIter = 20
 M = 400
 DiisStart = 4
@@ -52,9 +52,11 @@ for iter in range(MaxIter):
     log.section("\nconstructing impurity problem\n")
     #ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
     log.result("Making embedding basis")
-    basis = slater.embBasis(Lat, rho, local = False)
-    basis[:,:,:,:16] = dmet.basisMatching(basis[:,:,:,:16])
-    basis[:,:,:,16:] = dmet.basisMatching(basis[:,:,:,16:])
+    basis, counts = slater.embBasis(Lat, rho, local = False)
+    #basis = dmet.basisMatching(basis)
+    basis[:,:,:,:counts[0]] = dmet.basisMatching(basis[:,:,:,:counts[0]])
+    basis[:,:,:,counts[0]:-counts[2]] = dmet.basisMatching(basis[:,:,:,counts[0]:-counts[2]])
+    basis[:,:,:,-counts[2]:] = dmet.basisMatching(basis[:,:,:,-counts[2]:])
     log.result("Constructing impurity Hamiltonian")
     ImpHam, H1e = slater.embHam(Lat, basis, vcor, local = False)
 
