@@ -441,7 +441,7 @@ class Block(object):
     def cleanup(self, keep_restart = False):
         if keep_restart:
             for filename in Block.tempFiles:
-                sub.check_call(" ".join(Block.mpipernode + ["rm", "-rf", os.path.join(self.tmpDir, filename)), shell = True])
+                sub.check_call(" ".join(Block.mpipernode + ["rm", "-rf", os.path.join(self.tmpDir, filename)]), shell = True)
         else:
             sub.check_call(Block.mpipernode + ["rm", "-rf", self.tmpDir])
             if Block.nnode > 1:
