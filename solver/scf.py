@@ -198,7 +198,7 @@ class SCF(object):
             self.mol.build(verbose = 2)
         if log.Level[log.verbose] <= log.Level["INFO"]:
             def __flush(object, *args):
-                if args[0].startswith["cycle"]:
+                if len(args) > 0 and args[0].startswith("cycle"):
                     log.result(*args)
             pyscflogger.flush = __flush
             
@@ -276,14 +276,15 @@ if __name__ == "__main__":
     Int2e = np.zeros((3,8,8,8,8))
 
     for i in range(8):
-        Int2e[0,i,i,i,i] = 0.2
-        Int2e[1,i,i,i,i] = 0.2
-        Int2e[2,i,i,i,i] = 0.2
+        Int2e[0,i,i,i,i] = 4
+        Int2e[1,i,i,i,i] = 4
+        Int2e[2,i,i,i,i] = 4
 
     scf = SCF()
     scf.set_system(8, 0, False, False)
     scf.set_integral(8, 0, {"cd": Int1e}, {"ccdd": Int2e})
-    _, rhoHF = scf.HF(MaxIter = 100, tol = 1e-3)
+    _, rhoHF = scf.HF(MaxIter = 100, tol = 1e-3, \
+        InitGuess = (np.diag([0.5, 0, 0.5, 0, 0.5, 0, 0.5, 0]), np.diag([0, 0.5, 0, 0.5, 0, 0.5, 0, 0.5])))
     log.result("HF density matrix:\n%s\n%s", rhoHF[0], rhoHF[1])
     _, rhoMP = scf.MP2()
     log.result("MP2 density matrix:\n%s\n%s", rhoMP[0], rhoMP[1])
