@@ -252,7 +252,7 @@ class Block(object):
         else:
             startPath = self.tmpShared
         for f in files:
-            sub.check_call(Block.mpipernode + ["cp", os.path.join(src, f), startPath])
+            sub.check_call(" ".join(Block.mpipernode + ["cp", os.path.join(src, f), startPath]), shell = True)
         if Cleanup:
             sub.check_call(["rm", "-rf", src])
         self.restart = True
@@ -272,7 +272,7 @@ class Block(object):
             files += Block.restartFiles
 
         for f in files:
-            sub.check_call(Block.mpipernode + ["cp", os.path.join(self.tmpShared, f), self.tmpDir])
+            sub.check_call(" ".join(Block.mpipernode + ["cp", os.path.join(self.tmpShared, f), self.tmpDir]), shell = True)
 
     def callBlock(self):
         outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % self.count)
@@ -441,7 +441,7 @@ class Block(object):
     def cleanup(self, keep_restart = False):
         if keep_restart:
             for filename in Block.tempFiles:
-                sub.check_call(Block.mpipernode + ["rm", "-rf", os.path.join(self.tmpDir, filename)])
+                sub.check_call(" ".join(Block.mpipernode + ["rm", "-rf", os.path.join(self.tmpDir, filename)), shell = True])
         else:
             sub.check_call(Block.mpipernode + ["rm", "-rf", self.tmpDir])
             if Block.nnode > 1:
