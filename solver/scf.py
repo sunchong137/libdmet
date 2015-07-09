@@ -10,7 +10,29 @@ import libdmet.utils.logger as log
 from libdmet.system import integral
 from libdmet.utils.misc import mdot
 
-pyscflogger.flush = lambda *args: log.result(*args[1:])
+
+class flush(object):
+    def __init__(self, keywords):
+        self.keywords = set(keywords)
+
+    def addkey(self, key):
+        self.keywords.add(key)
+
+    def addkeys(self, keys):
+        self.keywords.union(keys)
+
+    def has_keyword(self, args):
+        for arg in map(str, args):
+            for key in self.keywords:
+                if key in arg:
+                    return True
+        return False
+
+    def __call__(self, object, *args):
+        if self.has_keyword(args):
+            log.result(*args)
+
+pyscflogger.flush = flush([""])
 pyscflogger.QUIET = 10
 
 class UIHF(UHF):
@@ -197,10 +219,7 @@ class SCF(object):
         else:
             self.mol.build(verbose = 2)
         if log.Level[log.verbose] <= log.Level["INFO"]:
-            def __flush(object, *args):
-                if len(args) > 0 and args[0].startswith("cycle"):
-                    log.result(*args)
-            pyscflogger.flush = __flush
+            pyscflogger.flush = flush(["cycle="])
             
         self.mol.nelectron = self.nelec
         self.mol.spin = self.spin
@@ -226,7 +245,7 @@ class SCF(object):
             self.mf = UIHF(self.mol, DiisDim = DiisDim, MaxIter = MaxIter)
             self.mf.h1e = self.integral.H1["cd"]
             self.mf.ovlp = np.eye(self.integral.norb)
-            self.mf._eri = self.integral.H2["ccdd"]
+            self.mf._eri = self.integral.H2["ccdd"] #vaa, vbb, vab
             self.mf.conv_tol = tol
             if InitGuess is not None:
                 E = self.mf.scf(InitGuess)
