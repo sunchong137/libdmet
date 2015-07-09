@@ -43,7 +43,7 @@ class UIHF(UHF):
             log.error("Direct SCF not implemented")
         return vhf
 
-    def get_fock(self, h1e, s1e, vhf, dm, cycle = -1, adiis = None):
+    def get_fock(self, h1e, s1e, vhf, dm, cycle = -1, adiis = None, *args):
         f = h1e + vhf
         if 0 <= cycle < self.diis_start_cycle - 1:
             f = np.asarray([
