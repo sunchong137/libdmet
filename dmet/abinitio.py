@@ -6,7 +6,7 @@ from libdmet.system.hamiltonian import HamNonInt
 import libdmet.system.lattice as Lat
 import libdmet.system.integral as integral
 import os
-from libdmet.solver import scf
+from libdmet.solver import scf, casscf
 from libdmet.routine.slater_helper import transform_trans_inv_sparse
 from libdmet.utils.misc import mdot
 
@@ -204,7 +204,7 @@ def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu, rhoNonInt = None, nel
  
 Hubbard.__SolveImpHam_with_dmu = __SolveImpHam_with_dmu
 
-def SolveImpHamCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3):
+def SolveImpHamCASCI(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3, MP2 = True):
     spin = ImpHam.H1["cd"].shape[0]
     if nelec is None:
         nelec = ImpHam.norb
@@ -217,16 +217,21 @@ def SolveImpHamCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, 
     nscsites = Lat.supercell.nsites
     reportOccupation(Lat, rhoHF[:, :nscsites, :nscsites])
     # then MP2
-    E_MP2, rhoMP2 = scfsolver.MP2()
-    log.result("MP2 energy = %20.12f", E_HF + E_MP2)
-    reportOccupation(Lat, rhoMP2[:, :nscsites, :nscsites])
+    if MP2:
+        E_MP2, rhoMP2 = scfsolver.MP2()
+        log.result("MP2 energy = %20.12f", E_HF + E_MP2)
+        reportOccupation(Lat, rhoMP2[:, :nscsites, :nscsites])
+        rho_guess = rhoMP2
+    else:
+        rho_guess = rhoHF
+    # define active space
     log.info("Setting up active space")
     if solver.optimized:
-        core, active = selectActiveSpace(rhoMP2, thrRdm, nact = solver.integral.norb)
+        core, active = selectActiveSpace(rho_guess, thrRdm, nact = solver.integral.norb)
     elif nact is not None:
-        core, active = selectActiveSpace(rhoMP2, thrRdm, nact = nact)        
+        core, active = selectActiveSpace(rho_guess, thrRdm, nact = nact)
     else:
-        core, active = selectActiveSpace(rhoMP2, thrRdm)
+        core, active = selectActiveSpace(rho_guess, thrRdm)
     nelec_active = nelec - core.shape[1] * 2
     log.info("Number of electrons in active space: %d", nelec_active)
     # FIXME additional localization for active?
@@ -242,3 +247,29 @@ def SolveImpHamCAS(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, 
     reportOccupation(Lat, rho[:, :nscsites, :nscsites])
     return rho, E
 
+def SolveImpHamCASSCF(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 1e-2):
+    spin = ImpHam.H1["cd"].shape[0]
+    if nelec is None:
+        nelec = ImpHam.norb
+    scfsolver.set_system(nelec, 0, False, spin == 1)
+    scfsolver.set_integral(ImpHam)
+    # using non-Interacting density matrix as initial guess
+    rhoHF = np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], Lat, rhoNonInt[s]), range(spin)))
+    # do Hartree-Fock
+    E_HF, rhoHF = scfsolver.HF(tol = 1e-5, MaxIter = 20, InitGuess = rhoHF)
+    nscsites = Lat.supercell.nsites
+    reportOccupation(Lat, rhoHF[:, :nscsites, :nscsites])
+    # define active space
+    log.info("Setting up active space")
+    if nact is not None:
+        core, active = selectActiveSpace(rho_guess, thrRdm, nact = nact)
+    else:
+        core, active = selectActiveSpace(rho_guess, thrRdm)
+        nact = active.shape[1]
+    nelec_active = nelec - core.shape[1] * 2
+    CASsolver = casscf.CASSCF(scfsolver.mf, nact, (nelec_active, nelec_active))
+    E_CAS = CASsolver.mc1step()[0]
+    rho = np.asarray(CASsolver.make_rdm1s())
+    log.result("Energy (CASSCF) = %20.12f", E_CAS)
+    reportOccupation(Lat, rho[:, :nscsites, :nscsites])
+    return rho, E_CAS
