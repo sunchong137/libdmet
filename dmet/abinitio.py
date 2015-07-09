@@ -44,14 +44,15 @@ def __read_bin(dirname, name, shape):
         log.error("couldn't find the integral file %s", name)
     return temp
 
-def read_integral(dirname, lattice, cutoff):
+def read_integral(dirname, lattice, cutoff = None):
     log.info("reading integrals from %s", os.path.realpath(dirname))
     nscsites = lattice.supercell.nsites
-    nonzero = map(np.asarray, list(it.product(range(cutoff), repeat = lattice.dim)))
     dirname = os.path.realpath(dirname)
     if cutoff is None:
         nnonzero = lattice.ncells
     else:
+        log.error("Deprecated function, do you know why you're using it?")      
+        nonzero = map(np.asarray, list(it.product(range(cutoff), repeat = lattice.dim)))      
         nnonzero = len(nonzero)
     H1 = __read_bin(dirname, "H1", (nnonzero, nscsites, nscsites))
     H2 = __read_bin(dirname, "H2", (nscsites,)*4)
@@ -69,8 +70,8 @@ def read_integral(dirname, lattice, cutoff):
         Fock, H1 = FockFull, H1Full
     return [H1, H2, Fock, ImpJK]
 
-def buildHamiltonian(dirname, lattice, cutoff):
-    return HamNonInt(lattice, *(read_integral(dirname, lattice, cutoff)))
+def buildHamiltonian(dirname, lattice):
+    return HamNonInt(lattice, *(read_integral(dirname, lattice)))
 
 def AFInitGuessOrbs(v, lattice, AForbs, PMorbs, shift = 0., polar = 0.5):
     names = lattice.supercell.names
@@ -196,9 +197,9 @@ def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu, rhoNonInt = None, nel
     # In impurity Ham, equivalent to substracting dMu from impurity, but not bath
     # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
     # alternatively, we can change ImpHam.H0 to compensate
-    ImpHam = __apply_dmu(lattice, ImpHam, basis, dmu)
+    ImpHam = apply_dmu(lattice, ImpHam, basis, dmu)
     result = SolveImpHamCAS(ImpHam, M, lattice, basis, rhoNonInt, nelec, nact, thrRdm)
-    ImpHam = __apply_dmu(lattice, ImpHam, basis, -dmu)    
+    ImpHam = apply_dmu(lattice, ImpHam, basis, -dmu)    
     return result
  
 Hubbard.__SolveImpHam_with_dmu = __SolveImpHam_with_dmu
