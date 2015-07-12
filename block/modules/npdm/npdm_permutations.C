@@ -8,6 +8,7 @@ Sandeep Sharma and Garnet K.-L. Chan
 
 #include <cassert>
 #include <algorithm>
+#include <vector>
 
 #include "npdm_permutations.h"
 

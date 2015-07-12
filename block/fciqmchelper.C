@@ -116,7 +116,7 @@ namespace SpinAdapted{
     //convert the int array into a vector<bool>
     std::vector<bool> occ(dmrginp.last_site(), 0);
 
-    ulong temp = 1;
+    size_t temp = 1;
     int index = 0;
     for (int i=0; i <length ; i++) 
       for (int j=63; j>=0; j--) {
