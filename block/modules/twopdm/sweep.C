@@ -31,6 +31,10 @@ using namespace std;
 void calcenergy(array_4d<double>& twopdm, int state)
 {
   using namespace SpinAdapted;
+  if (!dmrginp.spinAdapted()) {
+    pout << "not implemented for non spin-adapted case" << endl;
+    abort();
+  }
   Matrix onepdm(2*dmrginp.last_site(), 2*dmrginp.last_site()); onepdm = 0.0;
   int nelec = dmrginp.real_particle_number();
 
@@ -82,12 +86,12 @@ void SweepTwopdm::BlockAndDecimate (SweepParams &sweepParams, SpinBlock& system,
   int systemDotSize = sweepParams.get_sys_add() - 1;
   if (forward)
   {
-    systemDotStart = *system.get_sites().rbegin () + 1;
+    systemDotStart = dmrginp.spinAdapted() ? *system.get_sites().rbegin () + 1 : (*system.get_sites().rbegin()) / 2 + 1;
     systemDotEnd = systemDotStart + systemDotSize;
   }
   else
   {
-    systemDotStart = system.get_sites() [0] - 1;
+    systemDotStart = dmrginp.spinAdapted() ? system.get_sites() [0] - 1 : (*system.get_sites().rbegin()) / 2 - 1;
     systemDotEnd = systemDotStart - systemDotSize;
   }
   vector<int> spindotsites(2); 
@@ -146,13 +150,15 @@ void SweepTwopdm::BlockAndDecimate (SweepParams &sweepParams, SpinBlock& system,
 #ifndef SERIAL
   const int numprocs = world.size();
 #endif
-  if (sweepParams.get_block_iter() == 0)
+  if (sweepParams.get_block_iter() == 0) {
     compute_twopdm_initial(solution, system, systemDot, newSystem, newEnvironment, big, numprocs, state);
+  }
 
   compute_twopdm_sweep(solution, system, systemDot, newSystem, newEnvironment, big, numprocs, state);
 
-  if (sweepParams.get_block_iter()  == sweepParams.get_n_iters() - 1)
+  if (sweepParams.get_block_iter()  == sweepParams.get_n_iters() - 1) {
     compute_twopdm_final(solution, system, systemDot, newSystem, newEnvironment, big, numprocs, state);
+  }
 
   SaveRotationMatrix (newSystem.get_sites(), rotateMatrix, state);
 
@@ -167,7 +173,7 @@ double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const b
 {
   if (dmrginp.hamiltonian() == BCS) {
     cout << "Two PDM with BCS calculations is not implemented" << endl;
-    exit(0);
+    abort();
   }
   cout.precision(12);
   SpinBlock system;

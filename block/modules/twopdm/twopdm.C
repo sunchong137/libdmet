@@ -110,7 +110,7 @@ void compute_twopdm_initial(std::vector<Wavefunction>& wavefunctions, const Spin
 
 	pout << "compute 4_0_0"<<endl;	
 	if(mpigetrank() == distribute_work[0])
-	  compute_two_pdm_4_0_0(wavefunction1, wavefunction2, big, twopdm);
+	  compute_two_pdm_4_0_0_nospin(wavefunction1, wavefunction2, big, twopdm);
 
 	pout << "compute 3_1_0"<<endl;
 	if(mpigetrank() == distribute_work[1])
@@ -167,7 +167,6 @@ void compute_two_pdm_4_0_0(Wavefunction& wave1, Wavefunction& wave2, const SpinB
   SpinBlock* rightBlock = big.get_rightBlock();
   SpinBlock* dotBlock = leftBlock->get_rightBlock();
   int leftindex = leftBlock->get_sites()[0];
-
   SpinQuantum sq0 = (getSpinQuantum(leftindex)+getSpinQuantum(leftindex))[0];//(SpinQuantum(1,1,SymmetryOfSpatialOrb(leftindex))+SpinQuantum(1,1,SymmetryOfSpatialOrb(leftindex)))[0];
   boost::shared_ptr<SparseMatrix> leftop0 = leftBlock->get_op_rep(CRE_CRE, sq0, leftindex, leftindex);
 
@@ -1140,6 +1139,40 @@ std::vector<int> distribute_procs(const int numprocs, const int numjobs) {
     retval[(jobsperproc-1)*numprocs+numprocs + i]= i;
 
   return retval;
+}
+
+void compute_two_pdm_4_0_0_nospin(Wavefunction& wave1, Wavefunction& wave2, const SpinBlock& big, array_4d<double>& twopdm) {
+  SpinBlock* leftBlock = big.get_leftBlock() -> get_leftBlock();
+  SpinBlock* rightBlock = big.get_rightBlock();
+  SpinBlock* dotBlock = leftBlock->get_rightBlock();
+  
+  for (int ij = 0; ij < leftBlock->get_op_array(CRE_CRE).get_size(); ++ij)
+  {
+    boost::shared_ptr<SparseMatrix> leftop2 = leftBlock->get_op_array(CRE_CRE).get_local_element(ij)[0]->getworkingrepresentation(leftBlock);
+    int ix = leftop2->get_orbs(0);
+    int jx = leftop2->get_orbs(1);
+    SpinQuantum sq0 = (getSpinQuantum(ix) + getSpinQuantum(jx))[0];
+    if (ix == jx) {
+      continue;
+    }
+    boost::shared_ptr<SparseMatrix> leftop0 = leftBlock->get_op_rep(CRE_CRE,sq0, ix, jx);
+    
+    Cre leftop;
+    leftop.set_orbs() = leftop0 -> get_orbs();
+    leftop.set_orbs().push_back(jx);
+    leftop.set_orbs().push_back(ix);
+    leftop.set_initialised() = true;
+    leftop.set_fermion() = false;
+    leftop.set_deltaQuantum(1, (leftop0->get_deltaQuantum(0) - leftop0->get_deltaQuantum(0))[0]);
+    leftop.allocate(leftBlock->get_stateInfo());
+    operatorfunctions::Product(leftBlock, *leftop0, Transposeview(*leftop0), leftop, 1.);
+    SparseMatrix *dotop = 0;
+    SparseMatrix *rightop = 0;
+    vector<double> expectations;
+    cout << leftop << endl;
+    spinExpectation(wave1, wave2, leftop, *dotop, *rightop, big, expectations, false);
+    cout << expectations[0] << endl;
+  }
 }
 
 }
