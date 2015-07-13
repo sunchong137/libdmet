@@ -383,7 +383,7 @@ void assign_antisymmetric(array_4d<double>& twopdm, const int i, const int j, co
       cout << "earlier value: "<<twopdm(i,j,k,l)<<endl<<"new value: "<<val<<endl;
       assert(1 == 0);
     }
-
+  cout << i << " " << j << " " << k << " " << l << " " << val << endl;
   twopdm(i, j, k, l) = val;
   twopdm(i, j, l, k) = -val;
   twopdm(j, i, k, l) = -val;

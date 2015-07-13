@@ -141,7 +141,7 @@ void compute_twopdm_initial(std::vector<Wavefunction>& wavefunctions, const Spin
 
 	  pout << "compute 2_2_0"<<endl;
 	  if(mpigetrank() == distribute_work[2])
-	    compute_two_pdm_2_2_0(wavefunction1, wavefunction2, big, twopdm);
+	    compute_two_pdm_2_2_0_nospin(wavefunction1, wavefunction2, big, twopdm);
 
 	  pout << "compute 3_0_1"<<endl;
 	  compute_two_pdm_3_0_1(wavefunction1, wavefunction2, big, twopdm);
@@ -1174,10 +1174,10 @@ void compute_two_pdm_4_0_0_nospin(Wavefunction& wave1, Wavefunction& wave2, cons
     boost::shared_ptr<SparseMatrix> leftop2 = leftBlock->get_op_array(CRE_CRE).get_local_element(ij)[0]->getworkingrepresentation(leftBlock);
     int ix = leftop2->get_orbs(0);
     int jx = leftop2->get_orbs(1);
-    SpinQuantum sq0 = (getSpinQuantum(ix) + getSpinQuantum(jx))[0];
     if (ix == jx) {
       continue;
     }
+    SpinQuantum sq0 = (getSpinQuantum(ix) + getSpinQuantum(jx))[0];    
     boost::shared_ptr<SparseMatrix> leftop0 = leftBlock->get_op_rep(CRE_CRE,sq0, ix, jx);
     
     Cre leftop;
@@ -1201,7 +1201,57 @@ void compute_two_pdm_3_1_0_nospin(Wavefunction& wave1, Wavefunction& wave2, cons
   SpinBlock* leftBlock = big.get_leftBlock()->get_leftBlock();
   SpinBlock* rightBlock = big.get_rightBlock();
   SpinBlock* dotBlock = big.get_leftBlock()->get_rightBlock();
+  
+  for (int ij = 0; ij < leftBlock->get_op_array(CRE_CRE).get_size(); ++ij) {
+    boost::shared_ptr<SparseMatrix> leftop_tmp = leftBlock->get_op_array(CRE_CRE).get_local_element(ij)[0]->getworkingrepresentation(leftBlock);
+    int ix = leftop_tmp->get_orbs(0);
+    int jx = leftop_tmp->get_orbs(1);
+    if (ix == jx) {
+      continue;
+    }
+    SpinQuantum sq0 = (getSpinQuantum(ix) + getSpinQuantum(jx))[0];    
+    boost::shared_ptr<SparseMatrix> leftop0 = leftBlock->get_op_rep(CRE_CRE,sq0, ix, jx);
+    boost::shared_ptr<SparseMatrix> leftop1 = leftBlock->get_op_rep(CRE, getSpinQuantum(ix), ix);
+    boost::shared_ptr<SparseMatrix> leftop2 = leftBlock->get_op_rep(CRE, getSpinQuantum(jx), jx);
+    Cre Leftop1, Leftop2;
+    Leftop1.set_orbs() = leftop0->get_orbs();
+    Leftop1.set_orbs().push_back(ix);
+    Leftop1.set_initialised() = true;
+    Leftop1.set_fermion() = true;
+    Leftop1.set_deltaQuantum(1, (leftop0->get_deltaQuantum(0) - leftop1->get_deltaQuantum(0))[0]);
+    Leftop1.allocate(leftBlock->get_stateInfo());
+    operatorfunctions::Product(leftBlock, *leftop0, Transposeview(*leftop1), Leftop1, 1.);
+    Leftop2.set_orbs() = leftop0->get_orbs();
+    Leftop2.set_orbs().push_back(jx);
+    Leftop2.set_initialised() = true;
+    Leftop2.set_fermion() = true;
+    Leftop2.set_deltaQuantum(1, (leftop0->get_deltaQuantum(0) - leftop2->get_deltaQuantum(0))[0]);
+    Leftop2.allocate(leftBlock->get_stateInfo());
+    operatorfunctions::Product(leftBlock, *leftop0, Transposeview(*leftop2), Leftop2, 1.);
+    
+    boost::shared_ptr<SparseMatrix> rightop = 0;
+    for (int l = 0; l < dotBlock->get_op_array(CRE).get_size(); ++l) {
+      boost::shared_ptr<SparseMatrix> dotop = dotBlock->get_op_array(CRE).get_local_element(l)[0];
+      int lx = dotop->get_orbs(0);
+      Transposeview tdop = Transposeview(*dotop);
+      int s1 = (Leftop1.get_deltaQuantum(0) + tdop.get_deltaQuantum(0))[0].get_s().getirrep();
+      int s2 = (Leftop2.get_deltaQuantum(0) + tdop.get_deltaQuantum(0))[0].get_s().getirrep();
+      if (s1 == 0) {
+        vector<double> expectations;
+        spinExpectation(wave1, wave2, boost::make_shared<Cre>(Leftop1), boost::make_shared<Transposeview>(tdop), rightop, big, expectations, false);
+        assign_antisymmetric(twopdm, ix, jx, ix, lx, expectations[0]);
+      }
+      if (s2 == 0) {
+        vector<double> expectations;
+        spinExpectation(wave1, wave2, boost::make_shared<Cre>(Leftop2), boost::make_shared<Transposeview>(tdop), rightop, big, expectations, false);
+        assign_antisymmetric(twopdm, ix, jx, jx, lx, expectations[0]);
+      }
+    }
+  }
+}
 
+void compute_two_pdm_2_2_0_nospin(Wavefunction& wave1, Wavefunction& wave2, const SpinBlock& big, array_4d<double>& twopdm) {
+  
 }
 
 }
