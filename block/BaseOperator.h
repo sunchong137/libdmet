@@ -225,7 +225,7 @@ public:
   char &allowed(int i, int j) { return opdata->allowed(j, i); }
   const Matrix& operator_element(int i, int j) const { return opdata->operator_element(j, i); }
   Matrix& operator_element(int i, int j) { return opdata->operator_element(j, i); }
-  SpinSpace get_spin(int i=0) const  { return opdata->get_deltaQuantum(i).get_s();}
+  SpinSpace get_spin(int i=0) const  { return -opdata->get_deltaQuantum(i).get_s();} // in spinadapted case, -SpinSpace give exactly the same object, while in non-spinadapted case, it gives opposite value
   IrrepSpace get_symm(int i=0) const  { return -opdata->get_deltaQuantum(i).get_symm();}
   int get_orbs(int i) const {return opdata->get_orbs(i);}
   const std::vector<int>& get_orbs() const { return opdata->get_orbs(); }
