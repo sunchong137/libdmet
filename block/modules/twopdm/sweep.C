@@ -91,7 +91,7 @@ void SweepTwopdm::BlockAndDecimate (SweepParams &sweepParams, SpinBlock& system,
   }
   else
   {
-    systemDotStart = dmrginp.spinAdapted() ? system.get_sites() [0] - 1 : (*system.get_sites().rbegin()) / 2 - 1;
+    systemDotStart = dmrginp.spinAdapted() ? system.get_sites() [0] - 1 : system.get_sites()[0] / 2 - 1;
     systemDotEnd = systemDotStart - systemDotSize;
   }
   vector<int> spindotsites(2); 
@@ -155,7 +155,6 @@ void SweepTwopdm::BlockAndDecimate (SweepParams &sweepParams, SpinBlock& system,
   }
 
   compute_twopdm_sweep(solution, system, systemDot, newSystem, newEnvironment, big, numprocs, state);
-
   if (sweepParams.get_block_iter()  == sweepParams.get_n_iters() - 1) {
     compute_twopdm_final(solution, system, systemDot, newSystem, newEnvironment, big, numprocs, state);
   }
@@ -197,7 +196,8 @@ double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const b
   sweepParams.savestate(forward, system.get_sites().size());
   bool dot_with_sys = true;
 
-  array_4d<double> twopdm(2*dmrginp.last_site(), 2*dmrginp.last_site(), 2*dmrginp.last_site(), 2*dmrginp.last_site());
+  int nspinorb = dmrginp.spinAdapted() ? 2*dmrginp.last_site() : dmrginp.last_site();
+  array_4d<double> twopdm(nspinorb, nspinorb, nspinorb, nspinorb);
   twopdm.Clear();
 
   save_twopdm_binary(twopdm, state, state); 
@@ -265,7 +265,6 @@ double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const b
   save_twopdm_text(twopdm, i, j);
   save_spatial_twopdm_text(twopdm, i, j);
   save_spatial_twopdm_binary(twopdm, i, j);
-  
 
   // update the static number of iterations
 

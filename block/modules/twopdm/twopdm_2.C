@@ -42,8 +42,12 @@ void spinExpectation(Wavefunction& wave1, Wavefunction& wave2, boost::shared_ptr
   SpinBlock* rightBlock = big.get_rightBlock();
 
   Cre AOp; //This is just an example class
-  int totalspin = rightOp ? rightOp->get_spin().getirrep() : 0;
-
+  int totalspin;
+  if (dmrginp.spinAdapted()) {
+    totalspin = rightOp ? rightOp->get_spin().getirrep() : 0;
+  } else {
+    totalspin = rightOp ? -rightOp->get_spin().getirrep() : 0;
+  }
   if (Aindices != 0)
     FormLeftOp(leftBlock, leftOp, dotOp, AOp, totalspin);
   
@@ -383,7 +387,7 @@ void assign_antisymmetric(array_4d<double>& twopdm, const int i, const int j, co
       cout << "earlier value: "<<twopdm(i,j,k,l)<<endl<<"new value: "<<val<<endl;
       assert(1 == 0);
     }
-  cout << i << " " << j << " " << k << " " << l << " " << val << endl;
+  //cout << i << " " << j << " " << k << " " << l << " " << val << endl;
   twopdm(i, j, k, l) = val;
   twopdm(i, j, l, k) = -val;
   twopdm(j, i, k, l) = -val;
