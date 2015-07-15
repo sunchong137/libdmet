@@ -206,15 +206,24 @@ void save_twopdm_text(const array_4d<double>& twopdm, const int &i, const int &j
 {
   if(!mpigetrank())
   {
+    std::vector<int> reorder;
+    reorder.resize(twopdm.dim1()/2);
+    for (int k = 0; k < twopdm.dim2()/2; ++k) {
+      reorder.at(dmrginp.reorder_vector()[k]) = k;
+    }
     char file[5000];
     sprintf (file, "%s%s%d.%d%s", dmrginp.save_prefix().c_str(),"/twopdm.", i, j, ".txt");
     ofstream ofs(file);
     ofs << twopdm.dim1() << endl;
-    for(int k=0;k<twopdm.dim1();++k)
-      for(int l=0;l<twopdm.dim2();++l)
-        for(int m=0;m<twopdm.dim3();++m)
-          for(int n=0;n<twopdm.dim4();++n)
-            ofs << boost::format("%d %d %d %d %20.14e\n") % k % l % m % n % twopdm(k,l,m,n);
+    for (int s=0; s<2; ++s)
+      for (int t=s; t<2; ++t)
+        for(int k=0;k<twopdm.dim1()/2;++k)
+          for(int l=0;l<twopdm.dim2()/2;++l)
+            for(int m=0;m<twopdm.dim3()/2;++m)
+              for(int n=0;n<twopdm.dim4()/2;++n) {
+                // only store irreducible elements
+                ofs << boost::format("%d %d %d %d %20.14e\n") % (2*reorder.at(k)+s) % (2*reorder.at(l)+t) % (2*reorder.at(m)+t) % (2*reorder.at(n)+s) % twopdm(k,l,m,n);
+              }
     ofs.close();
   }
 }
