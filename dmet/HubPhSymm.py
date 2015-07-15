@@ -35,15 +35,24 @@ def basisMatching(basis):
     basisB = np.tensordot(basisB, vt, axes = (2, 1))
     return np.asarray([basisA, basisB])
 
-def ConstructImpHam(Lat, rho, v, matching = True, **kwargs):
+def ConstructImpHam(Lat, rho, v, matching = True, local = True, split = False, **kwargs):
     log.result("Making embedding basis")
-    basis = slater.embBasis(Lat, rho, local = True)
-    if matching and basis.shape[0] == 2: 
+    basis = slater.embBasis(Lat, rho, local = local)
+    if matching and basis.shape[0] == 2:
         log.result("Rotate bath orbitals to match alpha and beta basis")
         nscsites = Lat.supercell.nsites
-        basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+        if local:
+            basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+        else:
+            # split matching occ and virt
+            if split:
+                basis[:, :, :, :nscsites] = basisMatching(basis[:, :, :, :nscsites])
+                basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+            else:
+                basis = basisMatching(basis)
+            
     log.result("Constructing impurity Hamiltonian")
-    ImpHam, H1e = slater.embHam(Lat, basis, v, local = True, **kwargs)
+    ImpHam, H1e = slater.embHam(Lat, basis, v, local = local, **kwargs)
 
     return ImpHam, H1e, basis
 
