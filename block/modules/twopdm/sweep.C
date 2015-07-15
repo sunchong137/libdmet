@@ -31,44 +31,42 @@ using namespace std;
 void calcenergy(array_4d<double>& twopdm, int state)
 {
   using namespace SpinAdapted;
-  if (!dmrginp.spinAdapted()) {
-    pout << "not implemented for non spin-adapted case" << endl;
-    abort();
-  }
-  Matrix onepdm(2*dmrginp.last_site(), 2*dmrginp.last_site()); onepdm = 0.0;
+  
+  int nspinorb = dmrginp.spinAdapted() ? 2*dmrginp.last_site() : dmrginp.last_site();
+  Matrix onepdm(nspinorb, nspinorb); onepdm = 0.0;
   int nelec = dmrginp.real_particle_number();
 
-  for (int i=0; i<dmrginp.last_site()*2; i++)
-  for (int j=0; j<dmrginp.last_site()*2; j++)
-  for (int k=0; k<dmrginp.last_site()*2; k++)
-    onepdm(i+1, j+1) += twopdm(i, k, k, j);
+  for (int i=0; i<nspinorb; i++)
+    for (int j=0; j<nspinorb; j++)
+      for (int k=0; k<nspinorb; k++)
+        onepdm(i+1, j+1) += twopdm(i, k, k, j);
 
   onepdm /= (nelec-1);
   double nel = 0.0, sz=0.0;
-  for (int i=0; i<dmrginp.last_site(); i++) {
+  for (int i=0; i<nspinorb/2; i++) {
     nel += onepdm(2*i+1, 2*i+1)+onepdm(2*i+2, 2*i+2);
     sz += onepdm(2*i+1, 2*i+1)-onepdm(2*i+2, 2*i+2);
   }
 
   double energy = 0.0;
-  for (int i=0; i<dmrginp.last_site()*2; i++)
-  for (int j=0; j<dmrginp.last_site()*2; j++)
-  for (int k=0; k<dmrginp.last_site()*2; k++)
-  for (int l=0; l<dmrginp.last_site()*2; l++)
-    energy += v_2(i,j,k,l)*twopdm(i,j,l,k);
+  for (int i=0; i<nspinorb; i++)
+    for (int j=0; j<nspinorb; j++)
+      for (int k=0; k<nspinorb; k++)
+        for (int l=0; l<nspinorb; l++)
+          energy += v_2(i,j,k,l)*twopdm(i,j,l,k);
 
   energy *= 0.5;
 
-  for (int i=0; i<dmrginp.last_site()*2; i++)
-  for (int j=0; j<dmrginp.last_site()*2; j++)
-    energy += v_1(i,j) * onepdm(i+1,j+1);
+  for (int i=0; i<nspinorb; i++)
+    for (int j=0; j<nspinorb; j++)
+      energy += v_1(i,j) * onepdm(i+1,j+1);
 
   pout << "energy of state "<< state <<" = "<< energy+dmrginp.get_coreenergy()<<endl;
 
   ofstream out("onepdm_fromtpdm");
-  for (int i=0; i<dmrginp.last_site()*2; i++)
-  for (int j=0; j<dmrginp.last_site()*2; j++)
-    out<<i<<"  "<<j<<"  "<<onepdm(i+1,j+1)<<endl;
+  for (int i=0; i<nspinorb; i++)
+    for (int j=0; j<nspinorb; j++)
+      out << i << "  " << j << "  " << onepdm(i+1,j+1) << endl;
   out.close();
   
 }
@@ -260,8 +258,10 @@ double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const b
 
   int i = state, j = state;
   //for (int j=0; j<=i; j++) {
-  load_twopdm_binary(twopdm, i, j); 
-  //calcenergy(twopdm, i);
+  load_twopdm_binary(twopdm, i, j);
+  if (mpigetrank() == 0) {
+    calcenergy(twopdm, i);
+  }
   save_twopdm_text(twopdm, i, j);
   save_spatial_twopdm_text(twopdm, i, j);
   save_spatial_twopdm_binary(twopdm, i, j);
