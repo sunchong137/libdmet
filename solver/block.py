@@ -21,7 +21,7 @@ class Schedule(object):
 
         self.arrayM = [minM] + [M for M in defaultM if M > minM and M < maxM] + [maxM]
         self.arraySweep = range(0, 6 * len(self.arrayM), 6)
-        self.arrayTol = [self.sweeptol * 0.1 * 10.**i for i in range(len(self.arrayM))][::-1]
+        self.arrayTol = [min(1e-4, self.sweeptol * 0.1 * 10.**i) for i in range(len(self.arrayM))][::-1]
         self.arrayNoise = deepcopy(self.arrayTol)
 
         self.arrayM.append(maxM)

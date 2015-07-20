@@ -116,7 +116,6 @@ def incore_transform(eri_, c):
     eriAB = np.tensordot(eriAB, c[3][1], (3, 0))
     return np.asarray([eriA, eriB, eriAB])
 
-
 def kernel(mp, mo_coeff, mo_energy, nocc):
     log.debug(0, "transforming integral for MP2")
     ovov = mp.ao2mo(mo_coeff, nocc)
@@ -285,6 +284,10 @@ class SCF(object):
     def get_mo(self):
         log.eassert(self.doneHF, "Hartree-Fock calculation is not done")
         return np.asarray(self.mf.mo_coeff)
+
+    def get_mo_energy(self):
+        log.eassert(self.doneHF, "Hartree-Fock calculation is not done")
+        return np.asarray(self.mf.mo_energy)
 
 if __name__ == "__main__":
     log.verbose = "INFO"
