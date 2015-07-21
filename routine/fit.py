@@ -17,8 +17,12 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
             multi = False
 
     if multi:
-        log.debug(1, "Fitting: using %d cores to evaluate objective function", cpu_count())
+        log.debug(0, "Fitting: using %d cores to evaluate objective function", \
+                cpu_count())
         p = ProcessingPool()
+    else:
+        log.debug(0, "Fitting: serial specified or failed" \
+                " to load multiprocessing module, using single core")
 
     def grad(x):
         g = np.zeros_like(x)
