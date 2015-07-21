@@ -4,15 +4,13 @@ from libdmet.routine import vcor, slater
 from libdmet.routine.slater import FitVcorTwoStep
 from libdmet.routine.mfd import HF
 from libdmet.routine.diis import FDiisContext
-from libdmet.solver import block
 import libdmet.utils.logger as log
+from libdmet.solver import impurity_solver
 import types
 import numpy as np
 import numpy.linalg as la
 import itertools as it
-
-solver = block.Block()
-schedule = block.Schedule()
+from libdmet.routine.slater_helper import transform_trans_inv_sparse
 
 def HartreeFock(Lat, v, U):
     rho, mu, E, res = HF(Lat, v, 0.5, False, mu0 = U/2, beta = np.inf, ires = True)
@@ -56,21 +54,10 @@ def ConstructImpHam(Lat, rho, v, matching = True, local = True, split = False, *
 
     return ImpHam, H1e, basis
 
-def SolveImpHam(ImpHam, M, nelec = None):
-    if nelec is None:
-        nelec = ImpHam.norb
-    if not solver.sys_initialized:
-        solver.set_system(nelec, 0, False, False, False)
-    if not solver.optimized:
-        schedule.gen_initial(minM = 100, maxM = M)
-    else:
-        schedule.maxiter = 16
-        schedule.gen_restart(M)
-    solver.set_schedule(schedule)
-    solver.set_integral(ImpHam)
-
-    truncation, energy, onepdm = solver.optimize()
-    return onepdm, energy
+def foldRho(rho, Lat, basis):
+    spin = rho.shape[0]
+    return np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], \
+            Lat, rho[s]), range(spin)))
 
 def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     spin = rhoEmb.shape[0]
