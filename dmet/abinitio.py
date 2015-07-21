@@ -1,16 +1,11 @@
 from Hubbard import *
-import Hubbard
 import numpy as np
 import numpy.linalg as la
 from libdmet.system.hamiltonian import HamNonInt
 import libdmet.system.lattice as Lat
 import libdmet.system.integral as integral
 import os
-from libdmet.solver import scf, casscf
-from libdmet.routine.slater_helper import transform_trans_inv_sparse
 from libdmet.utils.misc import mdot
-
-scfsolver = scf.SCF()
 
 def buildUnitCell(size, atoms, basis):
     sites = []
@@ -26,7 +21,8 @@ def buildUnitCell(size, atoms, basis):
     return Lat.UnitCell(size, sites)
 
 def buildLattice(latSize, impSize, cellSize, atoms, basis):
-    log.eassert(np.allclose(latSize % impSize, 0), "incompatible lattice size and supercell size")
+    log.eassert(np.allclose(latSize % impSize, 0), \
+            "incompatible lattice size and supercell size")
     uc = buildUnitCell(cellSize, atoms, basis)
     sc = Lat.SuperCell(uc, impSize)
     lat = Lat.Lattice(sc, latSize / impSize)
@@ -35,8 +31,9 @@ def buildLattice(latSize, impSize, cellSize, atoms, basis):
 def __read_bin(dirname, name, shape):
     if os.path.exists(os.path.join(dirname, name + ".npy")):
         temp = np.load(os.path.join(dirname, name + ".npy"))
-        log.eassert(temp.shape == shape,
-            "when reading integral, the required shape is %s, but get %s", shape, temp.shape)
+        log.eassert(temp.shape == shape, \
+            "when reading integral, the required shape is %s," \
+            " but get %s", shape, temp.shape)
     elif os.path.exists(os.path.join(dirname, name + ".mmap")):
         temp = np.memmap(os.path.join(dirname, name + ".mmap"),\
             dtype = "float", mode = "c", shape = shape)
@@ -52,7 +49,8 @@ def read_integral(dirname, lattice, cutoff = None):
         nnonzero = lattice.ncells
     else:
         log.error("Deprecated function, do you know why you're using it?")      
-        nonzero = map(np.asarray, list(it.product(range(cutoff), repeat = lattice.dim)))      
+        nonzero = map(np.asarray, list(it.product(range(cutoff), \
+                repeat = lattice.dim)))
         nnonzero = len(nonzero)
     H1 = __read_bin(dirname, "H1", (nnonzero, nscsites, nscsites))
     H2 = __read_bin(dirname, "H2", (nscsites,)*4)
@@ -102,7 +100,8 @@ def AFInitGuessOrbs(v, lattice, AForbs, PMorbs, shift = 0., polar = 0.5):
         p[psite(site)] = p[psite(site) + psite(nscsites)] = shift
 
     v.update(p)
-    log.eassert(la.norm(v.get() - vguess) < 1e-10, "initial guess cannot be assgned directly")
+    log.eassert(la.norm(v.get() - vguess) < 1e-10, \
+            "initial guess cannot be assgned directly")
     return v
 
 def reportOccupation(lattice, rho, names = None):
@@ -155,7 +154,8 @@ def selectActiveSpace(rho, thrRdm, nact = None):
     nvirt = np.sum(natocc < thrRdm)
     nactive = rho.shape[1] - ncore - nvirt
     if nact is not None and nactive != nact:
-        log.warning("Imposing number of active orbitals: Using %d rather than %d", nact, nactive)
+        log.warning("Imposing number of active orbitals: " \
+                "Using %d rather than %d", nact, nactive)
         ncore += (nactive - nact) / 2
         nactive = nact
         nvirt = rho.shape[1] - ncore - nactive
@@ -165,7 +165,8 @@ def selectActiveSpace(rho, thrRdm, nact = None):
 def buildActiveHam(Ham, c, a):
     spin = Ham.H1["cd"].shape[0]
     if spin == 1:
-        log.error("Active space Hamiltonian with restricted Hamiltonian not implemented yet")
+        log.error("Active space Hamiltonian with restricted Hamiltonian " \
+                "not implemented yet")
 
     cRdm = np.dot(c, c.T)
     # core-core one-body
@@ -182,7 +183,8 @@ def buildActiveHam(Ham, c, a):
     H0 += 0.5 * np.sum(cRdm * (v[0] + v[1]))
     # active one-body: bare + effective from core Fock
     H1 = {
-        "cd": np.asarray(map(lambda s: mdot(a.T, v[s] + Ham.H1["cd"][s], a), range(spin)))
+        "cd": np.asarray(map(lambda s: mdot(a.T, v[s] + Ham.H1["cd"][s], a), \
+                range(spin)))
     }
     # transform active two-body part
     aSO = np.asarray((a, a))
@@ -190,86 +192,3 @@ def buildActiveHam(Ham, c, a):
         "ccdd": scf.incore_transform(Ham.H2["ccdd"], (aSO, aSO, aSO, aSO))
     }
     return integral.Integral(a.shape[1], False, False, H0, H1, H2)
-
-def __SolveImpHam_with_dmu(lattice, ImpHam, basis, M, dmu, rhoNonInt = None, nelec = None, nact = None, thrRdm = 5e-3):
-    # H = H1 + Vcor - Mu
-    # to keep H for mean-field Mu->Mu+dMu, Vcor->Vcor+dMu
-    # In impurity Ham, equivalent to substracting dMu from impurity, but not bath
-    # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
-    # alternatively, we can change ImpHam.H0 to compensate
-    ImpHam = apply_dmu(lattice, ImpHam, basis, dmu)
-    result = SolveImpHamCAS(ImpHam, M, lattice, basis, rhoNonInt, nelec, nact, thrRdm)
-    ImpHam = apply_dmu(lattice, ImpHam, basis, -dmu)    
-    return result
- 
-Hubbard.__SolveImpHam_with_dmu = __SolveImpHam_with_dmu
-
-def SolveImpHamCASCI(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 5e-3, MP2 = True):
-    spin = ImpHam.H1["cd"].shape[0]
-    if nelec is None:
-        nelec = ImpHam.norb
-    scfsolver.set_system(nelec, 0, False, spin == 1)
-    scfsolver.set_integral(ImpHam)
-    # using non-Interacting density matrix as initial guess
-    rhoHF = np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], Lat, rhoNonInt[s]), range(spin)))
-    # do Hartree-Fock
-    E_HF, rhoHF = scfsolver.HF(tol = 1e-5, MaxIter = 20, InitGuess = rhoHF)
-    nscsites = Lat.supercell.nsites
-    reportOccupation(Lat, rhoHF[:, :nscsites, :nscsites])
-    # then MP2
-    if MP2:
-        E_MP2, rhoMP2 = scfsolver.MP2()
-        log.result("MP2 energy = %20.12f", E_HF + E_MP2)
-        reportOccupation(Lat, rhoMP2[:, :nscsites, :nscsites])
-        rho_guess = rhoMP2
-    else:
-        rho_guess = rhoHF
-    # define active space
-    log.info("Setting up active space")
-    if solver.optimized:
-        core, active = selectActiveSpace(rho_guess, thrRdm, nact = solver.integral.norb)
-    elif nact is not None:
-        core, active = selectActiveSpace(rho_guess, thrRdm, nact = nact)
-    else:
-        core, active = selectActiveSpace(rho_guess, thrRdm)
-    nelec_active = nelec - core.shape[1] * 2
-    log.info("Number of electrons in active space: %d", nelec_active)
-    # FIXME additional localization for active?
-    # two ways: 1. location-based localization 2. integral based localization
-    # build active space Hamiltonian
-    log.debug(0, "build active space Hamiltonian")
-    actHam = buildActiveHam(ImpHam, core, active)
-    # solve active space Hamiltonian
-    log.debug(0, "solve active space Hamiltonian with BLOCK")
-    actRho, E = SolveImpHam(actHam, M, nelec = nelec_active)
-    coreRho = np.dot(core, core.T)
-    rho = np.asarray(map(lambda s: mdot(active, actRho[s], active.T) + coreRho, range(spin)))
-    reportOccupation(Lat, rho[:, :nscsites, :nscsites])
-    return rho, E
-
-def SolveImpHamCASSCF(ImpHam, M, Lat, basis, rhoNonInt, nelec = None, nact = None, thrRdm = 1e-2):
-    spin = ImpHam.H1["cd"].shape[0]
-    if nelec is None:
-        nelec = ImpHam.norb
-    scfsolver.set_system(nelec, 0, False, spin == 1)
-    scfsolver.set_integral(ImpHam)
-    # using non-Interacting density matrix as initial guess
-    rhoHF = np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], Lat, rhoNonInt[s]), range(spin)))
-    # do Hartree-Fock
-    E_HF, rhoHF = scfsolver.HF(tol = 1e-5, MaxIter = 20, InitGuess = rhoHF)
-    nscsites = Lat.supercell.nsites
-    reportOccupation(Lat, rhoHF[:, :nscsites, :nscsites])
-    # define active space
-    log.info("Setting up active space")
-    if nact is not None:
-        core, active = selectActiveSpace(rho_guess, thrRdm, nact = nact)
-    else:
-        core, active = selectActiveSpace(rho_guess, thrRdm)
-        nact = active.shape[1]
-    nelec_active = nelec - core.shape[1] * 2
-    CASsolver = casscf.CASSCF(scfsolver.mf, nact, (nelec_active, nelec_active))
-    E_CAS = CASsolver.mc1step()[0]
-    rho = np.asarray(CASsolver.make_rdm1s())
-    log.result("Energy (CASSCF) = %20.12f", E_CAS)
-    reportOccupation(Lat, rho[:, :nscsites, :nscsites])
-    return rho, E_CAS

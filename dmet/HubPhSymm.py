@@ -4,15 +4,13 @@ from libdmet.routine import vcor, slater
 from libdmet.routine.slater import FitVcorTwoStep
 from libdmet.routine.mfd import HF
 from libdmet.routine.diis import FDiisContext
-from libdmet.solver import block
 import libdmet.utils.logger as log
+from libdmet.solver import impurity_solver
 import types
 import numpy as np
 import numpy.linalg as la
 import itertools as it
-
-solver = block.Block()
-schedule = block.Schedule()
+from libdmet.routine.slater_helper import transform_trans_inv_sparse
 
 def HartreeFock(Lat, v, U):
     rho, mu, E, res = HF(Lat, v, 0.5, False, mu0 = U/2, beta = np.inf, ires = True)
@@ -35,33 +33,31 @@ def basisMatching(basis):
     basisB = np.tensordot(basisB, vt, axes = (2, 1))
     return np.asarray([basisA, basisB])
 
-def ConstructImpHam(Lat, rho, v, matching = True, **kwargs):
+def ConstructImpHam(Lat, rho, v, matching = True, local = True, split = False, **kwargs):
     log.result("Making embedding basis")
-    basis = slater.embBasis(Lat, rho, local = True)
-    if matching and basis.shape[0] == 2: 
+    basis = slater.embBasis(Lat, rho, local = local)
+    if matching and basis.shape[0] == 2:
         log.result("Rotate bath orbitals to match alpha and beta basis")
         nscsites = Lat.supercell.nsites
-        basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+        if local:
+            basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+        else:
+            # split matching occ and virt
+            if split:
+                basis[:, :, :, :nscsites] = basisMatching(basis[:, :, :, :nscsites])
+                basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+            else:
+                basis = basisMatching(basis)
+            
     log.result("Constructing impurity Hamiltonian")
-    ImpHam, H1e = slater.embHam(Lat, basis, v, local = True, **kwargs)
+    ImpHam, H1e = slater.embHam(Lat, basis, v, local = local, **kwargs)
 
     return ImpHam, H1e, basis
 
-def SolveImpHam(ImpHam, M, nelec = None):
-    if nelec is None:
-        nelec = ImpHam.norb
-    if not solver.sys_initialized:
-        solver.set_system(nelec, 0, False, False, False)
-    if not solver.optimized:
-        schedule.gen_initial(minM = 100, maxM = M)
-    else:
-        schedule.maxiter = 16
-        schedule.gen_restart(M)
-    solver.set_schedule(schedule)
-    solver.set_integral(ImpHam)
-
-    truncation, energy, onepdm = solver.optimize()
-    return onepdm, energy
+def foldRho(rho, Lat, basis):
+    spin = rho.shape[0]
+    return np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], \
+            Lat, rho[s]), range(spin)))
 
 def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     spin = rhoEmb.shape[0]

@@ -20,15 +20,15 @@ Sandeep Sharma and Garnet K.-L. Chan
 
 namespace SpinAdapted{
 
-void spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& leftOp, SparseMatrix& dotOp, SparseMatrix& rightOp, const SpinBlock& big, vector<double>& expectations, bool doTranspose)
+void spinExpectation(Wavefunction& wave1, Wavefunction& wave2, boost::shared_ptr<SparseMatrix> leftOp, boost::shared_ptr<SparseMatrix> dotOp, boost::shared_ptr<SparseMatrix> rightOp, const SpinBlock& big, vector<double>& expectations, bool doTranspose)
 {
   //calculating <wave1| Oa*Ob | wave2>
   // do transpose specifies if we want  <wave1| Oa^T*Ob |wave2> separately. This can be avoided in some sitations if wave1 and wave2 are the same functions
   int leftindices=0, dotindices=0, rightindices=0;
 
-  leftindices = &leftOp ? leftOp.get_orbs().size() : 0;
-  dotindices = &dotOp ? dotOp.get_orbs().size() : 0;
-  rightindices = &rightOp ? rightOp.get_orbs().size() : 0;
+  leftindices = leftOp ? leftOp->get_orbs().size() : 0;
+  dotindices = dotOp ? dotOp->get_orbs().size() : 0;
+  rightindices = rightOp ? rightOp->get_orbs().size() : 0;
 
   int Aindices, Bindices;
   Aindices = leftindices+dotindices;
@@ -42,15 +42,19 @@ void spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& lef
   SpinBlock* rightBlock = big.get_rightBlock();
 
   Cre AOp; //This is just an example class
-  int totalspin = (&rightOp) ? rightOp.get_spin().getirrep() : 0;
-
+  int totalspin;
+  if (dmrginp.spinAdapted()) {
+    totalspin = rightOp ? rightOp->get_spin().getirrep() : 0;
+  } else {
+    totalspin = rightOp ? -rightOp->get_spin().getirrep() : 0;
+  }
   if (Aindices != 0)
     FormLeftOp(leftBlock, leftOp, dotOp, AOp, totalspin);
   
   //different cases
   if (Aindices == 0 && Bindices == 4)
   {
-    operatorfunctions::TensorMultiply(rightBlock, rightOp, &big, wave2, opw2, dQ[0], 1.0);
+    operatorfunctions::TensorMultiply(rightBlock, *rightOp, &big, wave2, opw2, dQ[0], 1.0);
     expectations.push_back( DotProduct(wave1, opw2, dmrginp.Sz(), big) );
   }
   else if (Aindices == 4&& Bindices == 0)
@@ -60,12 +64,12 @@ void spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& lef
   }
   else if (Aindices != 0 && Bindices != 0)
   { 
-    operatorfunctions::TensorMultiply(leftBlock, AOp, rightOp, &big, wave2, opw2, dQ[0], 1.0);
+    operatorfunctions::TensorMultiply(leftBlock, AOp, *rightOp, &big, wave2, opw2, dQ[0], 1.0);
     expectations.push_back( DotProduct(wave1, opw2, dmrginp.Sz(), big) );    
     if (doTranspose)
     {
       opw2.Clear();
-      operatorfunctions::TensorMultiply(leftBlock, Transposeview(AOp), rightOp, &big, wave2, opw2, dQ[0], 1.0);
+      operatorfunctions::TensorMultiply(leftBlock, Transposeview(AOp), *rightOp, &big, wave2, opw2, dQ[0], 1.0);
       expectations.push_back( DotProduct(wave1, opw2, dmrginp.Sz(), big) );    
     }
   }
@@ -73,13 +77,13 @@ void spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& lef
 }
 
 
-void FormLeftOp(const SpinBlock* leftBlock, const SparseMatrix& leftOp, const SparseMatrix& dotOp, SparseMatrix& Aop, int totalspin)
+void FormLeftOp(const SpinBlock* leftBlock, const boost::shared_ptr<SparseMatrix> leftOp, const boost::shared_ptr<SparseMatrix> dotOp, SparseMatrix& Aop, int totalspin)
 {
   //Cre is just a class..it is not actually cre
   int leftindices=0, dotindices=0, rightindices=0;
 
-  leftindices = &leftOp ? leftOp.get_orbs().size() : 0;
-  dotindices = &dotOp ? dotOp.get_orbs().size() : 0;
+  leftindices = leftOp ? leftOp->get_orbs().size() : 0;
+  dotindices = dotOp ? dotOp->get_orbs().size() : 0;
   
   int Aindices, Bindices;
   Aindices = leftindices+dotindices;
@@ -89,31 +93,31 @@ void FormLeftOp(const SpinBlock* leftBlock, const SparseMatrix& leftOp, const Sp
   if (dotindices == 0)
     {
       Aop.set_fermion() = false;
-      Aop.set_orbs() = leftOp.get_orbs();
-      Aop.set_deltaQuantum(1, leftOp.get_deltaQuantum(0)); // FIXME does leftOp always has only one dQ?
+      Aop.set_orbs() = leftOp->get_orbs();
+      Aop.set_deltaQuantum(1, leftOp->get_deltaQuantum(0)); // FIXME does leftOp always has only one dQ?
       Aop.allocate(leftBlock->get_stateInfo());
-      operatorfunctions::TensorTrace(leftBlock->get_leftBlock(), leftOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);
+      operatorfunctions::TensorTrace(leftBlock->get_leftBlock(), *leftOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);
     }
   else if (leftindices == 0)
     {
       Aop.set_fermion() = false;
-      Aop.set_orbs() = dotOp.get_orbs();
-      Aop.set_deltaQuantum(1, dotOp.get_deltaQuantum(0));
+      Aop.set_orbs() = dotOp->get_orbs();
+      Aop.set_deltaQuantum(1, dotOp->get_deltaQuantum(0));
       Aop.allocate(leftBlock->get_stateInfo());
-      operatorfunctions::TensorTrace(leftBlock->get_rightBlock(), dotOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);
+      operatorfunctions::TensorTrace(leftBlock->get_rightBlock(), *dotOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);
     }
   else
     {
-      Aop.set_orbs() = leftOp.get_orbs(); copy(dotOp.get_orbs().begin(), dotOp.get_orbs().end(), back_inserter(Aop.set_orbs()));
+      Aop.set_orbs() = leftOp->get_orbs(); copy(dotOp->get_orbs().begin(), dotOp->get_orbs().end(), back_inserter(Aop.set_orbs()));
       Aop.set_fermion() = Aop.set_orbs().size() == 2 ? true : false;
-      vector<SpinQuantum> spins = (dotOp.get_deltaQuantum(0) + leftOp.get_deltaQuantum(0));
+      vector<SpinQuantum> spins = (dotOp->get_deltaQuantum(0) + leftOp->get_deltaQuantum(0));
       SpinQuantum dQ;
       for (int i=0; i< spins.size(); i++) {
 	if (spins[i].get_s().getirrep() == totalspin) { dQ = spins[i]; break; }
       }
       Aop.set_deltaQuantum(1, dQ);
       Aop.allocate(leftBlock->get_stateInfo());
-      operatorfunctions::TensorProduct(leftBlock->get_leftBlock(), leftOp, dotOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);      
+      operatorfunctions::TensorProduct(leftBlock->get_leftBlock(), *leftOp, *dotOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);      
     }
 } 
 
@@ -202,15 +206,25 @@ void save_twopdm_text(const array_4d<double>& twopdm, const int &i, const int &j
 {
   if(!mpigetrank())
   {
+    std::vector<int> reorder;
+    reorder.resize(twopdm.dim1()/2);
+    for (int k = 0; k < twopdm.dim2()/2; ++k) {
+      reorder.at(dmrginp.reorder_vector()[k]) = k;
+    }
     char file[5000];
     sprintf (file, "%s%s%d.%d%s", dmrginp.save_prefix().c_str(),"/twopdm.", i, j, ".txt");
     ofstream ofs(file);
     ofs << twopdm.dim1() << endl;
-    for(int k=0;k<twopdm.dim1();++k)
-      for(int l=0;l<twopdm.dim2();++l)
-        for(int m=0;m<twopdm.dim3();++m)
-          for(int n=0;n<twopdm.dim4();++n)
-            ofs << boost::format("%d %d %d %d %20.14e\n") % k % l % m % n % twopdm(k,l,m,n);
+    for (int s=0; s<2; ++s)
+      for (int t=s; t<2; ++t)
+        for(int k=0;k<twopdm.dim1()/2;++k)
+          for(int l=0;l<twopdm.dim2()/2;++l)
+            for(int m=0;m<twopdm.dim3()/2;++m)
+              for(int n=0;n<twopdm.dim4()/2;++n) {
+                // only store aa, ab, bb elements
+                ofs << boost::format("%d %d %d %d %20.14e\n") % (2*k+s) % (2*l+t) % (2*m+t) % (2*n+s) \
+                  % twopdm(2*reorder.at(k)+s,2*reorder.at(l)+t,2*reorder.at(m)+t,2*reorder.at(n)+s);
+              }
     ofs.close();
   }
 }
@@ -383,7 +397,7 @@ void assign_antisymmetric(array_4d<double>& twopdm, const int i, const int j, co
       cout << "earlier value: "<<twopdm(i,j,k,l)<<endl<<"new value: "<<val<<endl;
       assert(1 == 0);
     }
-
+  //cout << i << " " << j << " " << k << " " << l << " " << val << endl;
   twopdm(i, j, k, l) = val;
   twopdm(i, j, l, k) = -val;
   twopdm(j, i, k, l) = -val;

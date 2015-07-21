@@ -22,16 +22,16 @@ namespace Npdm{
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------
 
-double spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& leftOp, SparseMatrix& dotOp, SparseMatrix& rightOp, const SpinBlock& big)
+double spinExpectation(Wavefunction& wave1, Wavefunction& wave2, boost::shared_ptr<SparseMatrix> leftOp, boost::shared_ptr<SparseMatrix> dotOp, boost::shared_ptr<SparseMatrix> rightOp, const SpinBlock& big)
 {
 
   //calculating <wave1| Oa*Ob | wave2>
   // do transpose specifies if we want  <wave1| Oa^T*Ob |wave2> separately. This can be avoided in some sitations if wave1 and wave2 are the same functions
   int leftindices=0, dotindices=0, rightindices=0;
 
-  leftindices = &leftOp ? leftOp.get_orbs().size() : 0;
-  dotindices = &dotOp ? dotOp.get_orbs().size() : 0;
-  rightindices = &rightOp ? rightOp.get_orbs().size() : 0;
+  leftindices = leftOp ? leftOp->get_orbs().size() : 0;
+  dotindices = dotOp ? dotOp->get_orbs().size() : 0;
+  rightindices = rightOp ? rightOp->get_orbs().size() : 0;
 
   int Aindices, Bindices;
   Aindices = leftindices+dotindices;
@@ -45,7 +45,7 @@ double spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& l
   SpinBlock* rightBlock = big.get_rightBlock();
 
   Cre AOp; //This is just an example class
-  int totalspin = (&rightOp) ? rightOp.get_spin().getirrep() : 0;
+  int totalspin = rightOp ? rightOp->get_spin().getirrep() : 0;
 
   if (Aindices != 0) {
     FormLeftOp(leftBlock, leftOp, dotOp, AOp, totalspin);
@@ -54,7 +54,7 @@ double spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& l
   //different cases
   if (Aindices == 0 && Bindices != 0)
   {
-    operatorfunctions::TensorMultiply(rightBlock, rightOp, &big, wave2, opw2, dQ[0], 1.0);
+    operatorfunctions::TensorMultiply(rightBlock, *rightOp, &big, wave2, opw2, dQ[0], 1.0);
   }
   else if (Aindices != 0 && Bindices == 0)
   { 
@@ -62,7 +62,7 @@ double spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& l
   }
   else if (Aindices != 0 && Bindices != 0)
   { 
-    operatorfunctions::TensorMultiply(leftBlock, AOp, rightOp, &big, wave2, opw2, dQ[0], 1.0);
+    operatorfunctions::TensorMultiply(leftBlock, AOp, *rightOp, &big, wave2, opw2, dQ[0], 1.0);
   }
   else abort();
 
@@ -71,13 +71,13 @@ double spinExpectation(Wavefunction& wave1, Wavefunction& wave2, SparseMatrix& l
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void FormLeftOp(const SpinBlock* leftBlock, const SparseMatrix& leftOp, const SparseMatrix& dotOp, SparseMatrix& Aop, int totalspin)
+void FormLeftOp(const SpinBlock* leftBlock, const boost::shared_ptr<SparseMatrix> leftOp, const boost::shared_ptr<SparseMatrix> dotOp, SparseMatrix& Aop, int totalspin)
 {
   //Cre is just a class..it is not actually cre
   int leftindices=0, dotindices=0, rightindices=0;
 
-  leftindices = &leftOp ? leftOp.get_orbs().size() : 0;
-  dotindices = &dotOp ? dotOp.get_orbs().size() : 0;
+  leftindices = leftOp ? leftOp->get_orbs().size() : 0;
+  dotindices = dotOp ? dotOp->get_orbs().size() : 0;
   
   int Aindices, Bindices;
   Aindices = leftindices+dotindices;
@@ -87,31 +87,31 @@ void FormLeftOp(const SpinBlock* leftBlock, const SparseMatrix& leftOp, const Sp
   if (dotindices == 0)
     {
       Aop.set_fermion() = false;
-      Aop.set_orbs() = leftOp.get_orbs();
-      Aop.set_deltaQuantum(1, leftOp.get_deltaQuantum(0)); // FIXME does leftOp always has only one dQ?
+      Aop.set_orbs() = leftOp->get_orbs();
+      Aop.set_deltaQuantum(1, leftOp->get_deltaQuantum(0)); // FIXME does leftOp always has only one dQ?
       Aop.allocate(leftBlock->get_stateInfo());
-      operatorfunctions::TensorTrace(leftBlock->get_leftBlock(), leftOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);
+      operatorfunctions::TensorTrace(leftBlock->get_leftBlock(), *leftOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);
     }
   else if (leftindices == 0)
     {
       Aop.set_fermion() = false;
-      Aop.set_orbs() = dotOp.get_orbs();
-      Aop.set_deltaQuantum(1, dotOp.get_deltaQuantum(0));
+      Aop.set_orbs() = dotOp->get_orbs();
+      Aop.set_deltaQuantum(1, dotOp->get_deltaQuantum(0));
       Aop.allocate(leftBlock->get_stateInfo());
-      operatorfunctions::TensorTrace(leftBlock->get_rightBlock(), dotOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);
+      operatorfunctions::TensorTrace(leftBlock->get_rightBlock(), *dotOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);
     }
   else
     {
-      Aop.set_orbs() = leftOp.get_orbs(); copy(dotOp.get_orbs().begin(), dotOp.get_orbs().end(), back_inserter(Aop.set_orbs()));
+      Aop.set_orbs() = leftOp->get_orbs(); copy(dotOp->get_orbs().begin(), dotOp->get_orbs().end(), back_inserter(Aop.set_orbs()));
       Aop.set_fermion() = Aop.set_orbs().size() == 2 ? true : false;
-      vector<SpinQuantum> spins = (dotOp.get_deltaQuantum(0) + leftOp.get_deltaQuantum(0));
+      vector<SpinQuantum> spins = (dotOp->get_deltaQuantum(0) + leftOp->get_deltaQuantum(0));
       SpinQuantum dQ;
       for (int i=0; i< spins.size(); i++) {
 	if (spins[i].get_s().getirrep() == totalspin) { dQ = spins[i]; break; }
       }
       Aop.set_deltaQuantum(1, dQ);
       Aop.allocate(leftBlock->get_stateInfo());
-      operatorfunctions::TensorProduct(leftBlock->get_leftBlock(), leftOp, dotOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);      
+      operatorfunctions::TensorProduct(leftBlock->get_leftBlock(), *leftOp, *dotOp, leftBlock, &(leftBlock->get_stateInfo()), Aop, 1.0);      
     }
 } 
 

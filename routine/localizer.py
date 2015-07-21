@@ -88,7 +88,8 @@ class Localizer(object):
         # compute (i'i'||i'i')+(j'j'||j'j')-(ii||ii)-(jj||jj)
         # i'=i*cos\theta+j*sin\theta
         # j'=j*cos\theta-i*sin\theta
-        # (i'i'||i'i')+(j'j'||j'j') = [(ii||ii)+(jj||jj)][3/4+1/4*cos4\theta] + [(ii||ij)+...-(ij||jj)-...]*1/4*sin4\theta
+        # (i'i'||i'i')+(j'j'||j'j') = [(ii||ii)+(jj||jj)][3/4+1/4*cos4\theta]
+        # + [(ii||ij)+...-(ij||jj)-...]*1/4*sin4\theta
         # + [(ii||jj)+...][1/4-1/4*cos4\theta]
         A = self.Int2e[i,i,i,i] + self.Int2e[j,j,j,j]
         B = self.Int2e[i,i,i,j] + self.Int2e[i,i,j,i] + self.Int2e[i,j,i,i] + self.Int2e[j,i,i,i] \
@@ -126,13 +127,15 @@ class Localizer(object):
         # each Jacobian step \theta between -pi/4 to pi/4
         Iter = 0
         log.info("Edmiston-Ruedenberg localization")
+        initL = self.getL()
         log.debug(0, "Iter        L            dL     (i , j)   theta/pi")
         sweep = []
         for i,j in it.combinations(range(self.norbs), 2):
             sweep.append((i, j) + self.predictor(i, j))
         sweep.sort(key = lambda x: x[3])
         i, j, theta, dL = sweep[-1]
-        log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", Iter, self.getL(), dL, i, j, theta/pi)        
+        log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", \
+                Iter, self.getL(), dL, i, j, theta/pi)
         while dL > thr:
             self.transformInt(i,j,theta)
             self.transformCoef(i,j,theta)
@@ -142,8 +145,10 @@ class Localizer(object):
                 sweep.append((i, j) + self.predictor(i, j))
             sweep.sort(key = lambda x: x[3])
             i, j, theta, dL = sweep[-1]
-            log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", Iter, self.getL(), dL, i, j, theta/pi)            
+            log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", \
+                    Iter, self.getL(), dL, i, j, theta/pi)
         log.info("Localization converged after %4d iterations", Iter)
+        log.info("Cost function: init %12.6f   final %12.6f", initL, self.getL())
 
 if __name__ == "__main__":
     log.verbose = "DEBUG0"
@@ -157,4 +162,5 @@ if __name__ == "__main__":
     loc.optimize()
     R = loc.coefs
     err = loc.Int2e - np.einsum("pi,qj,rk,sl,ijkl->pqrs", R, R, R, R, s)
-    log.check(np.allclose(err, 0), "Inconsistent coefficients and integrals, difference is %.2e", la.norm(err))
+    log.check(np.allclose(err, 0), "Inconsistent coefficients and integrals,"
+            " difference is %.2e", la.norm(err))
