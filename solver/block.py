@@ -142,7 +142,7 @@ class Schedule(object):
 
         return text
 
-def readpdm(filename):
+def read1pdm(filename):
     with open(filename, "r") as f:
         lines = f.readlines()
 
@@ -150,8 +150,22 @@ def readpdm(filename):
     pdm = np.zeros((nsites, nsites))
 
     for line in lines[1:]:
-        tokens = line.split(" ")
+        tokens = line.split()
         pdm[int(tokens[0]), int(tokens[1])] = float(tokens[2])
+
+    return pdm
+
+def read2pdm(filename):
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    nsites = int(lines[0])
+    pdm = np.zeros((nsites, nsites, nsites, nsites))
+
+    for line in lines[1:]:
+        tokens = line.split()
+        pdm[int(tokens[0]), int(tokens[1]), int(tokens[2]), int(tokens[3])] = \
+                float(tokens[4])
 
     return pdm
 
@@ -340,22 +354,60 @@ class Block(object):
 
     def onepdm(self):
         if self.spinRestricted:
-            rho = readpdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
+            rho = read1pdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
             rho = rho.reshape((1, self.integral.norb, self.integral.norb))
         else:
-            rho0 = readpdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
+            rho0 = read1pdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
             rho = np.empty((2, self.integral.norb, self.integral.norb))
             rho[0] = rho0[::2, ::2]
             rho[1] = rho0[1::2, 1::2]
         if self.bogoliubov:
-            kappa = readpdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
+            kappa = read1pdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
             if self.spinRestricted:
                 kappa = (kappa + kappa.T) / 2
             return (rho, kappa)
         else:
             return rho
 
-    def just_run(self, onepdm = True, twopdm = False, dry_run = False):
+    def twopdm(self):
+        log.eassert(self.optimized, "2pdm is computed using restart")
+        log.eassert(not self.bogoliubov, \
+                "2pdm with non particle number conservation is not implemented in BLOCK")
+        log.debug(0, "Run BLOCK with restart_twopdm")
+
+        if Block.nnode == 1:
+            startPath = self.tmpDir
+        else:
+            startPath = self.tmpShared
+
+        # copy configure file and add a line
+        sub.check_call(["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
+            os.path.join(startPath, "dmrg.conf.%03d" % self.count)])
+
+        with open(os.path.join(startPath, "dmrg.conf.%03d" % self.count), "a") as f:
+            f.write("restart_twopdm\n")
+
+        if Block.nnode > 1:
+            self.broadcast()
+
+        self.callBlock()
+
+        norb = self.integral.norb
+        if self.spinRestricted:
+            # read spatial twopdm
+            gamma = read2pdm(os.path.join(self.tmpDir, "spatial_twopdm.0.0.txt")) / 2
+            # gamma_ijkl=0.25*sum_{s,t}<c_is c_jt d_kt d_ls>
+            gamma = gamma.reshape((1, norb, norb, norb, norb))
+        else:
+            gamma0 = read2pdm(os.path.join(self.tmpDir, "twopdm.0.0.txt"))
+            gamma = np.empty((3, norb, norb, norb, norb))
+            gamma[0] = gamma0[::2,::2,::2,::2] # alpha-alpha
+            gamma[1] = gamma0[1::2,1::2,1::2,1::2] # beta-beta
+            gamma[2] = gamma0[::2,1::2,1::2,::2] # alpha-beta
+
+        return gamma
+
+    def just_run(self, onepdm = True, dry_run = False):
         log.debug(0, "Run BLOCK")
 
         if Block.nnode == 1:
@@ -441,8 +493,8 @@ class Block(object):
 
         # just copy configure file
         sub.check_call(["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
-            os.path.join(startPath, "dmrg.conf.%03d" % (self.count))])
-        with open(os.path.join(startPath, "dmrg.conf.%03d" % (self.count)), "a") as f:
+            os.path.join(startPath, "dmrg.conf.%03d" % self.count)])
+        with open(os.path.join(startPath, "dmrg.conf.%03d" % self.count), "a") as f:
             f.write("fullrestart\n")
 
         intFile = os.path.join(startPath, "FCIDUMP")

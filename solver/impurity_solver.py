@@ -44,6 +44,10 @@ class Block(object):
         truncation, energy, onepdm = self.cisolver.optimize()
         return onepdm, energy
 
+    def twopdm(self):
+        log.info("Compute 2pdm")
+        return self.cisolver.twopdm()
+
     def cleanup(self):
         # FIXME first copy and save restart files
         self.cisolver.cleanup()
@@ -288,6 +292,9 @@ class CASCI(object):
 
         return rho, E
 
+    def cleanup(self):
+        self.cisolver.cleanup()
+
 class CASSCF(object):
     # CASSCF with FCI solver only, not DMRG-SCF
 
@@ -351,3 +358,6 @@ class CASSCF(object):
         rho = np.asarray(mc.make_rdm1s())
 
         return rho, E
+
+    def cleanup(self):
+        pass
