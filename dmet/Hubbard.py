@@ -80,7 +80,7 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, solver, \
             nprime = (nelec1 - nelec) / delta
             delta1 = (filling*2 - nelec) / nprime
             if abs(delta1) > step:
-                delta1 = copysign(0.1, delta1)
+                delta1 = copysign(step, delta1)
             log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
             log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
             log.result("extrapolated to dMu = %20.12f", delta1)
