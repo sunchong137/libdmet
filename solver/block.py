@@ -21,7 +21,8 @@ class Schedule(object):
 
         self.arrayM = [minM] + [M for M in defaultM if M > minM and M < maxM] + [maxM]
         self.arraySweep = range(0, 6 * len(self.arrayM), 6)
-        self.arrayTol = [self.sweeptol * 0.1 * 10.**i for i in range(len(self.arrayM))][::-1]
+        self.arrayTol = [min(1e-4, self.sweeptol * 0.1 * 10.**i) for i in \
+                range(len(self.arrayM))][::-1]
         self.arrayNoise = deepcopy(self.arrayTol)
 
         self.arrayM.append(maxM)
@@ -46,7 +47,8 @@ class Schedule(object):
         self.initialized = True
 
     def gen_restart(self, M):
-        log.debug(1, "Generate default schedule with restart calculation M = %d, maxiter = %d", M, self.maxiter)
+        log.debug(1, "Generate default schedule with restart calculation M = %d, " \
+                "maxiter = %d", M, self.maxiter)
         self.arrayM = [M, M]
         self.arraySweep = [0, 4]
         self.arrayTol = [self.sweeptol * 0.1] * 2
@@ -91,8 +93,8 @@ class Schedule(object):
     def gen_custom(self, arrayM, arraySweep, arrayTol, arrayNoise, twodot_to_onedot = None):
         log.debug(1, "Generate custom schedule")
         nstep = len(arrayM)
-        log.eassert(len(arraySweep) == nstep and len(arrayTol) == nstep and len(arrayNoise) == nstep, \
-            "The lengths of input arrays are not consistent.")
+        log.eassert(len(arraySweep) == nstep and len(arrayTol) == nstep and \
+                len(arrayNoise) == nstep, "The lengths of input arrays are not consistent.")
 
         self.arrayM, self.arraySweep, self.arrayTol, self.arrayNoise = \
             arrayM, arraySweep, arrayTol, arrayNoise
@@ -121,7 +123,8 @@ class Schedule(object):
         text = ["", "schedule"]
         nstep = len(self.arrayM)
         text += map(lambda n: "%d %d %.0e %.0e" % \
-            (self.arraySweep[n], self.arrayM[n], self.arrayTol[n], self.arrayNoise[n]), range(nstep))
+                (self.arraySweep[n], self.arrayM[n], self.arrayTol[n], self.arrayNoise[n]), \
+                range(nstep))
         text.append("end")
         text.append("")
         text.append("maxiter %d" % self.maxiter)
@@ -139,7 +142,7 @@ class Schedule(object):
 
         return text
 
-def readpdm(filename):
+def read1pdm(filename):
     with open(filename, "r") as f:
         lines = f.readlines()
 
@@ -147,14 +150,29 @@ def readpdm(filename):
     pdm = np.zeros((nsites, nsites))
 
     for line in lines[1:]:
-        tokens = line.split(" ")
+        tokens = line.split()
         pdm[int(tokens[0]), int(tokens[1])] = float(tokens[2])
+
+    return pdm
+
+def read2pdm(filename):
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    nsites = int(lines[0])
+    pdm = np.zeros((nsites, nsites, nsites, nsites))
+
+    for line in lines[1:]:
+        tokens = line.split()
+        pdm[int(tokens[0]), int(tokens[1]), int(tokens[2]), int(tokens[3])] = \
+                float(tokens[4])
 
     return pdm
 
 class Block(object):
 
-    execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../block"))
+    execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
+            "../block"))
     nproc = 1
     nnode = 1
     intFormat = "FCIDUMP"
@@ -174,7 +192,8 @@ class Block(object):
         cls.nnode = nnode
         log.info("Block interface  running with %d nodes, %d processors per node", \
             cls.nnode, cls.nproc)
-        log.info("Block running on nodes:\n%s", sub.check_output(Block.mpipernode + ["hostname"]).replace("\n", "\t"))
+        log.info("Block running on nodes:\n%s", sub.check_output(Block.mpipernode + \
+                ["hostname"]).replace("\n", "\t"))
 
     def __init__(self):
         self.sys_initialized = False
@@ -194,7 +213,8 @@ class Block(object):
         self.tmpDir = mkdtemp(prefix = "BLOCK", dir = tmp)
         log.info("Block working dir %s", self.tmpDir)
         if Block.nnode > 1:
-            log.eassert(shared is not None, "when running on multiple nodes, a shared tmporary folder is required")
+            log.eassert(shared is not None, "when running on multiple nodes," \
+                    " a shared tmporary folder is required")
             sub.check_call(["mkdir", "-p", shared])
             self.tmpShared = mkdtemp(prefix = "BLOCK", dir = shared)
             sub.check_call(Block.mpipernode + ["mkdir", "-p", self.tmpDir])
@@ -211,13 +231,15 @@ class Block(object):
         self.sys_initialized = True
 
     def set_integral(self, *args):
-        log.eassert(self.sys_initialized, "set_integral() should be used after initializing set_system()")
+        log.eassert(self.sys_initialized, "set_integral() should be used after" \
+                " initializing set_system()")
         if len(args) == 1:
             # a single integral object
             self.integral = args[0]
         elif len(args) == 4:
             # norb, H0, H1, H2
-            self.integral = integral.Integral(args[0], self.spinRestricted, self.bogoliubov, *args[1:])
+            self.integral = integral.Integral(args[0], self.spinRestricted, \
+                    self.bogoliubov, *args[1:])
         else:
             log.error("input either an integral object, or (norb, H0, H1, H2)")
         self.integral_initialized = True
@@ -252,7 +274,8 @@ class Block(object):
         else:
             startPath = self.tmpShared
         for f in files:
-            sub.check_call(" ".join(Block.mpipernode + ["cp", os.path.join(src, f), startPath]), shell = True)
+            sub.check_call(" ".join(Block.mpipernode + ["cp", os.path.join(src, f), \
+                    startPath]), shell = True)
         if Cleanup:
             sub.check_call(["rm", "-rf", src])
         self.restart = True
@@ -272,7 +295,8 @@ class Block(object):
             files += Block.restartFiles
 
         for f in files:
-            sub.check_call(" ".join(Block.mpipernode + ["cp", os.path.join(self.tmpShared, f), self.tmpDir]), shell = True)
+            sub.check_call(" ".join(Block.mpipernode + ["cp", os.path.join(self.tmpShared, \
+                    f), self.tmpDir]), shell = True)
 
     def callBlock(self):
         outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % self.count)
@@ -281,11 +305,13 @@ class Block(object):
         with open(outputfile, "w", buffering = 1) as f:
             if Block.env_slurm:
                 sub.check_call(" ".join(["srun", \
-                    os.path.join(Block.execPath, "block.spin_adapted"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)]), \
+                    os.path.join(Block.execPath, "block.spin_adapted"), \
+                    os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)]), \
                     stdout = f, shell = True)
             else:
                 sub.check_call(["mpirun", "-np", "%d" % (Block.nproc * Block.nnode), \
-                    os.path.join(Block.execPath, "block.spin_adapted"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
+                    os.path.join(Block.execPath, "block.spin_adapted"), \
+                    os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
                     stdout = f)
         log.result("BLOCK sweep summary")
         log.result(grep("Sweep Energy", outputfile))
@@ -298,11 +324,13 @@ class Block(object):
         with open(outputfile, "w", buffering = 1) as f:
             if Block.env_slurm:            
                 sub.check_call(" ".join(["srun", "-n", "1", \
-                    os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)]), \
+                    os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, \
+                    "dmrg.conf.%03d" % self.count)]), \
                     stdout = f, shell = True)
             else:
                 sub.check_call(["mpirun", "-np", "1", \
-                    os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)], \
+                    os.path.join(Block.execPath, "OH"), os.path.join(self.tmpDir, \
+                    "dmrg.conf.%03d" % self.count)], \
                     stdout = f)
         self.count += 1
 
@@ -312,32 +340,72 @@ class Block(object):
         keys = ["Weight"]
         for key in keys:
             place = map(lambda tokens: tokens.index(key), lines)
-            results.append(np.average(map(lambda (tokens, idx): float(tokens[idx+2]), zip(lines, place))))
+            results.append(np.average(map(lambda (tokens, idx): float(tokens[idx+2]), \
+                    zip(lines, place))))
 
         lines = map(lambda s: s.split(), text.split('\n')[-1:])
         keys = ["Energy"]
         for key in keys:
             place = map(lambda tokens: tokens.index(key), lines)
-            results.append(np.average(map(lambda (tokens, idx): float(tokens[idx+2]), zip(lines, place))))
+            results.append(np.average(map(lambda (tokens, idx): float(tokens[idx+2]), \
+                    zip(lines, place))))
 
         return tuple(results)
 
     def onepdm(self):
         if self.spinRestricted:
-            rho = readpdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
+            rho = read1pdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
             rho = rho.reshape((1, self.integral.norb, self.integral.norb))
         else:
-            rho0 = readpdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
+            rho0 = read1pdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
             rho = np.empty((2, self.integral.norb, self.integral.norb))
             rho[0] = rho0[::2, ::2]
             rho[1] = rho0[1::2, 1::2]
         if self.bogoliubov:
-            kappa = readpdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
+            kappa = read1pdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
             if self.spinRestricted:
                 kappa = (kappa + kappa.T) / 2
             return (rho, kappa)
         else:
             return rho
+
+    def twopdm(self):
+        log.eassert(self.optimized, "2pdm is computed using restart")
+        log.eassert(not self.bogoliubov, \
+                "2pdm with non particle number conservation is not implemented in BLOCK")
+        log.debug(0, "Run BLOCK with restart_twopdm")
+
+        if Block.nnode == 1:
+            startPath = self.tmpDir
+        else:
+            startPath = self.tmpShared
+
+        # copy configure file and add a line
+        sub.check_call(["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
+            os.path.join(startPath, "dmrg.conf.%03d" % self.count)])
+
+        with open(os.path.join(startPath, "dmrg.conf.%03d" % self.count), "a") as f:
+            f.write("restart_twopdm\n")
+
+        if Block.nnode > 1:
+            self.broadcast()
+
+        self.callBlock()
+
+        norb = self.integral.norb
+        if self.spinRestricted:
+            # read spatial twopdm
+            gamma = read2pdm(os.path.join(self.tmpDir, "spatial_twopdm.0.0.txt")) / 2
+            # gamma_ijkl=0.25*sum_{s,t}<c_is c_jt d_kt d_ls>
+            gamma = gamma.reshape((1, norb, norb, norb, norb))
+        else:
+            gamma0 = read2pdm(os.path.join(self.tmpDir, "twopdm.0.0.txt"))
+            gamma = np.empty((3, norb, norb, norb, norb))
+            gamma[0] = gamma0[::2,::2,::2,::2] # alpha-alpha
+            gamma[1] = gamma0[1::2,1::2,1::2,1::2] # beta-beta
+            gamma[2] = gamma0[::2,1::2,1::2,::2] # alpha-beta
+
+        return gamma
 
     def just_run(self, onepdm = True, dry_run = False):
         log.debug(0, "Run BLOCK")
@@ -371,8 +439,10 @@ class Block(object):
             return None, None, None
 
     def optimize(self, onepdm = True):
-        log.eassert(self.sys_initialized and self.integral_initialized and self.schedule_initialized, \
-            "components for optimization are not ready\nsys_init = %s\nint_init = %s\nschedule_init = %s", \
+        log.eassert(self.sys_initialized and self.integral_initialized and \
+                self.schedule_initialized, \
+            "components for optimization are not ready\nsys_init = %s\nint_init = %s\n" \
+            "schedule_init = %s", \
             self.sys_initialized, self.integral_initialized, self.schedule_initialized)
 
         if self.optimized:
@@ -423,8 +493,8 @@ class Block(object):
 
         # just copy configure file
         sub.check_call(["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
-            os.path.join(startPath, "dmrg.conf.%03d" % (self.count))])
-        with open(os.path.join(startPath, "dmrg.conf.%03d" % (self.count)), "a") as f:
+            os.path.join(startPath, "dmrg.conf.%03d" % self.count)])
+        with open(os.path.join(startPath, "dmrg.conf.%03d" % self.count), "a") as f:
             f.write("fullrestart\n")
 
         intFile = os.path.join(startPath, "FCIDUMP")
@@ -441,7 +511,8 @@ class Block(object):
     def cleanup(self, keep_restart = False):
         if keep_restart:
             for filename in Block.tempFiles:
-                sub.check_call(" ".join(Block.mpipernode + ["rm", "-rf", os.path.join(self.tmpDir, filename)]), shell = True)
+                sub.check_call(" ".join(Block.mpipernode + ["rm", "-rf", \
+                        os.path.join(self.tmpDir, filename)]), shell = True)
         else:
             sub.check_call(Block.mpipernode + ["rm", "-rf", self.tmpDir])
             if Block.nnode > 1:

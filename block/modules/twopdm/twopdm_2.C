@@ -221,8 +221,9 @@ void save_twopdm_text(const array_4d<double>& twopdm, const int &i, const int &j
           for(int l=0;l<twopdm.dim2()/2;++l)
             for(int m=0;m<twopdm.dim3()/2;++m)
               for(int n=0;n<twopdm.dim4()/2;++n) {
-                // only store irreducible elements
-                ofs << boost::format("%d %d %d %d %20.14e\n") % (2*reorder.at(k)+s) % (2*reorder.at(l)+t) % (2*reorder.at(m)+t) % (2*reorder.at(n)+s) % twopdm(k,l,m,n);
+                // only store aa, ab, bb elements
+                ofs << boost::format("%d %d %d %d %20.14e\n") % (2*k+s) % (2*l+t) % (2*m+t) % (2*n+s) \
+                  % twopdm(2*reorder.at(k)+s,2*reorder.at(l)+t,2*reorder.at(m)+t,2*reorder.at(n)+s);
               }
     ofs.close();
   }
