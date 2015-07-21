@@ -4,9 +4,7 @@ from libdmet.solver import block
 import numpy as np
 import numpy.linalg as la
 
-block.Block.set_nproc(4)
-dmet.solver.createTmp()
-log.verbose = "WARNING"
+log.verbose = "INFO"
 
 U = 4
 LatSize = [36, 36]
@@ -40,6 +38,8 @@ log.result("Vcor =\n%s", vcor.get())
 log.result("Mu (guess) = %20.12f", Mu)
 rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
 
+solver = dmet.impurity_solver.Block(nproc = 2, nnode = 1, tol = 1e-6)
+
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
 
@@ -51,13 +51,17 @@ for iter in range(MaxIter):
     log.section("\nconstructing impurity problem\n")
     ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
     log.section("\nsolving impurity problem\n")
-    rhoEmb, EnergyEmb, ImpHam, dmu = dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, M)
+    rhoEmb, EnergyEmb, ImpHam, dmu = \
+            dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver, \
+            solver_args = {"M": 400})
     Mu += dmu
     vcor = dmet.addDiag(vcor, dmu)
-    rhoImp, EnergyImp, nelecImp = dmet.transformResults(rhoEmb, EnergyEmb, basis, ImpHam, H1e)
+    rhoImp, EnergyImp, nelecImp = \
+            dmet.transformResults(rhoEmb, EnergyEmb, basis, ImpHam, H1e)
 
     log.section("\nfitting correlation potential\n")
-    vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, vcor, np.inf, Filling, MaxIter2 = 0)
+    vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, \
+            vcor, np.inf, Filling, MaxIter2 = 0)
 
     log.section("\nfitting chemical potential\n")
     rho, Mu_new = dmet.HartreeFock(Lat, vcor_new, Filling, Mu)
@@ -68,7 +72,8 @@ for iter in range(MaxIter):
     else:
         Mu = Mu_new
 
-    history.update(EnergyImp, err, nelecImp, np.max(abs(vcor.get() - vcor_new.get())), dc)
+    history.update(EnergyImp, err, nelecImp, \
+            np.max(abs(vcor.get() - vcor_new.get())), dc)
 
     if np.max(abs(vcor.get() - vcor_new.get())) < 1e-5:
         conv = True
@@ -76,8 +81,11 @@ for iter in range(MaxIter):
     # DIIS
     if not conv:
         skipDiis = (iter < DiisStart) and (la.norm(vcor_new.param - vcor.param) > 0.01)
-        pvcor, _, _ = dc.Apply(vcor_new.param, vcor_new.param - vcor.param, Skip = skipDiis)
+        pvcor, _, _ = dc.Apply(vcor_new.param, \
+                vcor_new.param - vcor.param, Skip = skipDiis)
         vcor.update(pvcor)
+
+solver.cleanup()
 
 if conv:
     log.result("DMET converged")

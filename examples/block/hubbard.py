@@ -40,6 +40,7 @@ for i in range(8):
 solver.integral.H2["ccdd"] = Int2e
 
 log.result("E = %20.12f", solver.restart_optimize(onepdm = False, M = 600)[1])
+solver.twopdm()
 
 solver.cleanup()
 

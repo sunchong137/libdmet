@@ -6,10 +6,10 @@ import numpy.linalg as la
 log.verbose = "INFO"
 
 U = 4
-LatSize = [24, 24]
-ImpSize = [2,2]
-MaxIter = 20
-M = 400
+LatSize = [72, 72]
+ImpSize = [4,4]
+MaxIter = 1
+M = 600
 DiisStart = 4
 DiisDim = 4
 
@@ -24,7 +24,10 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.Block(nproc = 2, nnode = 1, tol = 1e-6)
+block = dmet.impurity_solver.Block(nproc = 8, nnode = 1, \
+        reorder = True, tol = 1e-7)
+solver = dmet.impurity_solver.CASCI(ncas = 32, nelecas = 32, \
+        splitloc = True, cisolver = block)
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
@@ -34,14 +37,15 @@ for iter in range(MaxIter):
     rho, mu = dmet.HartreeFock(Lat, vcor, U)
 
     log.section("\nconstructing impurity problem\n")
-    ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
+    ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor, matching = True)
     log.section("\nsolving impurity problem\n")
-    rhoEmb, EnergyEmb = solver.run(ImpHam, M = 400)
+    rhoEmb, EnergyEmb = solver.run(ImpHam, ci_args = {'M':400}, \
+            guess = dmet.foldRho(rho, Lat, basis), basis = basis)
     rhoImp, EnergyImp, nelecImp = \
             dmet.transformResults(rhoEmb, EnergyEmb, basis, ImpHam, H1e)
 
     log.section("\nfitting correlation potential\n")
-    vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, vcor, np.inf)
+    vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, vcor, np.inf, MaxIter2 = 0)
     history.update(EnergyImp, err, nelecImp, \
             np.max(abs(vcor.get() - vcor_new.get())), dc)
 
