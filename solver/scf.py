@@ -99,17 +99,14 @@ class UIHF(UHF):
         return self.ovlp
 
 def incore_transform(eri_, c):
-    log.debug(1, "Int2e component 0")
     eriA = np.tensordot(c[0][0], eri_[0], (0, 0))
     eriA = np.swapaxes(np.tensordot(c[1][0], eriA, (0, 1)), 0, 1)
     eriA = np.swapaxes(np.tensordot(eriA, c[2][0], (2, 0)), 2, 3)
     eriA = np.tensordot(eriA, c[3][0], (3, 0))
-    log.debug(1, "Int2e component 1")
     eriB = np.tensordot(c[0][1], eri_[1], (0, 0))
     eriB = np.swapaxes(np.tensordot(c[1][1], eriB, (0, 1)), 0, 1)
     eriB = np.swapaxes(np.tensordot(eriB, c[2][1], (2, 0)), 2, 3)
     eriB = np.tensordot(eriB, c[3][1], (3, 0))
-    log.debug(1, "Int2e component 2")
     eriAB = np.tensordot(c[0][0], eri_[2], (0, 0))
     eriAB = np.swapaxes(np.tensordot(c[1][0], eriAB, (0, 1)), 0, 1)
     eriAB = np.swapaxes(np.tensordot(eriAB, c[2][1], (2, 0)), 2, 3)

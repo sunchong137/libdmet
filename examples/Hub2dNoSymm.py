@@ -1,6 +1,5 @@
 import libdmet.utils.logger as log
 import libdmet.dmet.Hubbard as dmet
-from libdmet.solver import block
 import numpy as np
 import numpy.linalg as la
 
