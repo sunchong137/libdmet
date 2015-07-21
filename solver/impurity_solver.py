@@ -73,11 +73,10 @@ def cas_from_1pdm(rho, ncas, nelecas, nelec):
             "Occupied (n>0.7): %d\n""Virtual  (n<0.3): %d\n"
             "Partial Occupied: %d\n", _ncore, _nvirt, _npart)
     
-    if ncore == 0:
-        return natorb[:, :0], natorb[:, nvirt::-1], (_ncore, _npart, _nvirt)
-    else:
-        return natorb[:, -ncore::-1], natorb[:, nvirt:-ncore:-1], \
-                (_ncore, _npart, _nvirt) # core, active and active orbital classification
+    core = natorb[:, norbs-ncore:]
+    cas = natorb[:, nvirt:norbs-ncore:-1]
+    virt = natorb[:, :nvirt]
+    return core, cas, virt, (_ncore, _npart, _nvirt)
 
 def cas_from_energy(mo, mo_energy, ncas, nelecas, nelec):
     assert(nelecas <= nelec)
@@ -105,10 +104,10 @@ def cas_from_energy(mo, mo_energy, ncas, nelecas, nelec):
             "Occupied (e<mu): %d\n""Virtual  (e>mu): %d\n"
             "Partial Occupied: %d\n", _ncore, _nvirt, _npart)
     
-    if nvirt == 0:
-        return mo[:, :ncore], mo[:, ncore:], (_ncore, _npart, _nvirt)
-    else:
-        return mo[:, :ncore], mo[:, ncore:-nvirt], (_ncore, _npart, _nvirt)
+    core = mo[:, :ncore]
+    cas = mo[:, ncore:norbs-nvirt]
+    virt = mo[:, norbs-nvirt:]
+    return core, cas, virt, (_ncore, _npart, _nvirt)
 
 def buildCASHamiltonian(Ham, core, cas):
     spin = Ham.H1["cd"].shape[0]
@@ -159,28 +158,30 @@ def get_orbs(casci, Ham, guess, nelec):
             rho0 = rhoMP2
         else:
             rho0 = rhoHF
-        core, cas, casinfo = \
-                cas_from_1pdm(0.5*(rho0[0]+rho0[1]), casci.ncas, casci.nelecas/2, nelec/2)
+        core, cas, virt, casinfo = cas_from_1pdm(0.5*(rho0[0]+rho0[1]), \
+                casci.ncas, casci.nelecas/2, nelec/2)
     else:
         core = [None, None]
         cas = [None, None]
+        virt = [None, None]
         casinfo = [None, None]
         if casci.MP2natorb:
             for s in range(spin):
                 log.info("Spin %d", s)
-                core[s], cas[s], casinfo[s] = cas_from_1pdm(rhoMP2[s], casci.ncas, \
-                        casci.nelecas/2, nelec/2)
+                core[s], cas[s], virt[s], casinfo[s] = cas_from_1pdm(rhoMP2[s], \
+                        casci.ncas, casci.nelecas/2, nelec/2)
         else:
             # use hartree-fock orbitals, we need orbital energy or order in this case
             mo = casci.scfsolver.get_mo()
             mo_energy = casci.scfsolver.get_mo_energy()
             for s in range(spin):
                 log.info("Spin %d", s)
-                core[s], cas[s], casinfo[s] = cas_from_energy(mo[s], mo_energy[s], \
-                        casci.ncas, casci.nelecas/2, nelec/2)
+                core[s], cas[s], virt[s], casinfo[s] = cas_from_energy(mo[s], \
+                        mo_energy[s], casci.ncas, casci.nelecas/2, nelec/2)
         core = np.asarray(core)
         cas = np.asarray(cas)
-    return core, cas, casinfo
+        virt = np.asarray(virt)
+    return core, cas, virt, casinfo
 
 def split_localize(orbs, info, Ham, basis = None):
     spin = Ham.H1["cd"].shape[0]
@@ -248,7 +249,7 @@ def split_localize(orbs, info, Ham, basis = None):
     return HamLocal, localorbs, rotmat
 
 class CASCI(object):
-    def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = True, \
+    def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
             splitloc = False, cisolver = None):
         log.eassert(ncas * 2 >= nelecas, \
                 "CAS size not compatible with number of electrons")
@@ -257,10 +258,12 @@ class CASCI(object):
         self.MP2natorb = MP2natorb
         self.spinAverage = spinAverage
         self.splitloc = splitloc
+        log.eassert(cisolver is not None, "No default ci solver is available" \
+                " with CASCI")
         self.cisolver = cisolver
         self.scfsolver = scf.SCF()
     
-    def run(self, Ham, ci_args, guess = None, nelec = None, basis = None): 
+    def run(self, Ham, ci_args = {}, guess = None, nelec = None, basis = None): 
         # ci_args is a list or dict for ci solver, or None
         spin = Ham.H1["cd"].shape[0]
         log.eassert(spin == 2, \
@@ -268,7 +271,7 @@ class CASCI(object):
         if nelec is None:
             nelec = Ham.norb
 
-        core, cas, casinfo = get_orbs(self, Ham, guess, nelec)
+        core, cas, virt, casinfo = get_orbs(self, Ham, guess, nelec)
         coreRho = np.asarray([np.dot(core[0], core[0].T), \
                 np.dot(core[1], core[1].T)])
         
@@ -278,11 +281,73 @@ class CASCI(object):
             casHam, cas, rotmat = \
                     split_localize(cas, casinfo, casHam, basis = basis)
         
-        if ci_args is None:
-            ci_args = {}
         casRho, E = self.cisolver.run(casHam, nelec = self.nelecas, **ci_args)
         
         rho = np.asarray([mdot(cas[0], casRho[0], cas[0].T), \
                 mdot(cas[1], casRho[1], cas[1].T)]) + coreRho
+
+        return rho, E
+
+class CASSCF(object):
+    # CASSCF with FCI solver only, not DMRG-SCF
+
+    options = {
+        "max_orb_stepsize": 0.03,
+        "max_cycle_macro": 50,
+        "max_cycle_micro": 2, # micro_cycle
+        "max_cycle_micro_inner": 8,
+        "conv_tol": 1e-5, # energy convergence
+        "conv_tol_grad": 5e-3, # orb grad convergence
+        # for augmented hessian
+        "ah_level_shift": 1e-4,
+        "ah_conv_tol": 1e-12, # augmented hessian accuracy
+        "ah_max_cycle": 30,
+        "ah_lindep": 1e-14,
+        "ah_start_tol": 1e-5, # augmented hessian accuracy
+        "ah_start_cycle": 2,
+        "ah_grad_trust_region": 1.5,
+        "ah_guess_space": 0,
+        "ah_decay_rate": 0.5, # augmented hessian decay
+        "dynamic_micro_step": True,
+    }
+
+    def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
+            cisolver = None):
+        log.eassert(ncas * 2 >= nelecas, \
+                "CAS size not compatible with number of electrons")
+        self.ncas = ncas
+        self.nelecas = nelecas # alpha and beta
+        self.MP2natorb = MP2natorb
+        self.spinAverage = spinAverage
+        self.cisolver = cisolver
+        self.scfsolver = scf.SCF()
+        self.mo_coef = None
+
+    def apply_options(self, mc):
+        for key, val in CASSCF.options.items():
+            setattr(mc, key, val)
+
+    def run(self, Ham, mcscf_args = {}, guess = None, nelec = None):
+        spin = Ham.H1["cd"].shape[0]
+        norbs = Ham.H1["cd"].shape[1]
+        if nelec is None:
+            nelec = Ham.norb
+        log.eassert(spin == 2, \
+                "spin-restricted CASSCF solver is not implemented")
+
+        if self.mo_coef is None: # restart from previous orbitals
+            core, cas, virt, casinfo = get_orbs(self, Ham, guess, nelec)
+            self.mo_coef = np.empty((2, norbs, norbs))
+            self.mo_coef[:, :, :core.shape[2]] = core
+            self.mo_coef[:, :, core.shape[2]:core.shape[2]+cas.shape[2]] = cas
+            self.mo_coef[:, :, core.shape[2]+cas.shape[2]:] = virt
+
+        nelecasAB = (self.nelecas/2, self.nelecas/2)
+        mc = casscf.CASSCF(self.scfsolver.mf, self.ncas, nelecasAB)
+        # apply options
+        self.apply_options(mc)
+        # run
+        E, _, _, self.mo_coef = mc.mc1step(mo_coeff = self.mo_coef)
+        rho = np.asarray(mc.make_rdm1s())
 
         return rho, E
