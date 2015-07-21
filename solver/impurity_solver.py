@@ -299,18 +299,18 @@ class CASSCF(object):
     # CASSCF with FCI solver only, not DMRG-SCF
 
     options = {
-        "max_orb_stepsize": 0.03,
+        "max_orb_stepsize": 0.04,
         "max_cycle_macro": 50,
         "max_cycle_micro": 2, # micro_cycle
         "max_cycle_micro_inner": 8,
         "conv_tol": 1e-5, # energy convergence
-        "conv_tol_grad": 5e-3, # orb grad convergence
+        "conv_tol_grad": 1e-3, # orb grad convergence
         # for augmented hessian
         "ah_level_shift": 1e-4,
         "ah_conv_tol": 1e-12, # augmented hessian accuracy
         "ah_max_cycle": 30,
         "ah_lindep": 1e-14,
-        "ah_start_tol": 1e-5, # augmented hessian accuracy
+        "ah_start_tol": 0.1,
         "ah_start_cycle": 2,
         "ah_grad_trust_region": 1.5,
         "ah_guess_space": 0,
@@ -341,8 +341,9 @@ class CASSCF(object):
             nelec = Ham.norb
         log.eassert(spin == 2, \
                 "spin-restricted CASSCF solver is not implemented")
-
-        if self.mo_coef is None: # restart from previous orbitals
+        
+        # FIXME restart from last CASSCF calculation seems not working
+        if self.mo_coef is None or 1: # restart from previous orbitals
             core, cas, virt, casinfo = get_orbs(self, Ham, guess, nelec)
             self.mo_coef = np.empty((2, norbs, norbs))
             self.mo_coef[:, :, :core.shape[2]] = core
