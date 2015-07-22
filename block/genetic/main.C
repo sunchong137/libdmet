@@ -26,11 +26,10 @@ int main(int argc, char* argv[])
   bool simple = false;
   for(int i = 1; i < argc; ++i)
   {
-    if(strcmp(argv[i], "-s") == 0) {simple = true; ++i;}
+    if(strcmp(argv[i], "-s") == 0) {simple = true;}
     if(strcmp(argv[i], "-config")   == 0) confFileName = argv[++i];
     if(strcmp(argv[i], "-integral") == 0) dumpFileName = argv[++i];
   }
-
   ifstream confFile(confFileName.c_str());
   ifstream dumpFile(dumpFileName.c_str());
 
