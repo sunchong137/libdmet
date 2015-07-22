@@ -1,10 +1,19 @@
-*.tmp
-*.pyc
-*.swp
-*.o
-*.a
+# block executable, library and tmp file
 block/OH
 block/block.spin_adapted
+*.o
+*.a
+*.so
+*.dylib
+*.tmp
+
+# python bitcode
+*.pyc
+
+# vi temp file
+*.swp
+
+# latex temp file
 *.aux
 *.dvi
 *.log

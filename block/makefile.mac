@@ -126,13 +126,13 @@ OBJ_spin_library=$(SRC_spin_library:.C=.o)
 
 all	: $(EXECUTABLE) libqcdmrg.a OH
 
-library : libqcdmrg.a $(NEWMATLIB)/libnewmat.a libqcdmrg.so
+library : libqcdmrg.a $(NEWMATLIB)/libnewmat.a libqcdmrg.dylib
 
 libqcdmrg.a : $(OBJ_spin_library)
 	$(AR) $(ARFLAGS) $@ $^
 	$(RANLIB) $@
 
-libqcdmrg.so : $(OBJ_spin_library)
+libqcdmrg.dylib : $(OBJ_spin_library)
 	$(CXX) -shared -o $@ $^ $(LIBS)
 
 $(EXECUTABLE) : $(OBJ_spin_adapted) $(NEWMATLIB)/libnewmat.a
@@ -145,7 +145,7 @@ $(NEWMATLIB)/libnewmat.a :
 	cd $(NEWMATLIB) && $(MAKE) -f makefile libnewmat.a
 
 clean:
-	rm *.o include/*.o modules/generate_blocks/*.o modules/onepdm/*.o modules/twopdm/*.o modules/npdm/*.o $(NEWMATLIB)*.o libqcdmrg.so $(EXECUTABLE) $(NEWMATLIB)/libnewmat.a genetic/gaopt genetic/*.o btas/lib/*.o btas/lib/libbtas.a modules/two_index_ops/*.o modules/three_index_ops/*.o modules/four_index_ops/*.o
+	rm *.o include/*.o modules/generate_blocks/*.o modules/onepdm/*.o modules/twopdm/*.o modules/npdm/*.o $(NEWMATLIB)*.o libqcdmrg.dylib $(EXECUTABLE) $(NEWMATLIB)/libnewmat.a genetic/gaopt genetic/*.o btas/lib/*.o btas/lib/libbtas.a modules/two_index_ops/*.o modules/three_index_ops/*.o modules/four_index_ops/*.o
 
 # DO NOT DELETE
 
