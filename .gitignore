@@ -1,6 +1,7 @@
 # block executable, library and tmp file
 block/OH
 block/block.spin_adapted
+block/genetic/gaopt
 *.o
 *.a
 *.so
