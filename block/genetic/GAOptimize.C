@@ -26,7 +26,7 @@ namespace genetic
   boost::function<double(const Gene&)> Cell::Evaluate;
 };
 
-genetic::Cell genetic::gaordering(ifstream& confFile, ifstream& dumpFile, std::vector<int> fiedlerorder)
+genetic::Cell genetic::gaordering(ifstream& confFile, ifstream& dumpFile, std::vector<int> fiedlerorder, bool simple)
 {
 #ifndef SERIAL
   mpi::communicator world;
@@ -40,7 +40,11 @@ genetic::Cell genetic::gaordering(ifstream& confFile, ifstream& dumpFile, std::v
   {
 #endif
     if(confFile.is_open()) gainput.Configure(confFile);
-    ReadIntegral(dumpFile, K);
+    if (simple) {
+      ReadKmatrix(dumpFile, K);
+    } else {
+      ReadIntegral(dumpFile, K);
+    }
     Gene::Length() = K.Nrows();
     if(gainput.max_cells == 0) gainput.max_cells = 2 * Gene::Length();
     for(int i = 0; i < K.Nrows(); ++i)
@@ -89,7 +93,7 @@ genetic::Cell genetic::gaordering(ifstream& confFile, ifstream& dumpFile, std::v
   return best;
 }
 
-genetic::Cell genetic::gaordering_bcs(ifstream& confFile, ifstream& dumpFile, std::vector<int> fiedlerorder)
+genetic::Cell genetic::gaordering_bcs(ifstream& confFile, ifstream& dumpFile, std::vector<int> fiedlerorder, bool simple)
 {
 #ifndef SERIAL
   mpi::communicator world;
@@ -103,7 +107,11 @@ genetic::Cell genetic::gaordering_bcs(ifstream& confFile, ifstream& dumpFile, st
   {
 #endif
     if(confFile.is_open()) gainput.Configure(confFile);
-    ReadIntegral_BCS(dumpFile, K);
+    if (simple) {
+      ReadKmatrix(dumpFile, K);
+    } else {
+      ReadIntegral_BCS(dumpFile, K);
+    }
     Gene::Length() = K.Nrows();
     if(gainput.max_cells == 0) gainput.max_cells = 2 * Gene::Length();
     for(int i = 0; i < K.Nrows(); ++i)

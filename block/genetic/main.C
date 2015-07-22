@@ -23,8 +23,10 @@ int main(int argc, char* argv[])
   string confFileName;
   string dumpFileName;
 
+  bool simple = false;
   for(int i = 1; i < argc; ++i)
   {
+    if(strcmp(argv[i], "-s") == 0) {simple = true; ++i;}
     if(strcmp(argv[i], "-config")   == 0) confFileName = argv[++i];
     if(strcmp(argv[i], "-integral") == 0) dumpFileName = argv[++i];
   }
@@ -32,9 +34,9 @@ int main(int argc, char* argv[])
   ifstream confFile(confFileName.c_str());
   ifstream dumpFile(dumpFileName.c_str());
 
-  std::vector<int> fiedlerv = get_fiedler(dumpFileName, dumpFile);
+  std::vector<int> fiedlerv = get_fiedler(dumpFileName, dumpFile, simple);
 
-  genetic::Cell final = genetic::gaordering(confFile, dumpFile, fiedlerv);
+  genetic::Cell final = genetic::gaordering(confFile, dumpFile, fiedlerv, simple);
 
 #ifndef SERIAL
   if(world.rank() == 0)

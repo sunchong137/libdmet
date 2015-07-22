@@ -15,7 +15,7 @@ FLAGS=$(CXXFLAGS)
 OBJ_gaopt = main.o fiedler.o CrossOver.o Evaluate.o GAInput.o GAOptimize.o Generation.o Mutation.o RandomGenerator.o ReadIntegral.o
 
 .C.o:
-	$(CXX) $(FLAGS) $(INCLUDES) $(LIBS) -c $*.C
+	$(CXX) $(FLAGS) $(INCLUDES) -c $*.C
 
 all     : gaopt
 
