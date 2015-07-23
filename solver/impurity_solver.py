@@ -418,7 +418,7 @@ class CASCI(object):
                 if q < 0.5:
                     order = gaopt(casHam)
 
-            log.debug(0, "Orbital order: %s", order)
+            log.info("Orbital order: %s", order)
             # reorder casHam and cas
             casHam, cas = reorder(order, casHam, cas)
             # store cas in atomic basis
