@@ -8,7 +8,9 @@ from libdmet.routine.localizer import Localizer
 from libdmet.utils.munkres import Munkres, make_cost_matrix
 from copy import deepcopy
 from tempfile import mkdtemp
+import itertools as it
 import os
+import subprocess as sub
 
 class AFQMC(object):
     pass
@@ -122,7 +124,7 @@ def get_orbs(casci, Ham, guess, nelec):
     casci.scfsolver.set_integral(Ham)
     
     E_HF, rhoHF = casci.scfsolver.HF(tol = 1e-5, MaxIter = 30, InitGuess = guess)
-    
+
     if casci.MP2natorb:
         E_MP2, rhoMP2 = casci.scfsolver.MP2()
         log.result("MP2 energy = %20.12f", E_HF + E_MP2)
@@ -199,6 +201,7 @@ def split_localize(orbs, info, Ham, basis = None):
         if occ > 0:
             localizer = Localizer(Ham.H2["ccdd"][s, \
                     :occ, :occ, :occ, :occ])
+            log.info("Localization: Spin %d, occupied", s)
             localizer.optimize()
             occ_coefs = localizer.coefs.T
             localorbs[s, :, :occ] = np.dot(orbs[s,:,:occ], occ_coefs)
@@ -206,6 +209,7 @@ def split_localize(orbs, info, Ham, basis = None):
         if virt > 0:
             localizer = Localizer(Ham.H2["ccdd"][s, \
                     -virt:, -virt:, -virt:, -virt:])
+            log.info("Localization: Spin %d, virtual", s)
             localizer.optimize()
             virt_coefs = localizer.coefs.T
             localorbs[s, :, -virt:] = np.dot(orbs[s,:,-virt:], virt_coefs)
@@ -213,6 +217,7 @@ def split_localize(orbs, info, Ham, basis = None):
         if part > 0:
             localizer = Localizer(Han.H2["ccdd"][s, occ:norbs-virt, \
                 occ:norbs-virt, occ:norbs-virt, occ:nobrs-virt])
+            log.info("Localization: Spin %d, partially occupied:", s)
             localizer.optimize()
             part_coefs = localizer.ceofs.T
             localorbs[s, :, occ:norbs-virt] = \
@@ -247,7 +252,7 @@ def split_localize(orbs, info, Ham, basis = None):
         # make spin up and down basis have the same sign, i.e.
         # inner product larger than 1
         for i in range(norbs):
-            if np.sum(localbasis[0,:,:,i], localbasis[1,:,:,i]) < 0:
+            if np.sum(localbasis[0,:,:,i] * localbasis[1,:,:,i]) < 0:
                 localorbs[1,:,i] *= -1.
                 rotmat[1,:,i] *= -1.
 
@@ -274,6 +279,7 @@ def gaopt(Ham):
 
     # write K matrix
     wd = mkdtemp(prefix = "GAOpt")
+    log.debug(0, "gaopt temporary file: %s", wd)
     with open(os.path.join(wd, "Kmat"), "w") as f:
         f.write("%d\n" % norbs)
         for i in range(norbs):
@@ -292,9 +298,9 @@ def gaopt(Ham):
         f.write("scale 1.0\n")
         f.write("method gauss\n")
 
-    executable = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)))), \
-            "../block/genetic/gaopt"
-    log.debug(2, "gaopt executable: %s", executable)
+    executable = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
+            "../block/genetic/gaopt"))
+    log.debug(0, "gaopt executable: %s", executable)
 
     log.debug(0, "call gaopt")
     with open(os.path.join(wd, "output"), "w") as f:
@@ -309,12 +315,12 @@ def gaopt(Ham):
 
     with open(os.path.join(wd, "output"), "r") as f:
         result = f.readlines()[-1]
-        log.debug(0, "gaopt result:\n%s", result)
-        reorder = map(lambda i: int(i)-1, result.split(,))
+        log.debug(1, "gaopt result: %s", result)
+        reorder = map(lambda i: int(i)-1, result.split(','))
 
-   sub.check_call(["rm", "-rf", wd])
+    sub.check_call(["rm", "-rf", wd])
 
-   return reorder
+    return reorder
     
 
 def momopt(old_basis, new_basis):
@@ -327,10 +333,11 @@ def momopt(old_basis, new_basis):
     indexes = m.compute(cost_matrix)
     indexes = sorted(indexes, key = lambda idx: idx[0])
     vals = map(lambda idx: ovlp_sq[idx], indexes)
-    log.info("MOM reorder quality: max %5.2f min %5.2 ave %5.2", \
+    log.info("MOM reorder quality: max %5.2f min %5.2f ave %5.2f", \
             np.max(vals), np.min(vals), np.average(vals))
 
-    return [idx[1] for idx in indexes]
+    reorder = [idx[1] for idx in indexes]
+    return reorder, np.average(vals)
 
 def reorder(order, Ham, orbs, rot = None):
     # order 4 1 3 2 means 4 to 1, 1 to 2, 3 to 3, 2 to 4
@@ -350,7 +357,7 @@ def reorder(order, Ham, orbs, rot = None):
 
 class CASCI(object):
     def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
-            splitloc = False, cisolver = None, mom_reorder = True):
+            splitloc = True, cisolver = None, mom_reorder = True):
         log.eassert(ncas * 2 >= nelecas, \
                 "CAS size not compatible with number of electrons")
         self.ncas = ncas
@@ -404,8 +411,14 @@ class CASCI(object):
                 ])
                 # cas_basis and self.localized_cas are both in
                 # atomic representation now
-                order = momopt(self.localized_cas, cas_basis)
+                order, q = momopt(self.localized_cas, cas_basis)
+                # if the quality of mom is too bad, we reorder the orbitals
+                # using genetic algorithm
+                # FIXME the threshold 0.5 may not be optimal
+                if q < 0.5:
+                    order = gaopt(casHam)
 
+            log.debug(0, "Orbital order: %s", order)
             # reorder casHam and cas
             casHam, cas = reorder(order, casHam, cas)
             # store cas in atomic basis

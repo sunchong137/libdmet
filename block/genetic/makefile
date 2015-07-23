@@ -1,7 +1,7 @@
 CXX=mpic++
 CXXFLAGS=-g -O3 -fPIC
 
-BOOSTDIR=/usr
+BOOSTDIR=/home/boxiao/usr
 BOOSTINCLUDE=$(BOOSTDIR)/include
 BOOSTLIB=-L$(BOOSTDIR)/lib
 
