@@ -7,6 +7,8 @@ from libdmet.utils.misc import mdot
 from libdmet.routine.localizer import Localizer
 from libdmet.utils.munkres import Munkres, make_cost_matrix
 from copy import deepcopy
+from tempfile import mkdtemp
+import os
 
 class AFQMC(object):
     pass
@@ -113,38 +115,6 @@ def cas_from_energy(mo, mo_energy, ncas, nelecas, nelec):
     virt = mo[:, norbs-nvirt:]
     return core, cas, virt, (_ncore, _npart, _nvirt)
 
-def buildCASHamiltonian(Ham, core, cas):
-    spin = Ham.H1["cd"].shape[0]
-    if len(core.shape) == 2:
-        core = np.asarray([core, core])
-        cas = np.asarray([cas, cas])
-
-    coreRdm = np.asarray([np.dot(core[0], core[0].T), np.dot(core[1], core[1].T)])
-    # zero-energy
-    H0 = Ham.H0
-    # core-core one-body
-    H0 += np.sum(coreRdm[0] * Ham.H1["cd"][0] + coreRdm[1] * Ham.H1["cd"][1])
-    # core-fock
-    vj00 = np.tensordot(coreRdm[0], Ham.H2["ccdd"][0], ((0,1), (0,1)))
-    vj11 = np.tensordot(coreRdm[1], Ham.H2["ccdd"][1], ((0,1), (0,1)))
-    vj10 = np.tensordot(coreRdm[0], Ham.H2["ccdd"][2], ((0,1), (0,1)))
-    vj01 = np.tensordot(coreRdm[1], Ham.H2["ccdd"][2], ((1,0), (3,2)))
-    vk00 = np.tensordot(coreRdm[0], Ham.H2["ccdd"][0], ((0,1), (0,3)))
-    vk11 = np.tensordot(coreRdm[1], Ham.H2["ccdd"][1], ((0,1), (0,3)))
-    v = np.asarray([vj00 + vj01 - vk00, vj11 + vj10 - vk11])
-    # core-core two-body
-    H0 += 0.5 * np.sum(coreRdm[0]*v[0] + coreRdm[1]*v[1])
-    H1 = {
-        "cd": np.asarray([
-            mdot(cas[0].T, Ham.H1["cd"][0]+v[0], cas[0]),
-            mdot(cas[1].T, Ham.H1["cd"][1]+v[1], cas[1])])
-    }
-    H2 = {
-        "ccdd": scf.incore_transform(Ham.H2["ccdd"], \
-            (cas, cas, cas, cas))
-    }
-    return integral.Integral(cas.shape[2], False, False, H0, H1, H2)
-
 def get_orbs(casci, Ham, guess, nelec):
     spin = Ham.H1["cd"].shape[0]
 
@@ -186,6 +156,38 @@ def get_orbs(casci, Ham, guess, nelec):
         cas = np.asarray(cas)
         virt = np.asarray(virt)
     return core, cas, virt, casinfo
+
+def buildCASHamiltonian(Ham, core, cas):
+    spin = Ham.H1["cd"].shape[0]
+    if len(core.shape) == 2:
+        core = np.asarray([core, core])
+        cas = np.asarray([cas, cas])
+
+    coreRdm = np.asarray([np.dot(core[0], core[0].T), np.dot(core[1], core[1].T)])
+    # zero-energy
+    H0 = Ham.H0
+    # core-core one-body
+    H0 += np.sum(coreRdm[0] * Ham.H1["cd"][0] + coreRdm[1] * Ham.H1["cd"][1])
+    # core-fock
+    vj00 = np.tensordot(coreRdm[0], Ham.H2["ccdd"][0], ((0,1), (0,1)))
+    vj11 = np.tensordot(coreRdm[1], Ham.H2["ccdd"][1], ((0,1), (0,1)))
+    vj10 = np.tensordot(coreRdm[0], Ham.H2["ccdd"][2], ((0,1), (0,1)))
+    vj01 = np.tensordot(coreRdm[1], Ham.H2["ccdd"][2], ((1,0), (3,2)))
+    vk00 = np.tensordot(coreRdm[0], Ham.H2["ccdd"][0], ((0,1), (0,3)))
+    vk11 = np.tensordot(coreRdm[1], Ham.H2["ccdd"][1], ((0,1), (0,3)))
+    v = np.asarray([vj00 + vj01 - vk00, vj11 + vj10 - vk11])
+    # core-core two-body
+    H0 += 0.5 * np.sum(coreRdm[0]*v[0] + coreRdm[1]*v[1])
+    H1 = {
+        "cd": np.asarray([
+            mdot(cas[0].T, Ham.H1["cd"][0]+v[0], cas[0]),
+            mdot(cas[1].T, Ham.H1["cd"][1]+v[1], cas[1])])
+    }
+    H2 = {
+        "ccdd": scf.incore_transform(Ham.H2["ccdd"], \
+            (cas, cas, cas, cas))
+    }
+    return integral.Integral(cas.shape[2], False, False, H0, H1, H2)
 
 def split_localize(orbs, info, Ham, basis = None):
     spin = Ham.H1["cd"].shape[0]
@@ -235,11 +237,20 @@ def split_localize(orbs, info, Ham, basis = None):
             log.debug(1, "(%2d, %2d) -> %12.6f", indexes[i][0], indexes[i][1], vals[i])
         log.info("Match localized orbitals: max %5.2f min %5.2f ave %5.2f", \
                 np.max(vals), np.min(vals), np.average(vals))
+
         # update localorbs and rotmat
         orderb = map(lambda idx: idx[1], indexes)
         localorbs[1] = localorbs[1][:,orderb]
         rotmat[1] = rotmat[1][:,orderb]
-    
+
+        localbasis[1] = localbasis[1][:,:,orderb]
+        # make spin up and down basis have the same sign, i.e.
+        # inner product larger than 1
+        for i in range(norbs):
+            if np.sum(localbasis[0,:,:,i], localbasis[1,:,:,i]) < 0:
+                localorbs[1,:,i] *= -1.
+                rotmat[1,:,i] *= -1.
+
     H1 = {
         "cd":np.asarray([
                 mdot(rotmat[0].T, Ham.H1["cd"][0], rotmat[0]),
@@ -252,9 +263,94 @@ def split_localize(orbs, info, Ham, basis = None):
     HamLocal = integral.Integral(norbs, False, False, Ham.H0, H1, H2)
     return HamLocal, localorbs, rotmat
 
+def gaopt(Ham):
+    norbs = Ham.norb
+    # build K matrix
+    K = np.empty((norbs, norbs))
+    Int2e = Ham.H2["ccdd"]
+    for i, j in it.product(range(norbs), repeat = 2):
+        K[i,j] = 0.5*abs(Int2e[0,i,j,i,j]) + 0.5*abs(Int2e[1,i,j,i,j]) + abs(Int2e[2,i,j,i,j])
+        K[i,j] += 1e-7 * (abs(Ham.H1["cd"][0,i,j])+abs(Ham.H1["cd"][1,i,j]))
+
+    # write K matrix
+    wd = mkdtemp(prefix = "GAOpt")
+    with open(os.path.join(wd, "Kmat"), "w") as f:
+        f.write("%d\n" % norbs)
+        for i in range(norbs):
+            for j in range(norbs):
+                f.write(" %24.16f" % K[i,j])
+            f.write("\n")
+
+    # write configure file
+    with open(os.path.join(wd, "ga.conf"), "w") as f:
+        f.write("maxcomm 32\n")
+        f.write("maxgen 20000\n")
+        f.write("maxcell %d\n" % (2*norbs))
+        f.write("cloning 0.90\n")
+        f.write("mutation 0.10\n")
+        f.write("elite 1\n")
+        f.write("scale 1.0\n")
+        f.write("method gauss\n")
+
+    executable = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)))), \
+            "../block/genetic/gaopt"
+    log.debug(2, "gaopt executable: %s", executable)
+
+    log.debug(0, "call gaopt")
+    with open(os.path.join(wd, "output"), "w") as f:
+        if block.Block.env_slurm:
+            sub.check_call(" ".join(["srun", \
+                    executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
+                    "-integral", os.path.join(wd, "Kmat")]), stdout = f, shell = True)
+        else:
+            sub.check_call(["mpirun", "-np", "4", \
+                    executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
+                    "-integral", os.path.join(wd, "Kmat")], stdout = f)
+
+    with open(os.path.join(wd, "output"), "r") as f:
+        result = f.readlines()[-1]
+        log.debug(0, "gaopt result:\n%s", result)
+        reorder = map(lambda i: int(i)-1, result.split(,))
+
+   sub.check_call(["rm", "-rf", wd])
+
+   return reorder
+    
+
+def momopt(old_basis, new_basis):
+    # use Hungarian algorithm to match the basis
+    ovlp = 0.5 * np.tensordot(np.abs(old_basis), np.abs(new_basis), ((0,1,2), (0,1,2)))
+    ovlp_sq = ovlp ** 2
+    cost_matrix = make_cost_matrix(ovlp_sq, lambda cost: 1. - cost)
+
+    m = Munkres()
+    indexes = m.compute(cost_matrix)
+    indexes = sorted(indexes, key = lambda idx: idx[0])
+    vals = map(lambda idx: ovlp_sq[idx], indexes)
+    log.info("MOM reorder quality: max %5.2f min %5.2 ave %5.2", \
+            np.max(vals), np.min(vals), np.average(vals))
+
+    return [idx[1] for idx in indexes]
+
+def reorder(order, Ham, orbs, rot = None):
+    # order 4 1 3 2 means 4 to 1, 1 to 2, 3 to 3, 2 to 4
+    # reorder in place
+    orbs = orbs[:, :, order]
+    Ham.H1["cd"] = Ham.H1["cd"][:, order, :]
+    Ham.H1["cd"] = Ham.H1["cd"][:, :, order]
+    Ham.H2["ccdd"] = Ham.H2["ccdd"][:, order, :, :, :]
+    Ham.H2["ccdd"] = Ham.H2["ccdd"][:, :, order, :, :]
+    Ham.H2["ccdd"] = Ham.H2["ccdd"][:, :, :, order, :]
+    Ham.H2["ccdd"] = Ham.H2["ccdd"][:, :, :, :, order]
+    if rot is not None:
+        rot = rot[:, :, order]
+        return Ham, orbs, rot
+    else:
+        return Ham, orbs
+
 class CASCI(object):
     def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
-            splitloc = False, cisolver = None):
+            splitloc = False, cisolver = None, mom_reorder = True):
         log.eassert(ncas * 2 >= nelecas, \
                 "CAS size not compatible with number of electrons")
         self.ncas = ncas
@@ -266,7 +362,17 @@ class CASCI(object):
                 " with CASCI")
         self.cisolver = cisolver
         self.scfsolver = scf.SCF()
-    
+
+        # reorder scheme for restart block calculations
+        if mom_reorder:
+            if block.Block.reorder:
+                log.warning("Using maximal overlap method (MOM) to reorder localized "\
+                        "orbitals, turning off Block reorder option")
+                block.Block.reoder = False
+
+        self.mom_reorder = mom_reorder
+        self.localized_cas = None
+
     def run(self, Ham, ci_args = {}, guess = None, nelec = None, basis = None): 
         # ci_args is a list or dict for ci solver, or None
         spin = Ham.H1["cd"].shape[0]
@@ -282,9 +388,32 @@ class CASCI(object):
         casHam = buildCASHamiltonian(Ham, core, cas)
 
         if self.splitloc:
-            casHam, cas, rotmat = \
+            casHam, cas, _ = \
                     split_localize(cas, casinfo, casHam, basis = basis)
         
+        if self.mom_reorder:
+            log.eassert(basis is not None, \
+                    "maximum overlap method (MOM) requires embedding basis")
+            if self.localized_cas is None:
+                order = gaopt(casHam)
+            else:
+                # define cas_basis
+                cas_basis = np.asarray([
+                        np.tensordot(basis[0], cas[0], (2,0)),
+                        np.tensordot(basis[1], cas[1], (2,0))
+                ])
+                # cas_basis and self.localized_cas are both in
+                # atomic representation now
+                order = momopt(self.localized_cas, cas_basis)
+
+            # reorder casHam and cas
+            casHam, cas = reorder(order, casHam, cas)
+            # store cas in atomic basis
+            self.localized_cas = np.asarray([
+                    np.tensordot(basis[0], cas[0], (2,0)),
+                    np.tensordot(basis[1], cas[1], (2,0))
+            ])
+
         casRho, E = self.cisolver.run(casHam, nelec = self.nelecas, **ci_args)
         
         rho = np.asarray([mdot(cas[0], casRho[0], cas[0].T), \
