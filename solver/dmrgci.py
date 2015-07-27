@@ -223,7 +223,7 @@ def split_localize(orbs, info, Ham, basis = None):
     HamLocal = integral.Integral(norbs, False, False, Ham.H0, H1, H2)
     return HamLocal, localorbs, rotmat
 
-def gaopt(Ham):
+def gaopt(Ham, tmp = "/tmp"):
     norbs = Ham.norb
     # build K matrix
     K = np.empty((norbs, norbs))
@@ -233,7 +233,7 @@ def gaopt(Ham):
         K[i,j] += 1e-7 * (abs(Ham.H1["cd"][0,i,j])+abs(Ham.H1["cd"][1,i,j]))
 
     # write K matrix
-    wd = mkdtemp(prefix = "GAOpt")
+    wd = mkdtemp(prefix = "GAOpt", dir = tmp)
     log.debug(0, "gaopt temporary file: %s", wd)
     with open(os.path.join(wd, "Kmat"), "w") as f:
         f.write("%d\n" % norbs)
@@ -311,7 +311,7 @@ def reorder(order, Ham, orbs, rot = None):
 
 class DmrgCI(object):
     def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
-            splitloc = True, cisolver = None, mom_reorder = True):
+            splitloc = True, cisolver = None, mom_reorder = True, tmpDir = "/tmp"):
         log.eassert(ncas * 2 >= nelecas, \
                 "CAS size not compatible with number of electrons")
         self.ncas = ncas
@@ -333,6 +333,7 @@ class DmrgCI(object):
 
         self.mom_reorder = mom_reorder
         self.localized_cas = None
+        self.tmpDir = tmpDir
 
     def run(self, Ham, ci_args = {}, guess = None, nelec = None, basis = None): 
         # ci_args is a list or dict for ci solver, or None
@@ -356,7 +357,7 @@ class DmrgCI(object):
             log.eassert(basis is not None, \
                     "maximum overlap method (MOM) requires embedding basis")
             if self.localized_cas is None:
-                order = gaopt(casHam)
+                order = gaopt(casHam, tmp = self.tmpDir)
             else:
                 # define cas_basis
                 cas_basis = np.asarray([
@@ -370,7 +371,7 @@ class DmrgCI(object):
                 # using genetic algorithm
                 # FIXME the threshold 0.5 may not be optimal
                 if q < 0.5:
-                    order = gaopt(casHam)
+                    order = gaopt(casHam, tmp = self.tmpDir)
 
             log.info("Orbital order: %s", order)
             # reorder casHam and cas

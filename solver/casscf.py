@@ -14,6 +14,7 @@ class CASSCF(mc1step_uhf.CASSCF):
             self.verbose = 2
         if log.Level[log.verbose] <= log.Level["INFO"]:
             pyscflogger.flush.addkey("macro iter")
+            pyscflogger.flush.addkey("CASCI")
 
     def ao2mo(self, mo):
         nmo = mo[0].shape[1]
