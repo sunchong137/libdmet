@@ -361,16 +361,16 @@ class DmrgCI(object):
             else:
                 # define cas_basis
                 cas_basis = np.asarray([
-                        np.tensordot(basis[0], cas[0], (2,0)),
-                        np.tensordot(basis[1], cas[1], (2,0))
+                    np.tensordot(basis[0], cas[0], (2,0)),
+                    np.tensordot(basis[1], cas[1], (2,0))
                 ])
                 # cas_basis and self.localized_cas are both in
                 # atomic representation now
                 order, q = momopt(self.localized_cas, cas_basis)
                 # if the quality of mom is too bad, we reorder the orbitals
                 # using genetic algorithm
-                # FIXME the threshold 0.5 may not be optimal
-                if q < 0.5:
+                # FIXME seems larger q is a better choice
+                if q < 0.7:
                     order = gaopt(casHam, tmp = self.tmpDir)
 
             log.info("Orbital order: %s", order)
@@ -378,8 +378,8 @@ class DmrgCI(object):
             casHam, cas = reorder(order, casHam, cas)
             # store cas in atomic basis
             self.localized_cas = np.asarray([
-                    np.tensordot(basis[0], cas[0], (2,0)),
-                    np.tensordot(basis[1], cas[1], (2,0))
+                np.tensordot(basis[0], cas[0], (2,0)),
+                np.tensordot(basis[1], cas[1], (2,0))
             ])
 
         casRho, E = self.cisolver.run(casHam, nelec = self.nelecas, **ci_args)

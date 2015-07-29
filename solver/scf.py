@@ -32,7 +32,7 @@ class flush(object):
         if self.has_keyword(args):
             log.result(*args)
 
-pyscflogger.flush = flush([""])
+pyscflogger.flush = flush([])
 pyscflogger.QUIET = 10
 
 class UIHF(UHF):
@@ -200,6 +200,10 @@ class SCF(object):
         self.integral_initialized = False
         self.doneHF = False
         log.debug(0, "Using pyscf version %s", pyscf.__version__)
+        if log.Level[log.verbose] <= log.Level["INFO"]:
+            pyscflogger.flush.addkey("cycle=")
+        else:
+            pyscflogger.flush = flush([""])
 
     def set_system(self, nelec, spin, bogoliubov, spinRestricted):
         log.eassert(not bogoliubov, "Hartree-Fock-Bogoliubov and MP2 not implemented yet")
@@ -214,9 +218,7 @@ class SCF(object):
             self.mol.build(verbose = 4)
         else:
             self.mol.build(verbose = 2)
-        if log.Level[log.verbose] <= log.Level["INFO"]:
-            pyscflogger.flush = flush(["cycle="])
-            
+
         self.mol.nelectron = self.nelec
         self.mol.spin = self.spin
         self.sys_initialized = True

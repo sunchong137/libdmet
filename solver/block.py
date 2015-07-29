@@ -164,7 +164,9 @@ def read2pdm(filename):
 
     for line in lines[1:]:
         tokens = line.split()
-        pdm[int(tokens[0]), int(tokens[1]), int(tokens[2]), int(tokens[3])] = \
+        # same convention as the two body integral
+        # \gamma(i,k,j,l)=<C_i C_j D_l D_k>
+        pdm[int(tokens[0]), int(tokens[3]), int(tokens[1]), int(tokens[2])] = \
                 float(tokens[4])
 
     return pdm
