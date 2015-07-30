@@ -1,5 +1,6 @@
 from libdmet.solver import block, scf, casscf
 from libdmet.solver.dmrgci import DmrgCI, get_orbs
+from libdmet.system import integral
 import libdmet.utils.logger as log
 import numpy as np
 import numpy.linalg as la
@@ -11,7 +12,7 @@ class AFQMC(object):
 
 class Block(object):
     def __init__(self, nproc, nnode = 1, TmpDir = "/tmp", SharedDir = None, \
-            reorder = False, minM = 100, tol = 1e-7, spinAdapted = False):
+            reorder = False, minM = 100, maxM = None, tol = 1e-6, spinAdapted = False):
         log.eassert(nnode == 1 or SharedDir is not None, \
                 "Running on multiple nodes (nnod = %d), must specify shared directory", \
                 nnode)
@@ -21,9 +22,12 @@ class Block(object):
         block.Block.reorder = reorder
         self.schedule = block.Schedule(sweeptol = tol)
         self.minM = minM
+        self.maxM = maxM
         self.spinAdapted = spinAdapted
 
-    def run(self, Ham, M, nelec = None):
+    def run(self, Ham, M = None, nelec = None, schedule = None):
+        if M is None:
+            M = self.maxM
         if nelec is None:
             nelec = Ham.norb
         if not self.cisolver.sys_initialized:
@@ -31,30 +35,37 @@ class Block(object):
                 self.cisolver.set_system(nelec, 0, True, False, True)
             else:
                 self.cisolver.set_system(nelec, 0, False, False, False)
-        if not self.cisolver.optimized:
-            self.schedule.gen_initial(minM = self.minM, maxM = M)
-        else:
-            self.schedule.max_iter = 16
-            self.schedule.gen_restart(M)
-        self.cisolver.set_schedule(self.schedule)
+        if schedule is None:
+            schedule = self.schedule
+            if self.cisolver.optimized:
+                schedule.maxiter = 16
+                schedule.gen_restart(M)
+            else:
+                schedule.gen_initial(minM = self.minM, maxM = M)
+
+        self.cisolver.set_schedule(schedule)
         self.cisolver.set_integral(Ham)
 
         truncation, energy, onepdm = self.cisolver.optimize()
         return onepdm, energy
 
+    def onepdm(self):
+        log.debug(1, "Compute 1pdm")
+        return self.cisolver.onepdm()
+
     def twopdm(self):
-        log.info("Compute 2pdm")
+        log.debug(1, "Compute 2pdm")
         return self.cisolver.twopdm()
 
     def cleanup(self):
         # FIXME first copy and save restart files
         self.cisolver.cleanup()
 
-class CASSCF(object):
-    # CASSCF with FCI solver only, not DMRG-SCF
 
-    options = {
-        "max_orb_stepsize": 0.04,
+class CASSCF(object):
+
+    settings = {
+        "max_stepsize": 0.04,
         "max_cycle_macro": 50,
         "max_cycle_micro": 2, # micro_cycle
         "max_cycle_micro_inner": 8,
@@ -69,49 +80,72 @@ class CASSCF(object):
         "ah_start_cycle": 2,
         "ah_grad_trust_region": 1.5,
         "ah_guess_space": 0,
-        "ah_decay_rate": 0.5, # augmented hessian decay
+        "ah_decay_rate": 0.7, # augmented hessian decay
+        "ci_repsonse_space": 3,
         "dynamic_micro_step": True,
     }
 
     def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
-            cisolver = None):
+            fcisolver = "FCI", settings = {}):
         log.eassert(ncas * 2 >= nelecas, \
                 "CAS size not compatible with number of electrons")
         self.ncas = ncas
         self.nelecas = nelecas # alpha and beta
         self.MP2natorb = MP2natorb
         self.spinAverage = spinAverage
-        self.cisolver = cisolver
         self.scfsolver = scf.SCF()
         self.mo_coef = None
 
-    def apply_options(self, mc):
-        for key, val in CASSCF.options.items():
+        # mcscf options, these will be used for first installation of
+        # mcscf class: casscf.CASSCF or casscf.DMRGSCF
+        self.settings = settings
+        if fcisolver.upper() == "FCI":
+            self.solver_cls = casscf.CASSCF
+        elif fcisolver.upper() == "DMRG":
+            log.eassert(self.settings.has_key("fcisolver"), \
+                    "When using DMRG-CASSCF, must specify "
+                    "the key 'fcisolver' with a BLOCK solver instance")
+            self.solver_cls = casscf.DMRGSCF
+        else:
+            log.error("FCI solver %s is not valid.", fcisolver.upper())
+        # solver instance, initialized at first run
+        self.solver = None
+
+    def apply_options(self, mc, options):
+        for key, val in options.items():
             setattr(mc, key, val)
 
-    def run(self, Ham, mcscf_args = {}, guess = None, nelec = None):
+    def run(self, Ham, mcscf_args = {}, guess = None, nelec = None, \
+            reuse_mo = False):
         spin = Ham.H1["cd"].shape[0]
         norbs = Ham.H1["cd"].shape[1]
         if nelec is None:
             nelec = Ham.norb
         log.eassert(spin == 2, \
                 "spin-restricted CASSCF solver is not implemented")
-        
-        # FIXME restart from last CASSCF calculation seems not working
-        if self.mo_coef is None or 1: # restart from previous orbitals
+
+        nelecasAB = (self.nelecas/2, self.nelecas/2)
+        if self.mo_coef is None or not reuse_mo:
+            # not restart from previous orbitals
             core, cas, virt, casinfo = get_orbs(self, Ham, guess, nelec)
             self.mo_coef = np.empty((2, norbs, norbs))
             self.mo_coef[:, :, :core.shape[2]] = core
             self.mo_coef[:, :, core.shape[2]:core.shape[2]+cas.shape[2]] = cas
             self.mo_coef[:, :, core.shape[2]+cas.shape[2]:] = virt
 
-        nelecasAB = (self.nelecas/2, self.nelecas/2)
-        mc = casscf.CASSCF(self.scfsolver.mf, self.ncas, nelecasAB)
-        # apply options
-        self.apply_options(mc)
-        # run
-        E, _, _, self.mo_coef = mc.mc1step(mo_coeff = self.mo_coef)
-        rho = np.asarray(mc.make_rdm1s())
+        if self.solver is None:
+            self.solver = self.solver_cls(self.scfsolver.mf, \
+                    self.ncas, nelecasAB, **self.settings)
+        else:
+            self.solver.refresh(self.scfsolver.mf, self.ncas, nelecasAB)
+
+        # apply options, these options are limited to the CASSCF convergence
+        # settings specified as static members
+        self.apply_options(self.solver, CASSCF.settings)
+
+        E, _, _, self.mo_coef = self.solver.mc1step(mo_coeff = self.mo_coef, \
+                **mcscf_args)
+        rho = np.asarray(self.solver.make_rdm1s())
 
         return rho, E
 

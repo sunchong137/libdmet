@@ -66,7 +66,9 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.CASSCF(ncas = 12, nelecas = 10)
+block = dmet.impurity_solver.Block(nproc = 4, maxM = 300)
+solver = dmet.impurity_solver.CASSCF(ncas = 12, nelecas = 10, fcisolver = "DMRG", \
+        settings = {"fcisolver": block, "splitloc": True, "mom_reorder": True})
 
 for iter in range(MaxIter):
 
@@ -82,7 +84,7 @@ for iter in range(MaxIter):
     ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor, matching = True)
     log.section("\nsolving impurity problem\n")
     rhoEmb, EnergyEmb, ImpHam, dmu = dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver, \
-          solver_args = {"guess": dmet.foldRho(rho, Lat, basis)})
+            solver_args = {"guess": dmet.foldRho(rho, Lat, basis), "mcscf_args": {"basis": basis}})
     Mu += dmu
     vcor = dmet.addDiag(vcor, dmu)
     rhoImp, EnergyImp, nelecImp = dmet.transformResults(rhoEmb, EnergyEmb, basis, ImpHam, H1e)

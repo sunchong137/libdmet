@@ -405,7 +405,7 @@ class Block(object):
             gamma = np.empty((3, norb, norb, norb, norb))
             gamma[0] = gamma0[::2,::2,::2,::2] # alpha-alpha
             gamma[1] = gamma0[1::2,1::2,1::2,1::2] # beta-beta
-            gamma[2] = gamma0[::2,1::2,1::2,::2] # alpha-beta
+            gamma[2] = gamma0[::2,::2,1::2,1::2] # alpha-beta
 
         return gamma
 
@@ -447,9 +447,6 @@ class Block(object):
             "schedule_init = %s", \
             self.sys_initialized, self.integral_initialized, self.schedule_initialized)
 
-        if self.optimized:
-            return self.restart_optimize(onepdm)
-
         log.info("Run BLOCK to optimize wavefunction")
         results = self.just_run(onepdm, dry_run = False)
         self.optimized = True
@@ -464,7 +461,6 @@ class Block(object):
 
         log.info("Run BLOCK to optimize wavefunction (restart)")
         return self.just_run(onepdm, dry_run = False)
-
 
     def extrapolate(self, Ms, onepdm = True):
         log.eassert(self.sys_initialized and self.integral_initialized, \
