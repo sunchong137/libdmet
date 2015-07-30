@@ -65,7 +65,7 @@ void calcenergy(array_4d<double>& twopdm, int state)
     pout << "energy of state "<< state <<" = "<< energy+dmrginp.get_coreenergy()<<endl;
     
     char file[5000];
-    sprintf(file, "%s%s%d.%d%s", dmrginp.save_prefix().c_str(), "onepdm_fromtpdm", state, state, ".txt");
+    sprintf(file, "%s%s%d.%d%s", dmrginp.save_prefix().c_str(), "/onepdm_fromtpdm.", state, state, ".txt");
     ofstream out(file);
     for (int i=0; i<nspinorb; i++)
       for (int j=0; j<nspinorb; j++)
