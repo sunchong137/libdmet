@@ -7,6 +7,7 @@ import libdmet.utils.logger as log
 from libdmet.solver import dmrgci, block
 from libdmet.solver.scf import SCF, incore_transform, pyscflogger
 from libdmet.system import integral
+import copy
 
 class CASSCF(mc1step_uhf.CASSCF):
     def __init__(self, mf, ncas, nelecas, ncore = None, frozen = []):
@@ -135,7 +136,10 @@ class DMRGSCF(CASSCF):
                 make_rdm12s(self.fcisolver, self)
 
     def refresh(self, mf, ncas, nelecas, ncore = None, frozen = []):
+        # FIXME fcisolver is replaced when refresh!
+        self._fcisolver = copy.copy(self.fcisolver)
         CASSCF.__init__(self, mf, ncas, nelecas, ncore, frozen)
+        self.fcisolver = self._fcisolver
         self.rot = None
         self.basis = None
         hf_coefs = mf.mo_coeff
