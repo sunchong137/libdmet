@@ -1,4 +1,5 @@
 from libdmet.solver import block, scf, casscf
+from libdmet.solver.afqmc import AFQMC
 from libdmet.solver.dmrgci import DmrgCI, get_orbs
 from libdmet.system import integral
 import libdmet.utils.logger as log
@@ -6,9 +7,6 @@ import numpy as np
 import numpy.linalg as la
 
 __all__ = ["AFQMC", "Block", "DmrgCI", "CASSCF"]
-
-class AFQMC(object):
-    pass
 
 class Block(object):
     def __init__(self, nproc, nnode = 1, TmpDir = "/tmp", SharedDir = None, \

@@ -318,6 +318,7 @@ class Block(object):
         log.result("BLOCK sweep summary")
         log.result(grep("Sweep Energy", outputfile))
         self.count += 1
+        return outputfile
 
     def callOH(self):
         outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % self.count)
@@ -429,8 +430,7 @@ class Block(object):
             self.broadcast()
 
         if not dry_run:
-            self.callBlock()
-            outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % (self.count-1))
+            outputfile = self.callBlock()
             truncation, energy = self.extractE(grep("Sweep Energy", outputfile))
 
             if onepdm:
