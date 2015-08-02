@@ -162,3 +162,7 @@ class AFQMC(object):
                         os.path.join(AFQMC.execPath, "afqmc")], stdout = f)
         self.count += 1
         return outputfile
+
+    def cleanup(self):
+        import shutil  
+        shutil.rmtree(self.tmpDir)
