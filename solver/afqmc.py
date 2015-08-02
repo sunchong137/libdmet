@@ -155,8 +155,8 @@ class AFQMC(object):
         with open(outputfile, "w", buffering = 1) as f:
             if AFQMC.env_slurm:
                 sub.check_call(" ".join(["srun", \
-                        os.path.join(AFQMC.execPath, "afqmc")], \
-                        stdout = f, shell = True))
+                        os.path.join(AFQMC.execPath, "afqmc")]), \
+                        stdout = f, shell = True)
             else:
                 sub.check_call(["mpirun", "-np", "%d" % (AFQMC.nproc * AFQMC.nnode), \
                         os.path.join(AFQMC.execPath, "afqmc")], stdout = f)
