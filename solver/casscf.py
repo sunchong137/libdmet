@@ -108,7 +108,7 @@ def make_rdm12s(solver, casscf):
 
 class DMRGSCF(CASSCF):
     def __init__(self, mf, ncas, nelecas, fcisolver, ncore = None, \
-            frozen = [], splitloc = True, mom_reorder = True, tmpDir = "/tmp"):
+            frozen = [], splitloc = True, mom_reorder = True, TmpDir = "/tmp"):
         CASSCF.__init__(self, mf, ncas, nelecas, ncore, frozen)
         self.fcisolver = fcisolver
         self.splitloc = splitloc
@@ -119,7 +119,7 @@ class DMRGSCF(CASSCF):
                         "orbitals, turning off Block reorder option")
                 block.Block.reoder = False
         self.mom_reorder = mom_reorder
-        self.tmpDir = tmpDir
+        self.tmpDir = TmpDir
 
         self.rot = None
         self.basis = None

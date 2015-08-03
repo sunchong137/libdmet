@@ -13,16 +13,19 @@ def dumpH1(filename, H1):
     spin = H1.shape[0]
     log.eassert(spin == 2, "not implemented for restricted calculations")
     nsites = H1.shape[1]
-    nH1 = map(lambda s: np.sum(abs(H1[s]) > 1e-10), range(spin))
-
+    eta = 1e-16
+    nH1 = map(lambda s: np.sum(abs(H1[s]) > eta), range(spin))
+    log.check(nH1[0] == nH1[1], "number of nonzero elements in alpha hopping matrix"
+            "does not equal to that in beta hopping matrix!")
     with open(filename, "w") as f:
         f.write("%d\n" % nsites)
         for s in range(spin):
             f.write("%d\n" % nH1[s])
             for i, j in it.product(range(nsites), repeat = 2):
-                if abs(H1[s,i,j]) > 1e-10:
-                    f.write("%5d %5d   ( %20.12f, %20.12f )\n" \
-                            % (i,j,H1[s,i,j].real, H1[s,i,j].imag))
+                if abs(H1[s,i,j]) > eta:
+                    f.write("%5d %5d   ( %s, %s )\n" \
+                            % (i, j, H1[s,i,j].real.__repr__(), H1[s,i,j].imag.__repr__()))
+                    # we need the number to be exact
 
 def dumpH2(filename, H2):
     if isinstance(H2, np.ndarray):
@@ -137,7 +140,7 @@ class AFQMC(object):
         rho = rho.reshape((2, norbs, norbs))
         erho = np.max(abs(drho))
         log.result("AFQMC density matrix uncertainty (max) = %20.12f", erho)
-        return rho, E
+        return rho, E + Ham.H0
 
     def extractE(self, text):
         lines = text.split('\n')
