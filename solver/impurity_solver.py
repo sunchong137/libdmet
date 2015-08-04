@@ -23,7 +23,7 @@ class Block(object):
         self.maxM = maxM
         self.spinAdapted = spinAdapted
 
-    def run(self, Ham, M = None, nelec = None, schedule = None):
+    def run(self, Ham, M = None, nelec = None, schedule = None, similar = False):
         if M is None:
             M = self.maxM
         if nelec is None:
@@ -114,7 +114,7 @@ class CASSCF(object):
             setattr(mc, key, val)
 
     def run(self, Ham, mcscf_args = {}, guess = None, nelec = None, \
-            reuse_mo = False):
+            similar = False):
         spin = Ham.H1["cd"].shape[0]
         norbs = Ham.H1["cd"].shape[1]
         if nelec is None:
@@ -123,7 +123,7 @@ class CASSCF(object):
                 "spin-restricted CASSCF solver is not implemented")
 
         nelecasAB = (self.nelecas/2, self.nelecas/2)
-        if self.mo_coef is None or not reuse_mo:
+        if self.mo_coef is None or not similar: 
             # not restart from previous orbitals
             core, cas, virt, casinfo = get_orbs(self, Ham, guess, nelec)
             self.mo_coef = np.empty((2, norbs, norbs))
