@@ -13,7 +13,8 @@ def RHartreeFock(Lat, v, filling, mu0):
 
 def HartreeFock(Lat, v, filling, mu0):
     rho, mu, E, res = HF(Lat, v, filling, False, mu0 = mu0, beta = np.inf, ires = True)
-    log.result("Local density matrix (mean-field):\n%s\n%s", rho[0][0], rho[1][0])
+    log.result("Local density matrix (mean-field): alpha and beta\n%s\n%s", \
+            rho[0][0], rho[1][0])
     log.result("Chemical potential (mean-field) = %20.12f", mu)
     log.result("Energy per site (mean-field) = %20.12f", E/Lat.supercell.nsites)
     log.result("Gap (mean-field) = %20.12f" % res["gap"])
@@ -88,16 +89,21 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, solver, \
             ImpHam = apply_dmu(lattice, ImpHam, basis, delta1)
             return rhoEmb2, EnergyEmb2, ImpHam, delta1
 
-def AFInitGuess(ImpSize, U, Filling, polar = None):
+def AFInitGuess(ImpSize, U, Filling, polar = None, bogoliubov = False, rand = 0.):
     subA, subB = BipartiteSquare(ImpSize)
     nscsites = len(subA) + len(subB)    
-    v = VcorLocal(False, False, nscsites)
     shift = U * Filling
     if polar is None:
         polar = shift * Filling
     init_v = np.eye(nscsites) * shift
     init_p = np.diag(map(lambda s: polar if s in subA else -polar, range(nscsites)))
-    v.assign(np.asarray([init_v+init_p, init_v-init_p]))
+    v = VcorLocal(False, bogoliubov, nscsites)
+    if bogoliubov:
+        np.random.seed(32499823)
+        init_d = (np.random.rand(nscsites, nscsites) - 0.5) * rand
+        v.assign(np.asarray([init_v+init_p, init_v-init_p, init_d]))
+    else:
+        v.assign(np.asarray([init_v+init_p, init_v-init_p]))
     return v
 
 def addDiag(v, scalar):

@@ -48,6 +48,9 @@ class Vcor(object):
         res = minimize(fn, np.zeros(self.length()), tol = 1e-10)
         log.check(fn(res.x) < 1e-6, "symmetrization imposed on initial guess")
 
+    def __str__(self):
+        return self.evaluate().__str__()
+
 def VcorNonLocl(restricted, bogoliubov, ncells, nscsites):
     # need to replace __call__ function
     log.error("VcorNonLocal not implemented yet")
