@@ -238,7 +238,7 @@ class DMRGSCF(CASSCF):
         self.solve_approx_ci(h1cas, h2cas, mo, u)
         casdm1, casdm2 = self.fcisolver.make_rdm12s()
 
-        return casdm1, casdm2, None
+        return casdm1, casdm2, None, None
 
     def solve_approx_ci(self, h1, h2, mo, u):
         # solve CI problem approximately
