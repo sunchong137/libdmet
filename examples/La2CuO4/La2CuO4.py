@@ -66,10 +66,6 @@ conv = False
 
 history = dmet.IterHistory()
 
-log.section("\nsolving mean-field problem\n")
-log.result("Vcor =\n%s", vcor.get())
-log.result("Mu (guess) = %20.12f", Mu)
-rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
 dmet.reportOccupation(Lat, rho[:,0])
 
 for iter in range(MaxIter):

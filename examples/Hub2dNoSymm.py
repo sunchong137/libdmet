@@ -32,11 +32,6 @@ conv = False
 
 history = dmet.IterHistory()
 
-log.section("\nsolving mean-field problem\n")
-log.result("Vcor =\n%s", vcor.get())
-log.result("Mu (guess) = %20.12f", Mu)
-rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
-
 solver = dmet.impurity_solver.Block(nproc = 2, nnode = 1, tol = 1e-6)
 
 for iter in range(MaxIter):
