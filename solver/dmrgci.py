@@ -335,7 +335,7 @@ class DmrgCI(object):
         self.localized_cas = None
         self.tmpDir = tmpDir
 
-    def run(self, Ham, ci_args = {}, guess = None, nelec = None, basis = None): 
+    def run(self, Ham, ci_args = {}, guess = None, nelec = None, basis = None, similar = False): 
         # ci_args is a list or dict for ci solver, or None
         spin = Ham.H1["cd"].shape[0]
         log.eassert(spin == 2, \

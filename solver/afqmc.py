@@ -120,7 +120,7 @@ class AFQMC(object):
         log.info("AFQMC working dir %s", self.tmpDir)
         self.count = 0
 
-    def run(self, Ham, onepdm = True):
+    def run(self, Ham, onepdm = True, similar = False):
         norbs = Ham.norb
         settings = copy.copy(AFQMC.settings)
         settings["onepdm"] = onepdm

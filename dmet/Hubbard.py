@@ -63,7 +63,8 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, solver, \
     rhoEmb, EnergyEmb = solve_with_mu(0.)
     nelec = transformResults(rhoEmb, None, basis, None, None)
     log.result("nelec = %20.12f (target is %20.12f)", nelec, filling*2)
-
+    
+    solver_args["similar"] = True
     if abs(nelec/(filling*2) - 1.) < thrnelec:
         log.info("chemical potential fitting unnecessary")
         return rhoEmb, EnergyEmb, ImpHam, 0.
