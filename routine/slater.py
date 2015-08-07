@@ -36,7 +36,7 @@ def normalizeBasis1(b):
     return np.tensordot(b, norms, axes = (2,0))
 
 def orthonormalizeBasis(b):
-    nbasis = b.shape[2]
+    nbasis = b.shape[-1]
     ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
     log.debug(1, "basis overlap is\n%s", ovlp)
     if np.allclose(ovlp - np.diag(np.diag(ovlp)), 0.):
@@ -68,7 +68,7 @@ def getNonDiagBlocks(mat):
     return map(lambda b: sorted(list(b)), blocks)
 
 def orthonormalizeBasisPHsymm(b):
-    nbasis = b.shape[2]
+    nbasis = b.shape[-1]
     ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
     log.debug(1, "basis overlap is\n%s", ovlp)
     if np.allclose(ovlp - np.eye(nbasis), 0.):
@@ -136,14 +136,14 @@ def embHam(lattice, basis, vcor, local = True, **kwargs):
     Int2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
 
     spin = basis.shape[0]
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     return integral.Integral(nbasis, spin == 1, False, 0, {"cd": Int1e}, {"ccdd": Int2e}), {"cd": Int1e_energy}
 
 def __embHam1e(lattice, basis, vcor, **kwargs):
     log.eassert(vcor.islocal(), "nonlocal correlation potential cannot be treated in this routine")
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     latFock = lattice.getFock(kspace = False)
     latH1 = lattice.getH1(kspace = False)
     ImpJK = lattice.getImpJK()
@@ -178,7 +178,7 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
 
 def __embHam2e(lattice, basis, vcor, local, **kwargs):
     nscsites = lattice.supercell.nsites
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     spin = basis.shape[0]
 
     if "mmap" in kwargs.keys() and kwargs["mmap"]:
@@ -207,7 +207,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
 
 def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
     spin = basis.shape[0]
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     nscsites = lattice.supercell.nsites
     nelec = nscsites * spin
 
@@ -277,7 +277,7 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
 
 def FitVcorFull(rho, lattice, basis, vcor, beta, filling, MaxIter = 20, **kwargs):
     spin = basis.shape[0]
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     rho1 = np.empty((spin, nbasis, nbasis))
 
     def errfunc(param):

@@ -37,12 +37,13 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
 
 def apply_dmu(lattice, ImpHam, basis, dmu):
     nscsites = lattice.supercell.nsites  
+    nbasis = basis.shape[-1]
     if ImpHam.restricted:
         ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
     else:
         ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
         ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu * np.eye(nscsites))
-    ImpHam.H0 += dmu * nscsites * 2
+    ImpHam.H0 += dmu * nbasis
     return ImpHam
 
 def SolveImpHam_with_dmu(lattice, ImpHam, basis, dmu, solver, solver_args = {}):

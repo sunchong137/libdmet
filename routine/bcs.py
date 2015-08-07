@@ -63,7 +63,7 @@ def embHam(lattice, basis, vcor, local = True, **kwargs):
     log.info("Two-body part")
     Int2e, Int1e_from2e, H0_from2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
 
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     Int1e["cd"] += Int1e_from2e["cd"]
     Int1e["cc"] += Int1e_from2e["cc"]
     H0 = H0_from1e + H0_from2e
@@ -78,7 +78,7 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
     log.eassert(vcor.islocal(), "nonlocal correlation potential cannot be treated in this routine")
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     latFock = lattice.getFock(kspace = False)
     latH1 = lattice.getH1(kspace = False)
     ImpJK = lattice.getImpJK()
@@ -122,7 +122,7 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
 
 def __embHam2e(lattice, basis, vcor, local, **kwargs):
     nscsites = lattice.supercell.nsites
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
 
     if "mmap" in kwargs.keys() and kwargs["mmap"]:
         log.debug(0, "Use memory map for 2-electron integral")
