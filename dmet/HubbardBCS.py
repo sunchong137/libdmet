@@ -2,7 +2,7 @@ from Hubbard import *
 import Hubbard
 from libdmet.routine import bcs
 from libdmet.routine.mfd import HFB
-from libdmet.routine.bcs_helper import mono_fit, extractRdm
+from libdmet.routine.bcs_helper import mono_fit, extractRdm, transform_imp
 
 def HartreeFockBogoliubov(Lat, v, filling, mu0, thrnelec = 1e-6):
     # fit chemical potential
@@ -40,6 +40,19 @@ def ConstructImpHam(Lat, GRho, v, matching = True, local = True, **kwargs):
     ImpHam, (H1e, H0e) = bcs.embHam(Lat, basis, v, local = local, **kwargs)
 
     return ImpHam, (H1e, H0e), basis
+
+def apply_dmu(lattice, ImpHam, basis, dmu):
+    nscsites = lattice.supercell.nsites
+    nbasis = basis.shape[-1]
+    dmu = 0.1
+    tempCD, tempCC, tempH0 = transform_imp(basis, lattice, dmu * np.eye(nscsites))
+    ImpHam.H1["cd"] -= tempCD
+    ImpHam.H1["cc"] -= tempCC
+    ImpHam.H0 -= tempH0
+    ImpHam.H0 += dmu * nbasis
+    return ImpHam
+
+Hubbard.apply_dmu = apply_dmu
 
 def AFInitGuess(ImpSize, U, Filling, polar = None, rand = 0.01):
     return Hubbard.AFInitGuess(ImpSize, U, Filling, polar, True, rand)
