@@ -12,11 +12,11 @@ def transform_trans_inv(basis, lattice, H, symmetric = True):
         for i in range(ncells):
             res += mdot(basis[i].T, H[0], basis[i])
         for i, j in it.combinations(range(ncells), 2):
-            temp = mdot(basis[i].T, H[lattice.substract(j,i)], basis[j])
+            temp = mdot(basis[i].T, H[lattice.subtract(j,i)], basis[j])
             res += temp + temp.T
     else:
         for i, j in it.product(range(ncells), repeat = 2):
-            res += mdot(basis[i].T, H[lattice.substract(j,i)], basis[j])
+            res += mdot(basis[i].T, H[lattice.subtract(j,i)], basis[j])
     return res
 
 def transform_trans_inv_sparse(basis, lattice, H, symmetric = True, thr = 1e-7):
@@ -29,13 +29,13 @@ def transform_trans_inv_sparse(basis, lattice, H, symmetric = True, thr = 1e-7):
         for i in mask_basis:
             res += mdot(basis[i].T, H[0], basis[i])
         for i, j in it.combinations(mask_basis, 2):
-            Hidx = lattice.substract(j,i)
+            Hidx = lattice.subtract(j,i)
             if Hidx in mask_H:
                 temp = mdot(basis[i].T, H[Hidx], basis[j])
                 res += temp + temp.T
     else:
         for i, j in it.product(mask_basis, repeat = 2):
-            Hidx = lattice.substract(j,i)
+            Hidx = lattice.subtract(j,i)
             if Hidx in mask_H:
                 res += mdot(basis[i].T, H[Hidx], basis[j])
     return res
@@ -80,7 +80,7 @@ def transform_imp_env(basis, lattice, H):
     for i in range(ncells):
         # this is the proper way to do it. equivalently, we do symmetrization 0.5 * (res+res.T)
         #res += 0.5 * mdot(basis[0].T, H[i], basis[i])
-        #res += 0.5 * mdot(basis[i].T, H[lattice.substract(0,i)], basis[0])
+        #res += 0.5 * mdot(basis[i].T, H[lattice.subtract(0,i)], basis[0])
         res += mdot(basis[0].T, H[i], basis[i])
     res = 0.5 * (res + res.T)
     return res

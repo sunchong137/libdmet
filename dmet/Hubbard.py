@@ -48,7 +48,7 @@ def apply_dmu(lattice, ImpHam, basis, dmu):
 def SolveImpHam_with_dmu(lattice, ImpHam, basis, dmu, solver, solver_args = {}):
     # H = H1 + Vcor - Mu
     # to keep H for mean-field Mu->Mu+dMu, Vcor->Vcor+dMu
-    # In impurity Ham, equivalent to substracting dMu from impurity, but not bath
+    # In impurity Ham, equivalent to subtracting dMu from impurity, but not bath
     # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
     # alternatively, we can change ImpHam.H0 to compensate
     ImpHam = apply_dmu(lattice, ImpHam, basis, dmu)

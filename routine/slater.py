@@ -99,10 +99,7 @@ def __embBasis_proj(lattice, rho, **kwargs):
     basis = np.zeros((spin, ncells, nscsites, nscsites * 2))
     for s in range(spin):
         A = MatSqrt(rho[s,0])
-        #B1 = np.swapaxes(rho[s,1:], 0, 1).reshape((nscsites, -1))
-        #B1 = np.dot(la.inv(A), B1).T
-        #B1 = normalizeBasis(B1)
-        B = np.swapaxes(np.tensordot(la.inv(A), rho[s], axes = (1,1)), 0, 1)[1:]
+        B = np.swapaxes(np.tensordot(la.inv(A), rho[s, 1:], axes = (1,1)), 0, 1)
         B = np.swapaxes(B, 1, 2)
         B = orthonormalizeBasis(B)
         basis[s, 0, :, :nscsites] = np.eye(nscsites)
@@ -160,7 +157,7 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
         log.debug(1, "transform Fock")
         H1[s] = transform_trans_inv_sparse(basis[s], lattice, latFock)
         # then add Vcor only in environment
-        # need to substract impurity contribution
+        # need to subtract impurity contribution
         log.debug(1, "transform Vcor")
         H1[s] += transform_local(basis[s], lattice, vcor.get()[s])
 
@@ -168,7 +165,7 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
             # for fitting purpose, we need H1 with vcor on impurity
             H1[s] -= transform_imp(basis[s], lattice, vcor.get()[s])
 
-        # substract impurity Fock if necessary
+        # subtract impurity Fock if necessary
         # i.e. rho_kl[2(ij||kl)-(il||jk)] where i,j,k,l are all impurity
         if ImpJK is not None:
             log.debug(1, "transform impurity JK")
