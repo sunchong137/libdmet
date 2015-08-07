@@ -122,7 +122,7 @@ def HFB(lattice, vcor, restricted, mu = 0., beta = np.inf, ires = False):
     ewocc = 1 * (ew < 0.)
     nocc = np.sum(ewocc)
     # FIXME should it be a warning or an error?
-    log.check(nocc*2 == ew.size, \
+    log.eassert(nocc*2 == ew.size, \
             "number of negative and positive modes are not equal," \
             "the difference is %d, this means total spin on lattice is nonzero", \
             nocc*2 - ew.size)
@@ -142,17 +142,16 @@ def HFB(lattice, vcor, restricted, mu = 0., beta = np.inf, ires = False):
     else:
         vcorT = np.asarray(map(lambda i: vcor.get(i, kspace = False), range(lattice.ncells)))
 
-    rhoTA, rhoTB, kappaT = np.swapaxes(np.asarray(map(extractRdm, GRhoT)), 0, 1)
-    # FIXME I'm not sure whether kappaT is correct
+    rhoTA, rhoTB, kappaTBA = np.swapaxes(np.asarray(map(extractRdm, GRhoT)), 0, 1)
 
     n = np.trace(rhoTA[0]) + np.trace(rhoTB[0])
     E = 0.5 * np.sum((FockT+H1T) * (rhoTA + rhoTB))
     if vcor.islocal():
         E += 0.5 * np.sum(vcorT[0] * rhoTA[0] + vcorT[1] * rhoTB[0] + \
-                2 * vcorT[2] * kappaT[0].T)
+                2 * vcorT[2] * kappaTBA[0])
     else:
         E += 0.5 * np.sum(vcorT[:,0] * rhoTA + vcorT[:,1] * rhoTB + \
-                2 * vcorT[:,2] * lattice.transpose(kappaT))
+                2 * vcorT[:,2] * kappaTBA)
 
     if ires:
         res = {"gap": np.min(abs(ew)), "e": ew, "coef": ev}

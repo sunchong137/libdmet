@@ -1,5 +1,6 @@
 from Hubbard import *
 import Hubbard
+from libdmet.routine import bcs
 from libdmet.routine.mfd import HFB
 from libdmet.routine.bcs_helper import mono_fit, extractRdm
 
@@ -17,12 +18,29 @@ def HartreeFockBogoliubov(Lat, v, filling, mu0, thrnelec = 1e-6):
         log.info("after fitting, mu = %20.12f", mu)
     rho, n, E, res = HFB(Lat, v, False, mu = mu, beta = np.inf, \
             ires = True)
-    rhoA, rhoB, kappa = extractRdm(rho[0])
+    rhoA, rhoB, kappaBA = extractRdm(rho[0])
     log.result("Local density matrix (mean-field): alpha, beta and pairing"
-            "\n%s\n%s\n%s", rhoA, rhoB, kappa)
+            "\n%s\n%s\n%s", rhoA, rhoB, kappaBA.T)
 
     # present results
     return rho, mu
 
+def ConstructImpHam(Lat, GRho, v, matching = True, local = True, **kwargs):
+    log.result("Making embedding basis")
+    basis = bcs.embBasis(Lat, GRho, local = local)
+    if matching:
+        log.result("Rotate bath orbitals to match alpha and beta basis")
+        nscsites = Lat.supercell.nsites
+        if local:
+            basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+        else:
+            basis = basisMatching(basis)
+
+    log.result("Constructing impurity Hamiltonian")
+    ImpHam, (H1e, H0e) = bcs.embHam(Lat, basis, v, local = local, **kwargs)
+
+    return ImpHam, (H1e, H0e), basis
+
 def AFInitGuess(ImpSize, U, Filling, polar = None, rand = 0.01):
     return Hubbard.AFInitGuess(ImpSize, U, Filling, polar, True, rand)
+
