@@ -70,9 +70,8 @@ def embHam(lattice, basis, vcor, local = True, **kwargs):
     Int1e_energy["cd"] += Int1e_from2e["cd"]
     Int1e_energy["cc"] += Int1e_from2e["cc"]
     H0_energy = H0_energy_from1e + H0_from2e
-    return integral.Integral(nbasis, True, False, H0, Int1e, Int2e), \
+    return integral.Integral(nbasis, False, True, H0, Int1e, Int2e), \
             (Int1e_energy, H0_energy)
-
 
 def __embHam1e(lattice, basis, vcor, **kwargs):
     log.eassert(vcor.islocal(), "nonlocal correlation potential cannot be treated in this routine")
@@ -84,26 +83,26 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
     ImpJK = lattice.getImpJK()
     spin = 2
     H0 = 0.
-    H1 = {"cd": np.empty((2, nbasis, nbasis)), "cc": np.empty((nbasis, nbasis))}
+    H1 = {"cd": np.empty((2, nbasis, nbasis)), "cc": np.empty((1, nbasis, nbasis))}
     H0energy = 0.
-    H1energy = {"cd": np.empty((2, nbasis, nbasis)), "cc": np.empty((nbasis, nbasis))}
+    H1energy = {"cd": np.empty((2, nbasis, nbasis)), "cc": np.empty((1, nbasis, nbasis))}
 
     # Fock part first
     log.debug(1, "transform Fock")
-    H1["cd"], H1["cc"], H0 = transform_trans_inv_sparse(basis, lattice, latFock)
+    H1["cd"], H1["cc"][0], H0 = transform_trans_inv_sparse(basis, lattice, latFock)
     # then add Vcor, only in environment
     # add it everywhere then subtract impurity part
     log.debug(1, "transform Vcor")
     tempCD, tempCC, tempH0 = transform_local(basis, lattice, vcor.get())
     H1["cd"] += tempCD
-    H1["cc"] += tempCC
+    H1["cc"][0] += tempCC
     H0 += tempH0
 
     if not "fitting" in kwargs or not kwargs["fitting"]:
         # for fitting purpose, we need H1 with vcor on impurity
         tempCD, tempCC, tempH0 = transform_imp(basis, lattice, vcor.get())
         H1["cd"] -= tempCD
-        H1["cc"] -= tempCC
+        H1["cc"][0] -= tempCC
         H0 -= tempH0
 
     # subtract impurity Fock if necessary
@@ -112,11 +111,11 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
         log.debug(1, "transform impurity JK")
         tempCD, tempCC, tempH0 = transform_imp(basis, lattice, ImpJK)
         H1["cd"] -= tempCD
-        H1["cc"] -= tempCC
+        H1["cc"][0] -= tempCC
         H0 -= tempH0
 
     log.debug(1, "transform native H1")
-    H1energy["cd"], H1energy["cc"], H0energy = transform_imp_env(basis, lattice, latH1)
+    H1energy["cd"], H1energy["cc"][0], H0energy = transform_imp_env(basis, lattice, latH1)
 
     return (H1, H0), (H1energy, H0energy)
 
@@ -128,20 +127,14 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         log.debug(0, "Use memory map for 2-electron integral")
         ccdd = np.memmap(NamedTemporaryFile(dir = TmpDir), dtype = float, \
                 mode = 'w+', shape = (3, nbasis, nbasis, nbasis, nbasis))
-        if local:
-            cccd = cccc = None
-        else:
-            cccd = np.memmap(NamedTemporaryFile(dir = TmpDir), dtype = float, \
-                mode = 'w+', shape = (2, nbasis, nbasis, nbasis, nbasis))
-            cccc = np.memmap(NamedTemporaryFile(dir = TmpDir), dtype = float, \
-                mode = 'w+', shape = (nbasis, nbasis, nbasis, nbasis))
+        cccd = np.memmap(NamedTemporaryFile(dir = TmpDir), dtype = float, \
+            mode = 'w+', shape = (2, nbasis, nbasis, nbasis, nbasis))
+        cccc = np.memmap(NamedTemporaryFile(dir = TmpDir), dtype = float, \
+            mode = 'w+', shape = (nbasis, nbasis, nbasis, nbasis))
     else:
         ccdd = np.zeros((3, nbasis, nbasis, nbasis, nbasis))
-        if local:
-            cccd = cccc = None
-        else:
-            cccd = np.zeros((2, nbasis, nbasis, nbasis, nbasis))
-            cccc = np.zeros((nbasis, nbasis, nbasis, nbasis))
+        cccd = np.zeros((2, nbasis, nbasis, nbasis, nbasis))
+        cccc = np.zeros((1, nbasis, nbasis, nbasis, nbasis))
 
     log.info("H2 memory allocated size = %d MB", ccdd.size * 2 * 8. / 1024 / 1024)
     
@@ -152,8 +145,32 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         for i in range(ccdd.shape[0]):
             ccdd[i, :nscsites, :nscsites, :nscsites, :nscsites] = lattice.getH2()
         cd = np.zeros((2, nbasis, nbasis))
-        cc = np.zeros((nbasis, nbasis))
+        cc = np.zeros((1, nbasis, nbasis))
         H0 = 0.
     else:
         log.error("Int2e for nonlocal embedding basis not implemented yet")
     return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, {"cd": cd, "cc": cc}, H0
+
+def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
+    VA, VB, UA, UB = separate_basis(basis)
+    nscsites = basis.shape[-2] / 2
+    nbasis = basis.shape[-1]
+    R = np.empty((nscsites*2, nbasis*2))
+    R[:nscsites, :nbasis] = VA[0]
+    R[nscsites:, :nbasis] = UB[0]
+    R[:nscsites, nbasis:] = UA[0]
+    R[nscsites:, nbasis:] = VB[0]
+    GRhoImp = mdot(R, GRhoEmb, R.T)
+    occs = np.diag(GRhoImp)
+    nelec = np.sum(occs[:nscsites]) - np.sum(occs[nscsites:]) + nscsites
+    if E is not None:
+        H1energy, H0energy = H_energy
+        CDeff = ImpHam.H1["cd"] - H1energy["cd"]
+        CCeff = ImpHam.H1["cc"] - H1energy["cc"]
+        H0eff = ImpHam.H0 - H0energy
+        rhoA, rhoB, kappaBA = extractRdm(GRhoEmb)
+        Efrag = E - np.sum(CDeff[0] * rhoA) - np.sum(CDeff[1] * rhoB) - \
+                np.sum(CCeff.T * kappaBA) - H0eff
+    else:
+        Efrag = None
+    return GRhoImp, Efrag, nelec

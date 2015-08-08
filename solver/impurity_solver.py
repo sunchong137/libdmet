@@ -10,7 +10,8 @@ __all__ = ["AFQMC", "Block", "DmrgCI", "CASSCF"]
 
 class Block(object):
     def __init__(self, nproc, nnode = 1, TmpDir = "/tmp", SharedDir = None, \
-            reorder = False, minM = 100, maxM = None, tol = 1e-6, spinAdapted = False):
+            reorder = False, minM = 100, maxM = None, tol = 1e-6, spinAdapted = False, \
+            bcs = False):
         log.eassert(nnode == 1 or SharedDir is not None, \
                 "Running on multiple nodes (nnod = %d), must specify shared directory", \
                 nnode)
@@ -22,17 +23,20 @@ class Block(object):
         self.minM = minM
         self.maxM = maxM
         self.spinAdapted = spinAdapted
+        self.bcs = bcs
 
     def run(self, Ham, M = None, nelec = None, schedule = None, similar = False):
         if M is None:
             M = self.maxM
         if nelec is None:
-            nelec = Ham.norb
-        if not self.cisolver.sys_initialized:
-            if self.spinAdapted:
-                self.cisolver.set_system(nelec, 0, True, False, True)
+            if self.bcs:
+                nelec = Ham.norb * 2
             else:
-                self.cisolver.set_system(nelec, 0, False, False, False)
+                nelec = Ham.norb
+        if not self.cisolver.sys_initialized:
+            self.cisolver.set_system(nelec, 0, self.spinAdapted, \
+                    self.bcs, self.spinAdapted)
+
         if schedule is None:
             schedule = self.schedule
             if self.cisolver.optimized:

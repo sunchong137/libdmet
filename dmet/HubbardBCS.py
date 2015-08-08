@@ -25,6 +25,24 @@ def HartreeFockBogoliubov(Lat, v, filling, mu0, thrnelec = 1e-6):
     # present results
     return rho, mu
 
+def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
+    nscsites = basis.shape[-2] / 2
+    GRhoImp, Efrag, nelec = bcs.transformResults(GRhoEmb, E, basis, ImpHam, H_energy)
+    if Efrag is None:
+        return nelec/nscsites
+    else:
+        log.result("Local density matrix (impurity):")
+        rhoA, rhoB, kappaBA = extractRdm(GRhoImp)
+        log.result("%s", rhoA)
+        log.result("%s", rhoB)
+        log.result("%s", -kappaBA.T)
+        log.result("nelec per site (impurity) = %20.12f", nelec/nscsites)
+        log.result("Energy per site (impurity) = %20.12f", Efrag/nscsites)
+
+        return GRhoImp, Efrag/nscsites, nelec/nscsites
+
+Hubbard.transformResults = transformResults
+
 def ConstructImpHam(Lat, GRho, v, matching = True, local = True, **kwargs):
     log.result("Making embedding basis")
     basis = bcs.embBasis(Lat, GRho, local = local)
@@ -44,7 +62,6 @@ def ConstructImpHam(Lat, GRho, v, matching = True, local = True, **kwargs):
 def apply_dmu(lattice, ImpHam, basis, dmu):
     nscsites = lattice.supercell.nsites
     nbasis = basis.shape[-1]
-    dmu = 0.1
     tempCD, tempCC, tempH0 = transform_imp(basis, lattice, dmu * np.eye(nscsites))
     ImpHam.H1["cd"] -= tempCD
     ImpHam.H1["cc"] -= tempCC
@@ -57,3 +74,10 @@ Hubbard.apply_dmu = apply_dmu
 def AFInitGuess(ImpSize, U, Filling, polar = None, rand = 0.01):
     return Hubbard.AFInitGuess(ImpSize, U, Filling, polar, True, rand)
 
+def addDiag(v, scalar):
+    rep = v.get()
+    nscsites = rep.shape[1]
+    rep[0] += np.eye(nscsites) * scalar
+    rep[1] += np.eye(nscsites) * scalar
+    v.assign(rep)
+    return v

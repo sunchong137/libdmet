@@ -78,6 +78,7 @@ def mono_fit(fn, y0, x0, thr, increase = True):
 
 def separate_basis(basis):
     nscsites = basis.shape[2] / 2
+    # VA, VB, UA, UB
     return basis[0, :, :nscsites], basis[1, :, :nscsites], \
             basis[1, :, nscsites:], basis[0, :, nscsites:]
 
