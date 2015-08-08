@@ -214,4 +214,4 @@ def VcorLocal(restricted, bogoliubov, nscsites):
     v.length = types.MethodType(lambda self: nV+nD, v)
     return v
 
-FitVcor = FitVcorTwoStep
+FitVcor = slater.FitVcorTwoStep

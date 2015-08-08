@@ -1,7 +1,6 @@
 from libdmet.system.lattice import ChainLattice, SquareLattice, CubicLattice, HoneycombLattice, BipartiteSquare
 from libdmet.system.hamiltonian import HubbardHamiltonian as Ham
 from libdmet.routine import vcor, slater
-from libdmet.routine.slater import FitVcorTwoStep
 from libdmet.routine.mfd import HF
 from libdmet.routine.diis import FDiisContext
 import libdmet.utils.logger as log
@@ -160,7 +159,8 @@ def VcorLocalPhSymm(U, bogoliubov, subA, subB):
     return v
 
 def FitVcor(rho, lattice, basis, vcor, beta, MaxIter1 = 300, MaxIter2 = 20):
-    return FitVcorTwoStep(rho, lattice, basis, vcor, beta, 0.5, MaxIter1, MaxIter2)
+    return slater.FitVcorTwoStep(rho, lattice, basis, vcor, beta, 0.5, \
+            MaxIter1, MaxIter2)
 
 class IterHistory(object):
     def __init__(self):
