@@ -24,6 +24,7 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     spin = rhoEmb.shape[0]
     nscsites = basis.shape[2]
     rhoImp, Efrag, nelec = slater.transformResults(rhoEmb, E, basis, ImpHam, H1e)
+    log.debug(1, "impurity density matrix:\n%s", rhoImp)
     if Efrag is None:
         return nelec/nscsites
     else:

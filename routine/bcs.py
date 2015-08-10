@@ -62,12 +62,13 @@ def __embBasis_phsymm(lattice, GRho, **kwargs):
             AB2[:, nscsites:], AB2[:, nscsites:]
     return basis
 
-def embHam(lattice, basis, vcor, local = True, **kwargs):
+def embHam(lattice, basis, vcor, mu, local = True, **kwargs):
     log.info("One-body part")
     (Int1e, H0_from1e), (Int1e_energy, H0_energy_from1e) = \
-            __embHam1e(lattice, basis, vcor, **kwargs)
+            __embHam1e(lattice, basis, vcor, mu, **kwargs)
     log.info("Two-body part")
-    Int2e, Int1e_from2e, H0_from2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
+    Int2e, Int1e_from2e, H0_from2e = \
+            __embHam2e(lattice, basis, vcor, local, **kwargs)
 
     nbasis = basis.shape[-1]
     Int1e["cd"] += Int1e_from2e["cd"]
@@ -79,7 +80,7 @@ def embHam(lattice, basis, vcor, local = True, **kwargs):
     return integral.Integral(nbasis, False, True, H0, Int1e, Int2e), \
             (Int1e_energy, H0_energy)
 
-def __embHam1e(lattice, basis, vcor, **kwargs):
+def __embHam1e(lattice, basis, vcor, mu, **kwargs):
     log.eassert(vcor.islocal(), "nonlocal correlation potential cannot be treated in this routine")
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
@@ -96,10 +97,13 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
     # Fock part first
     log.debug(1, "transform Fock")
     H1["cd"], H1["cc"][0], H0 = transform_trans_inv_sparse(basis, lattice, latFock)
-    # then add Vcor, only in environment
+    # then add Vcor, only in environment; and -mu*I in impurity and environment
     # add it everywhere then subtract impurity part
     log.debug(1, "transform Vcor")
-    tempCD, tempCC, tempH0 = transform_local(basis, lattice, vcor.get())
+    v = vcor.get()
+    v[0] -= mu * np.eye(nscsites)
+    v[1] -= mu * np.eye(nscsites)
+    tempCD, tempCC, tempH0 = transform_local(basis, lattice, v)
     H1["cd"] += tempCD
     H1["cc"][0] += tempCC
     H0 += tempH0
@@ -171,9 +175,9 @@ def foldRho(GRho, Lat, basis):
     mask_GRho = find(True, map(lambda a: la.norm(a) > thr, GRho))
 
     for i, j in it.product(mask_basis, repeat = 2):
-        Hidx = Lat.substract(j, i)
+        Hidx = Lat.subtract(j, i)
         if Hidx in mask_GRho:
-            res += mdot(basis[i].T, H[Hidx], basis[j])
+            res += mdot(basisCanonical[i].T, GRho[Hidx], basisCanonical[j])
     return res
 
 def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
@@ -232,10 +236,11 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
     err_begin = errfunc(vcor.param)
     log.info("Using analytic gradient")
     param, err_end = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
+    print vcor.get()
     return vcor, err_begin, err_end
 
 def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
-    nbasis = nbasis.shape[-1]
+    nbasis = basis.shape[-1]
 
     def errfunc(param):
         vcor.update(param)
@@ -280,6 +285,8 @@ def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
     occs = np.diag(GRhoImp)
     nelec = np.sum(occs[:nscsites]) - np.sum(occs[nscsites:]) + nscsites
     if E is not None:
+        # FIXME energy expression is definitely wrong with mu built in the
+        # Hamiltonian
         H1energy, H0energy = H_energy
         CDeff = ImpHam.H1["cd"] - H1energy["cd"]
         CCeff = ImpHam.H1["cc"] - H1energy["cc"]

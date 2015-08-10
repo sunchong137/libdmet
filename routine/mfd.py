@@ -122,10 +122,10 @@ def HFB(lattice, vcor, restricted, mu = 0., beta = np.inf, ires = False):
     ewocc = 1 * (ew < 0.)
     nocc = np.sum(ewocc)
     # FIXME should it be a warning or an error?
-    log.eassert(nocc*2 == ew.size, \
-            "number of negative and positive modes are not equal," \
-            "the difference is %d, this means total spin on lattice is nonzero", \
-            nocc*2 - ew.size)
+    #log.check(nocc*2 == ew.size, \
+    #        "number of negative and positive modes are not equal," \
+    #        "the difference is %d, this means total spin on lattice is nonzero", \
+    #        nocc*2 - ew.size)
 
     GRho = np.empty_like(ev) # k-space
     GRhoT = np.empty_like(GRho) # real space

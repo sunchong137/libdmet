@@ -28,6 +28,8 @@ def HartreeFockBogoliubov(Lat, v, filling, mu0, thrnelec = 1e-6):
 def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
     nscsites = basis.shape[-2] / 2
     GRhoImp, Efrag, nelec = bcs.transformResults(GRhoEmb, E, basis, ImpHam, H_energy)
+    log.debug(1, "impurity generalized density matrix:\n%s", GRhoImp)
+
     if Efrag is None:
         return nelec/nscsites
     else:
@@ -43,7 +45,7 @@ def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
 
 Hubbard.transformResults = transformResults
 
-def ConstructImpHam(Lat, GRho, v, matching = True, local = True, **kwargs):
+def ConstructImpHam(Lat, GRho, v, mu, matching = True, local = True, **kwargs):
     log.result("Making embedding basis")
     basis = bcs.embBasis(Lat, GRho, local = local)
     if matching:
@@ -55,7 +57,7 @@ def ConstructImpHam(Lat, GRho, v, matching = True, local = True, **kwargs):
             basis = basisMatching(basis)
 
     log.result("Constructing impurity Hamiltonian")
-    ImpHam, (H1e, H0e) = bcs.embHam(Lat, basis, v, local = local, **kwargs)
+    ImpHam, (H1e, H0e) = bcs.embHam(Lat, basis, v, mu, local = local, **kwargs)
 
     return ImpHam, (H1e, H0e), basis
 
@@ -66,7 +68,7 @@ def apply_dmu(lattice, ImpHam, basis, dmu):
     ImpHam.H1["cd"] -= tempCD
     ImpHam.H1["cc"] -= tempCC
     ImpHam.H0 -= tempH0
-    ImpHam.H0 += dmu * nbasis
+    #ImpHam.H0 += dmu * nbasis
     return ImpHam
 
 Hubbard.apply_dmu = apply_dmu
