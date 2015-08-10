@@ -53,11 +53,6 @@ def ConstructImpHam(Lat, rho, v, matching = True, local = True, split = False, *
 
     return ImpHam, H1e, basis
 
-def foldRho(rho, Lat, basis):
-    spin = rho.shape[0]
-    return np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], \
-            Lat, rho[s]), range(spin)))
-
 def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     spin = rhoEmb.shape[0]
     nscsites = basis.shape[2]
@@ -174,3 +169,5 @@ class IterHistory(object):
         for idx, item in enumerate(self.history):
             log.result(" %3d %20.12f %20.12f %20.12f %20.12f  %2d %2d", idx, *item)
         log.result("")
+
+foldRho = slater.foldRho

@@ -205,6 +205,11 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
                 basis[1,0], basis[1,0])
     return H2
 
+def foldRho(rho, Lat, basis):
+    spin = rho.shape[0]
+    return np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], \
+            Lat, rho[s]), range(spin)))
+
 def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
     spin = basis.shape[0]
     nbasis = basis.shape[-1]
@@ -286,8 +291,7 @@ def FitVcorFull(rho, lattice, basis, vcor, beta, filling, MaxIter = 20, **kwargs
         log.verbose = "RESULT"
         rhoT, _, _ = HF(lattice, vcor, filling, spin == 1, mu0 = 0., beta = beta)
         log.verbose = verbose
-        for s in range(spin):
-            rho1[s] = transform_trans_inv_sparse(basis[s], lattice, rhoT[s], thr = 1e-6)
+        rho1 = foldRho(rhoT, lattice, basis)
         return la.norm(rho - rho1) / sqrt(spin)
     
     err_begin = errfunc(vcor.param)
