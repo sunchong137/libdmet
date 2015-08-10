@@ -1,12 +1,15 @@
 import numpy as np
 import numpy.linalg as la
-import libdmet.utils.logger as log
 from copy import deepcopy
+from math import sqrt
+import itertools as it
+import libdmet.utils.logger as log
 from libdmet.system import integral
 from bcs_helper import *
 from slater import MatSqrt, orthonormalizeBasis
-from math import sqrt
+from mfd import assignocc, HFB
 from fit import minimize
+from libdmet.utils.misc import mdot, find
 
 def embBasis(lattice, GRho, local = True, **kwargs):
     if local:
@@ -154,6 +157,25 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         log.error("Int2e for nonlocal embedding basis not implemented yet")
     return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, {"cd": cd, "cc": cc}, H0
 
+def foldRho(GRho, Lat, basis):
+    thr = 1e-7
+    ncells = Lat.ncells
+    nscsites = Lat.supercell.nsites
+    nbasis = basis.shape[-1]
+    basisCanonical = np.empty((ncells, nscsites*2, nbasis*2))
+    basisCanonical[:,:,:nbasis] = basis[0] # (VA, UB)^T
+    basisCanonical[:,:nscsites,nbasis:] = basis[1, :, nscsites:] # UA
+    basisCanonical[:,nscsites:,nbasis:] = basis[1, :, :nscsites] # VB
+    res = np.zeros((nbasis*2, nbasis*2))
+    mask_basis = find(True, map(lambda a: la.norm(a) > thr, basisCanonical))
+    mask_GRho = find(True, map(lambda a: la.norm(a) > thr, GRho))
+
+    for i, j in it.product(mask_basis, repeat = 2):
+        Hidx = Lat.substract(j, i)
+        if Hidx in mask_GRho:
+            res += mdot(basis[i].T, H[Hidx], basis[j])
+    return res
+
 def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
     nbasis = basis.shape[-1]
     (embHA, embHB), embD, _ = transform_trans_inv_sparse(basis, lattice, \
@@ -212,7 +234,24 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
     param, err_end = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
     return vcor, err_begin, err_end
 
-def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 20):
+def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
+    nbasis = nbasis.shape[-1]
+
+    def errfunc(param):
+        vcor.update(param)
+        verbose = log.verbose
+        log.verbose = "RESULT"
+        GRhoT, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
+        log.verbose = verbose
+        GRho1 = foldRho(GRhoT, lattice, basis)
+        return la.norm(GRho - GRho1) / sqrt(2.)
+
+    err_begin = errfunc(vcor.param)
+    param, err_end = minimize(errfunc, vcor.param, MaxIter, **kwargs)
+    vcor.update(param)
+    return vcor, err_begin, err_end
+
+def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0):
     vcor_new = deepcopy(vcor)
     log.result("Using two-step vcor fitting")
     if MaxIter1 > 0:

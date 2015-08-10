@@ -83,3 +83,5 @@ def addDiag(v, scalar):
     return v
 
 FitVcor = bcs.FitVcorTwoStep
+
+foldRho = bcs.foldRho
