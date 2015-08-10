@@ -187,7 +187,7 @@ def VcorLocal(restricted, bogoliubov, nscsites):
                 self.grad = g
             return self.grad
 
-    else:
+    else: # not restricted and bogoliubov
         def evaluate(self):
             log.eassert(self.param.shape == (nV+nD,), "wrong parameter shape, require %s", (nV+nD,))
             V = np.zeros((3, nscsites, nscsites))

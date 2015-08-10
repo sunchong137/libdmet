@@ -91,21 +91,6 @@ def contract_trans_inv(basisL, basisR, lattice, H):
         res += mdot(basisL[i].T, H[lattice.subtract(j,i)], basisR[j])
     return res
 
-def contract_trans_inv_sparse(basisL, basisR, lattice, H, thr = 1e-7):
-    ncells = lattice.ncells
-    nbasisL = basisL.shape[2]
-    nbasisR = basisR.shape[2]
-    res = np.zeros((nbasisL, nbasisR))
-    mask_basisL = find(True, map(lambda a: la.norm(a) > thr, basisL))
-    mask_basisR = find(True, map(lambda a: la.norm(a) > thr, basisR))
-    mask_H = find(True, map(lambda a: la.norm(a) > thr, H))
-
-    for i, j in it.product(mask_basisL, mask_basisR):
-        Hidx = lattice.subtract(j, i)
-        if Hidx in mask_H:
-            res += mdot(basisL[i].T, H[Hidx], basisR[j])
-    return res
-
 def transform_trans_inv(basis, lattice, H):
     VA, VB, UA, UB = separate_basis(basis)
     if len(H.shape) == 3:
@@ -123,6 +108,21 @@ def transform_trans_inv(basis, lattice, H):
     resD = ctr(VA, HA, UA) - ctr(UB, HB, VB) + ctr(VA, D, VB) + ctr(UB, D_T, UA)
     resE0 = np.trace(ctr(UA, HA, UA) + ctr(UB, HB, UB) + ctr(UA, D, VB) + ctr(VB, D_T, UA))
     return np.asarray([resHA, resHB]), resD, resE0
+
+def contract_trans_inv_sparse(basisL, basisR, lattice, H, thr = 1e-7):
+    ncells = lattice.ncells
+    nbasisL = basisL.shape[2]
+    nbasisR = basisR.shape[2]
+    res = np.zeros((nbasisL, nbasisR))
+    mask_basisL = find(True, map(lambda a: la.norm(a) > thr, basisL))
+    mask_basisR = find(True, map(lambda a: la.norm(a) > thr, basisR))
+    mask_H = find(True, map(lambda a: la.norm(a) > thr, H))
+
+    for i, j in it.product(mask_basisL, mask_basisR):
+        Hidx = lattice.subtract(j, i)
+        if Hidx in mask_H:
+            res += mdot(basisL[i].T, H[Hidx], basisR[j])
+    return res
 
 def transform_trans_inv_sparse(basis, lattice, H, thr = 1e-7):
     VA, VB, UA, UB = separate_basis(basis)
@@ -158,6 +158,34 @@ def transform_local(basis, lattice, H):
     elif H.shape[0] == 3:
         HA, HB, D = H[0], H[1], H[2]
     ctr = lambda L, H, R: contract_local(L, R, lattice, H)
+    resHA = ctr(VA, HA, VA) - ctr(UB, HB, UB) + ctr(VA, D, UB) + ctr(UB, D.T, VA)
+    resHB = ctr(VB, HB, VB) - ctr(UA, HA, UA) - ctr(VB, D.T, UA) - ctr(UA, D, VB)
+    resD = ctr(VA, HA, UA) - ctr(UB, HB, VB) + ctr(VA, D, VB) + ctr(UB, D.T, UA)
+    resE0 = np.trace(ctr(UA, HA, UA) + ctr(UB, HB, UB) + ctr(UA, D, VB) + ctr(VB, D.T, UA))
+    return np.asarray([resHA, resHB]), resD, resE0
+
+def contract_local_sparseH(basisL, basisR, lattice, H, thr = 1e-7):
+    ncells = lattice.ncells
+    nbasisL = basisL.shape[-1]
+    nbasisR = basisR.shape[-1]
+    res = np.zeros((nbasisL, nbasisR))
+    mask_H = np.nonzero(abs(H) > thr)
+    mask_H = zip(*map(lambda a: a.tolist(), mask_H))
+    for j, k in mask_H:
+        res += np.dot(basisL[:,j].T, basisR[:,k]) * H[j,k]
+    return res
+
+def transform_local_sparseH(basis, lattice, H, thr = 1e-7):
+    VA, VB, UA, UB = separate_basis(basis)
+    if len(H.shape) == 2:
+        HA = HB = H
+        D = np.zeros_like(HA)
+    elif H.shape[0] == 2:
+        HA, HB = H[0], H[1]
+        D = np.zeros_like(HA)
+    elif H.shape[0] == 3:
+        HA, HB, D = H[0], H[1], H[2]
+    ctr = lambda L, H, R: contract_local_sparseH(L, R, lattice, H, thr = 1e-7)
     resHA = ctr(VA, HA, VA) - ctr(UB, HB, UB) + ctr(VA, D, UB) + ctr(UB, D.T, VA)
     resHB = ctr(VB, HB, VB) - ctr(UA, HA, UA) - ctr(VB, D.T, UA) - ctr(UA, D, VB)
     resD = ctr(VA, HA, UA) - ctr(UB, HB, VB) + ctr(VA, D, VB) + ctr(UB, D.T, UA)

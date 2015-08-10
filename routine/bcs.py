@@ -1,9 +1,12 @@
 import numpy as np
 import numpy.linalg as la
 import libdmet.utils.logger as log
+from copy import deepcopy
 from libdmet.system import integral
 from bcs_helper import *
 from slater import MatSqrt, orthonormalizeBasis
+from math import sqrt
+from fit import minimize
 
 def embBasis(lattice, GRho, local = True, **kwargs):
     if local:
@@ -150,6 +153,80 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
     else:
         log.error("Int2e for nonlocal embedding basis not implemented yet")
     return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, {"cd": cd, "cc": cc}, H0
+
+def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
+    nbasis = basis.shape[-1]
+    (embHA, embHB), embD, _ = transform_trans_inv_sparse(basis, lattice, \
+            lattice.getFock(kspace = False))
+
+    embHeff = np.zeros((nbasis*2, nbasis*2))
+    def errfunc(param):
+        vcor.update(param)
+        (VA, VB), VD, _ = transform_local(basis, lattice, vcor.get())
+        embHeff[:nbasis, :nbasis] = embHA + VA - mu * np.eye(nbasis)
+        embHeff[nbasis:, nbasis:] = -embHB - VB + mu * np.eye(nbasis)
+        embHeff[:nbasis, nbasis:] = VD
+        embHeff[nbasis:, :nbasis] = VD.T
+        ew, ev = la.eigh(embHeff)
+        GRho1 = np.dot(ev[:, :nbasis], ev[:, :nbasis].T)
+        return la.norm(GRho - GRho1) / sqrt(2.)
+
+    def gradfunc(param):
+        vcor.update(param)
+        (VA, VB), VD, _ = transform_local(basis, lattice, vcor.get())
+        embHeff[:nbasis, :nbasis] = embHA + VA - mu * np.eye(nbasis)
+        embHeff[nbasis:, nbasis:] = -embHB - VB + mu * np.eye(nbasis)
+        embHeff[:nbasis, nbasis:] = VD
+        embHeff[nbasis:, :nbasis] = VD.T
+        ew, ev = la.eigh(embHeff)
+        GRho1 = np.dot(ev[:, :nbasis], ev[:, :nbasis].T)
+        val = la.norm(GRho - GRho1)
+
+        ewocc, ewvirt = ew[:nbasis], ew[nbasis:]
+        evocc, evvirt = ev[:, :nbasis], ev[:, nbasis:]
+        # dGRho_ij / dV_ij, where V corresponds to terms in the
+        # embedding generalized density matrix
+        dGRho_dV = np.empty((nbasis*2, nbasis*2, nbasis*2, nbasis*2))
+        dnorm_dV = np.empty((nbasis*2, nbasis*2))
+        dV_dparam = np.empty((vcor.length(), nbasis*2, nbasis*2))
+        c_jln = np.einsum("jn,ln->jln", evocc, evocc)
+        c_ikm = np.einsum("im,km->ikm", evvirt, evvirt)
+        e_mn = 1. / (-ewvirt.reshape((-1,1)) + ewocc)
+        dGRho_dV = np.swapaxes(np.tensordot(np.tensordot(c_ikm, e_mn, \
+                axes = (2,0)), c_jln, axes = (2,2)), 1, 2)
+        dGRho_dV += np.swapaxes(np.swapaxes(dGRho_dV, 0, 1), 2, 3)
+        dnorm_dV = np.tensordot(GRho1 - GRho, dGRho_dV, \
+                axes = ((0,1), (0,1))) / val / sqrt(2.)
+        # now compute dV/dparam
+        for ip in range(vcor.length()):
+            (dA_dV, dB_dV), dD_dV, _ = \
+                    transform_local(basis, lattice, vcor.gradient()[ip])
+            dV_dparam[ip, :nbasis, :nbasis] = dA_dV
+            dV_dparam[ip, nbasis:, nbasis:] = -dB_dV
+            dV_dparam[ip, :nbasis, nbasis:] = dD_dV
+            dV_dparam[ip, nbasis:, :nbasis] = dD_dV.T
+        return np.tensordot(dV_dparam, dnorm_dV, axes = ((1,2), (0,1)))
+
+    err_begin = errfunc(vcor.param)
+    log.info("Using analytic gradient")
+    param, err_end = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
+    return vcor, err_begin, err_end
+
+def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 20):
+    vcor_new = deepcopy(vcor)
+    log.result("Using two-step vcor fitting")
+    if MaxIter1 > 0:
+        log.info("Impurity model stage  max %d steps", MaxIter1)
+        vcor_new, err_begin, err_end = FitVcorEmb(GRho, lattice, basis, vcor_new, \
+            mu, MaxIter = MaxIter1, serial = True)
+        log.result("residue (begin) = %20.12f", err_begin)
+        log.info("residue (end)   = %20.12f", err_end)
+    if MaxIter2 > 0:
+        log.info("Full lattice stage  max %d steps", MaxIter2)
+        vcor_new, _, err_end = FitVcorFull(GRho, lattice, basis, vcor_new, \
+                mu, MaxIter = MaxIter2)
+    log.result("residue (end)   = %20.12f", err_end)
+    return vcor_new, err_begin
 
 def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
     VA, VB, UA, UB = separate_basis(basis)

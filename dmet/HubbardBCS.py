@@ -81,3 +81,5 @@ def addDiag(v, scalar):
     rep[1] += np.eye(nscsites) * scalar
     v.assign(rep)
     return v
+
+FitVcor = bcs.FitVcorTwoStep
