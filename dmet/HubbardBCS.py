@@ -34,7 +34,7 @@ def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
     if Efrag is None:
         return nelec/nscsites
     else:
-        log.result("Local density matrix (impurity):")
+        log.result("Local density matrix (impurity): alpha, beta and pairing")
         rhoA, rhoB, kappaBA = extractRdm(GRhoImp)
         log.result("%s", rhoA)
         log.result("%s", rhoB)
