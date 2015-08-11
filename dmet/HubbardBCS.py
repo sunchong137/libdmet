@@ -19,8 +19,9 @@ def HartreeFockBogoliubov(Lat, v, filling, mu0, thrnelec = 1e-6):
     rho, n, E, res = HFB(Lat, v, False, mu = mu, beta = np.inf, \
             ires = True)
     rhoA, rhoB, kappaBA = extractRdm(rho[0])
-    log.result("Local density matrix (mean-field): alpha, beta and pairing"
-            "\n%s\n%s\n%s", rhoA, rhoB, kappaBA.T)
+    if filling is None:
+        log.result("Local density matrix (mean-field): alpha, beta and pairing"
+                "\n%s\n%s\n%s", rhoA, rhoB, kappaBA.T)
 
     # present results
     return rho, mu

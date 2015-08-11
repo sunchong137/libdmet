@@ -30,13 +30,16 @@ history = dmet.IterHistory()
 solver = dmet.impurity_solver.Block(nproc = 4, nnode = 1, \
         bcs = True, reorder = True, tol = 1e-6)
 
+log.section("\nfitting chemical potential\n")
+_, Mu = dmet.HartreeFockBogoliubov(Lat, vcor_new, Filling, Mu)
+
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
 
     log.section ("\nsolving mean-field problem\n")
     log.result("Vcor =\n%s", vcor.get())
     log.result("Mu (guess) = %20.12f", Mu)
-    GRho, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu)
+    GRho, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, None, Mu)
 
     log.section("\nconstructing impurity problem\n")
     ImpHam, H_energy, basis = dmet.ConstructImpHam(Lat, GRho, vcor, Mu)

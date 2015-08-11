@@ -55,7 +55,7 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
 
     x = x0
 
-    log.debug(2, "  Iter           Value               Grad                 Step\n"
+    log.debug(1, "  Iter           Value               Grad                 Step\n"
         "---------------------------------------------------------------------")
 
     y = fn(x)
@@ -96,6 +96,6 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
 
         x -= dx
         y = y_new
-        log.debug(2, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
+        log.debug(1, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
 
     return x, y
