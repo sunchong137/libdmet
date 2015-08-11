@@ -3,12 +3,12 @@ import libdmet.dmet.HubbardBCS as dmet
 import numpy as np
 import numpy.linalg as la
 
-log.verbose = "DEBUG2"
+log.verbose = "INFO"
 
 U = 4
 LatSize = [36, 36]
 ImpSize = [2, 2]
-Filling = 1./2
+Filling = 0.875/2
 MaxIter = 20
 M = 400
 DiisStart = 4
@@ -19,7 +19,7 @@ Lat = dmet.SquareLattice(*(LatSize + ImpSize))
 Ham = dmet.Ham(Lat, U)
 Lat.setHam(Ham)
 
-vcor = dmet.AFInitGuess(ImpSize, U, Filling, rand = 0.00001)
+vcor = dmet.AFInitGuess(ImpSize, U, Filling, rand = 0.001)
 Mu = U * Filling
 dc = dmet.FDiisContext(DiisDim) # I don't know yet whether diis needs to be changed
 
@@ -40,32 +40,20 @@ for iter in range(MaxIter):
 
     log.section("\nconstructing impurity problem\n")
     ImpHam, H_energy, basis = dmet.ConstructImpHam(Lat, GRho, vcor, Mu)
-    GRho1 = dmet.foldRho(GRho, Lat, basis)    
+
     log.section("\nsolving impurity problem\n")
     GRhoEmb, EnergyEmb, ImpHam, dmu = \
             dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver, \
-            solver_args = {"M": 400}, delta = 0.05, step = 0.15)
-    
-    #print GRho1
-    #print GRhoEmb
-    #print la.norm(GRhoEmb - GRho1)
-    #assert(0)
+            solver_args = {"M": 400})
     Mu += dmu
     vcor = dmet.addDiag(vcor, dmu)
-
     GRhoImp, EnergyImp, nelecImp = \
             dmet.transformResults(GRhoEmb, EnergyEmb, basis, ImpHam, H_energy)
 
     log.section("\nfitting correlation potential\n")
-
-    GRho, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu)
-    GRho1 = dmet.foldRho(GRho, Lat, basis)    
-    print la.norm(GRhoEmb - GRho1)
-
     vcor_new, err = dmet.FitVcor(GRhoEmb, Lat, basis, vcor, Mu, \
             MaxIter1 = 200, MaxIter2 = 0)
 
-    print vcor_new
     log.section("\nfitting chemical potential\n")
     GRho, Mu_new = dmet.HartreeFockBogoliubov(Lat, vcor_new, Filling, Mu)
     log.result("dMu = %20.12f", Mu_new - Mu)

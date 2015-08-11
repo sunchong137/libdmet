@@ -68,7 +68,6 @@ def apply_dmu(lattice, ImpHam, basis, dmu):
     ImpHam.H1["cd"] -= tempCD
     ImpHam.H1["cc"] -= tempCC
     ImpHam.H0 -= tempH0
-    #ImpHam.H0 += dmu * nbasis
     return ImpHam
 
 Hubbard.apply_dmu = apply_dmu

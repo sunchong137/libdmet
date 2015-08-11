@@ -193,13 +193,23 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
         v[1] -= mu * np.eye(nscsites)
         (VA, VB), VD, _ = transform_local(basis, lattice, v)
         embHeff[:nbasis, :nbasis] = embHA + VA
-        embHeff[nbasis:, nbasis:] = -embHB - VB
-        embHeff[:nbasis, nbasis:] = VD
-        embHeff[nbasis:, :nbasis] = VD.T
+        embHeff[nbasis:, nbasis:] = -(embHB + VB)
+        embHeff[:nbasis, nbasis:] = embD + VD
+        embHeff[nbasis:, :nbasis] = (embD + VD).T
         ew, ev = la.eigh(embHeff)
         ewocc = 1 * (ew < 0.)
         GRho1 = mdot(ev, np.diag(ewocc), ev.T)
         return la.norm(GRho - GRho1) / sqrt(2.)
+
+    # now compute dV/dparam (will be used in gradient)
+    dV_dparam = np.empty((vcor.length(), nbasis*2, nbasis*2))
+    for ip in range(vcor.length()):
+        (dA_dV, dB_dV), dD_dV, _ = \
+                transform_local(basis, lattice, vcor.gradient()[ip])
+        dV_dparam[ip, :nbasis, :nbasis] = dA_dV
+        dV_dparam[ip, nbasis:, nbasis:] = -dB_dV
+        dV_dparam[ip, :nbasis, nbasis:] = dD_dV
+        dV_dparam[ip, nbasis:, :nbasis] = dD_dV.T
 
     def gradfunc(param):
         vcor.update(param)
@@ -209,8 +219,8 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
         (VA, VB), VD, _ = transform_local(basis, lattice, v)
         embHeff[:nbasis, :nbasis] = embHA + VA
         embHeff[nbasis:, nbasis:] = -embHB - VB
-        embHeff[:nbasis, nbasis:] = VD
-        embHeff[nbasis:, :nbasis] = VD.T
+        embHeff[:nbasis, nbasis:] = embD + VD
+        embHeff[nbasis:, :nbasis] = (embD + VD).T
         ew, ev = la.eigh(embHeff)
         ewocc = 1 * (ew < 0.)
         GRho1 = mdot(ev, np.diag(ewocc), ev.T)
@@ -222,7 +232,6 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
         # embedding generalized density matrix
         dGRho_dV = np.empty((nbasis*2, nbasis*2, nbasis*2, nbasis*2))
         dnorm_dV = np.empty((nbasis*2, nbasis*2))
-        dV_dparam = np.empty((vcor.length(), nbasis*2, nbasis*2))
         c_jln = np.einsum("jn,ln->jln", evocc, evocc)
         c_ikm = np.einsum("im,km->ikm", evvirt, evvirt)
         e_mn = 1. / (-ewvirt.reshape((-1,1)) + ewocc)
@@ -231,15 +240,6 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
         dGRho_dV += np.swapaxes(np.swapaxes(dGRho_dV, 0, 1), 2, 3)
         dnorm_dV = np.tensordot(GRho1 - GRho, dGRho_dV, \
                 axes = ((0,1), (0,1))) / val / sqrt(2.)
-        # now compute dV/dparam
-        # FIXME dV/dparam should be computed only once
-        for ip in range(vcor.length()):
-            (dA_dV, dB_dV), dD_dV, _ = \
-                    transform_local(basis, lattice, vcor.gradient()[ip])
-            dV_dparam[ip, :nbasis, :nbasis] = dA_dV
-            dV_dparam[ip, nbasis:, nbasis:] = -dB_dV
-            dV_dparam[ip, :nbasis, nbasis:] = dD_dV
-            dV_dparam[ip, nbasis:, :nbasis] = dD_dV.T
         return np.tensordot(dV_dparam, dnorm_dV, axes = ((1,2), (0,1)))
 
     err_begin = errfunc(vcor.param)

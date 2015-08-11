@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as la
 import itertools as it
 import libdmet.utils.logger as log
-from libdmet.utils.misc import mdot, find
+from libdmet.utils.misc import mdot, find, counted
 
 def extractRdm(GRho):
     norbs = GRho.shape[0] / 2
@@ -26,14 +26,14 @@ def mono_fit(fn, y0, x0, thr, increase = True):
     if not increase:
         return mono_fit(lambda x: -fn(x), -y0, x0, thr, True)
 
-    count = 0
-    log.debug(0, "target f(x) = %20.12f", y0)
+    @counted
     def evaluate(xx):
         yy = fn(xx)
-        log.debug(0, "Iter %2d, x = %20.12f, f(x) = %20.12f", \
-                count, xx, yy)
+        log.debug(1, "Iter %2d, x = %20.12f, f(x) = %20.12f", \
+                evaluate.count-1, xx, yy)
         return yy
 
+    log.debug(0, "target f(x) = %20.12f", y0)
     # first section search
     x = x0
     y = evaluate(x)
