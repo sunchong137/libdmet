@@ -22,6 +22,10 @@ def HartreeFockBogoliubov(Lat, v, filling, mu0, thrnelec = 1e-6):
     if filling is None:
         log.result("Local density matrix (mean-field): alpha, beta and pairing"
                 "\n%s\n%s\n%s", rhoA, rhoB, kappaBA.T)
+        nscsites = Lat.supercell.nsites
+        log.result("nelec per site (mean-field) = %20.12f", n/nscsites)
+        log.result("Energy per site (mean-field) = %20.12f", E/nscsites)
+        log.result("Gap (mean-field) = %20.12f" % res["gap"])
 
     # present results
     return rho, mu
