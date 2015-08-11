@@ -120,7 +120,7 @@ def HFB(lattice, vcor, restricted, mu = 0., beta = np.inf, ires = False):
         ew, ev = DiagBdG(Fock, vcor, mu)
 
     ewocc = 1 * (ew < 0.)
-    nocc = np.sum(ewocc)
+    #nocc = np.sum(ewocc)
     # FIXME should it be a warning or an error?
     #log.check(nocc*2 == ew.size, \
     #        "number of negative and positive modes are not equal," \

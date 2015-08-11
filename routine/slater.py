@@ -235,6 +235,11 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
 
         return la.norm(rho - rho1) / sqrt(spin)
 
+    dV_dparam = np.empty((vcor.length(), spin, nbasis, nbasis))
+    for s in range(spin):
+        for ip in range(vcor.length()):
+            dV_dparam[ip, s] = transform_local_sparseH(basis[s], lattice, vcor.gradient()[ip,s])
+
     def gradfunc(param):
         # analytic gradient for beta = np.inf and local basis
         vcor.update(param)
@@ -255,8 +260,6 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
         # drho_ij/dV_ij
         drho_dV = np.empty((spin, nbasis, nbasis, nbasis, nbasis))
         dnorm_dV = np.empty((spin, nbasis, nbasis))
-        dV_dparam = np.zeros((vcor.length(), spin, nbasis, nbasis))
-        level_shift = 0.
         for s in range(spin):
             c_jln = np.einsum("jn,ln->jln", evocc[s], evocc[s])
             c_ikm = np.einsum("im,km->ikm", evvirt[s], evvirt[s])
@@ -266,8 +269,6 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
             drho_dV[s] += np.swapaxes(np.swapaxes(drho_dV[s], 0, 1), 2, 3)
             dnorm_dV[s] = np.tensordot(rho1[s]-rho[s], drho_dV[s], axes = ((0,1),(0,1))) \
                 / val / sqrt(spin)
-            for ip in range(vcor.length()):
-                dV_dparam[ip, s] = transform_local_sparseH(basis[s], lattice, vcor.gradient()[ip,s])
         # now only indices kl
         return np.tensordot(dV_dparam, dnorm_dV, axes = ((1,2,3), (0,1,2)))
     

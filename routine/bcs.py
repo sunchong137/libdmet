@@ -69,7 +69,6 @@ def embHam(lattice, basis, vcor, mu, local = True, **kwargs):
     log.info("Two-body part")
     Int2e, Int1e_from2e, H0_from2e = \
             __embHam2e(lattice, basis, vcor, local, **kwargs)
-
     nbasis = basis.shape[-1]
     Int1e["cd"] += Int1e_from2e["cd"]
     Int1e["cc"] += Int1e_from2e["cc"]
@@ -100,7 +99,7 @@ def __embHam1e(lattice, basis, vcor, mu, **kwargs):
     # then add Vcor, only in environment; and -mu*I in impurity and environment
     # add it everywhere then subtract impurity part
     log.debug(1, "transform Vcor")
-    v = vcor.get()
+    v = deepcopy(vcor.get())
     v[0] -= mu * np.eye(nscsites)
     v[1] -= mu * np.eye(nscsites)
     tempCD, tempCC, tempH0 = transform_local(basis, lattice, v)
@@ -181,31 +180,40 @@ def foldRho(GRho, Lat, basis):
     return res
 
 def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
+    nscsites = lattice.supercell.nsites
     nbasis = basis.shape[-1]
     (embHA, embHB), embD, _ = transform_trans_inv_sparse(basis, lattice, \
             lattice.getFock(kspace = False))
 
-    embHeff = np.zeros((nbasis*2, nbasis*2))
+    embHeff = np.empty((nbasis*2, nbasis*2))
     def errfunc(param):
         vcor.update(param)
-        (VA, VB), VD, _ = transform_local(basis, lattice, vcor.get())
-        embHeff[:nbasis, :nbasis] = embHA + VA - mu * np.eye(nbasis)
-        embHeff[nbasis:, nbasis:] = -embHB - VB + mu * np.eye(nbasis)
+        v = deepcopy(vcor.get())
+        v[0] -= mu * np.eye(nscsites)
+        v[1] -= mu * np.eye(nscsites)
+        (VA, VB), VD, _ = transform_local(basis, lattice, v)
+        embHeff[:nbasis, :nbasis] = embHA + VA
+        embHeff[nbasis:, nbasis:] = -embHB - VB
         embHeff[:nbasis, nbasis:] = VD
         embHeff[nbasis:, :nbasis] = VD.T
         ew, ev = la.eigh(embHeff)
-        GRho1 = np.dot(ev[:, :nbasis], ev[:, :nbasis].T)
+        ewocc = 1 * (ew < 0.)
+        GRho1 = mdot(ev, np.diag(ewocc), ev.T)
         return la.norm(GRho - GRho1) / sqrt(2.)
 
     def gradfunc(param):
         vcor.update(param)
-        (VA, VB), VD, _ = transform_local(basis, lattice, vcor.get())
-        embHeff[:nbasis, :nbasis] = embHA + VA - mu * np.eye(nbasis)
-        embHeff[nbasis:, nbasis:] = -embHB - VB + mu * np.eye(nbasis)
+        v = deepcopy(vcor.get())
+        v[0] -= mu * np.eye(nscsites)
+        v[1] -= mu * np.eye(nscsites)
+        (VA, VB), VD, _ = transform_local(basis, lattice, v)
+        embHeff[:nbasis, :nbasis] = embHA + VA
+        embHeff[nbasis:, nbasis:] = -embHB - VB
         embHeff[:nbasis, nbasis:] = VD
         embHeff[nbasis:, :nbasis] = VD.T
         ew, ev = la.eigh(embHeff)
-        GRho1 = np.dot(ev[:, :nbasis], ev[:, :nbasis].T)
+        ewocc = 1 * (ew < 0.)
+        GRho1 = mdot(ev, np.diag(ewocc), ev.T)
         val = la.norm(GRho - GRho1)
 
         ewocc, ewvirt = ew[:nbasis], ew[nbasis:]
@@ -224,6 +232,7 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
         dnorm_dV = np.tensordot(GRho1 - GRho, dGRho_dV, \
                 axes = ((0,1), (0,1))) / val / sqrt(2.)
         # now compute dV/dparam
+        # FIXME dV/dparam should be computed only once
         for ip in range(vcor.length()):
             (dA_dV, dB_dV), dD_dV, _ = \
                     transform_local(basis, lattice, vcor.gradient()[ip])
@@ -236,7 +245,6 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
     err_begin = errfunc(vcor.param)
     log.info("Using analytic gradient")
     param, err_end = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
-    print vcor.get()
     return vcor, err_begin, err_end
 
 def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
