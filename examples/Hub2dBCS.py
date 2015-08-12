@@ -31,7 +31,7 @@ solver = dmet.impurity_solver.Block(nproc = 4, nnode = 1, \
         bcs = True, reorder = True, tol = 1e-6)
 
 log.section("\nfitting chemical potential\n")
-_, Mu = dmet.HartreeFockBogoliubov(Lat, vcor_new, Filling, Mu)
+_, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu)
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
