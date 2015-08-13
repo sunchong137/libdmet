@@ -1,7 +1,7 @@
 import numpy as np
-import libdmet.utils.logger as log
 from copy import deepcopy
-import tensor_symm as symm
+import tensor_symm as symmetry
+import libdmet.utils.logger as log
 
 __all__ = ["BaseTensor", "Fermion", "NumTensor", "Delta"]
 
@@ -44,7 +44,7 @@ class Fermion(BaseTensor):
         assert(spin in ['A', 'B'])
         assert(cre in [True, False])
         self.nidx = 1
-        self.symm = symm.IdxNoSymm(0)
+        self.symm = symmetry.IdxNoSymm(1)
         self.spin = spin
         self.cre = cre
         self.set_idx(idx)
@@ -92,7 +92,7 @@ class NumTensor(BaseTensor):
         else:
             raise Exception("One of idx and nidx must be provided")
         if symm is None:
-            self.symm = symm.IdxNoSymm(self.nidx)
+            self.symm = symmetry.IdxNoSymm(self.nidx)
         else:
             self.symm = symm
         self.name = name
@@ -124,7 +124,7 @@ class NumTensor(BaseTensor):
 class Delta(BaseTensor):
     def __init__(self, idx = None):
         self.nidx = 2
-        self.symm = symm.IdxSymm()
+        self.symm = symmetry.IdxSymm()
         self.set_idx(idx)
 
     def dn(self):
@@ -154,5 +154,5 @@ if __name__ == "__main__":
     log.result("This is a delta function, %s", Delta('ij'))
     log.result("Is %s equal to %s? %s", Delta('ij'), \
             Delta('ji'), Delta('ij') == Delta('ji'))
-    w = NumTensor('w', 'ijkl', symm = symm.Idx8FoldSymm())
+    w = NumTensor('w', 'ijkl', symm = symmetry.Idx8FoldSymm())
     log.result("8-fold symmetry of (ij||kl):\n%s", w.equiv())
