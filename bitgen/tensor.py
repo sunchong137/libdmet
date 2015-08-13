@@ -1,8 +1,16 @@
 import numpy as np
 import libdmet.utils.logger as log
 from copy import deepcopy
+import tensor_symm as symm
 
-__all__ = ["BaseTensor", "fermion", "num_tensor", "delta"]
+__all__ = ["BaseTensor", "Fermion", "NumTensor", "Delta"]
+
+def isidx(i):
+    # an index should be a lower case letter, eg. i,j,k,l, ...
+    return len(i) == 1 and 'a' <= i and i <= 'z'
+
+def isindices(indices):
+    return reduce(lambda a,b: a and b, map(isidx, indices), True)
 
 class BaseTensor(object):
     # the base class for all tensors
@@ -13,23 +21,30 @@ class BaseTensor(object):
         else:
             self.idx = None
 
+    def replace_idx(self, idx, new_idx):
+        if idx in self.idx:
+            self.set_idx([new_idx if x == idx else x for x in list(self.idx)])
+
     def rm_idx(self):
         # remove index to get the base type of the operator
         self.idx = None
 
-def isidx(i):
-    # an index should be a lower case letter, eg. i,j,k,l, ...
-    return len(i) == 1 and 'a' <= i and i <= 'z'
+    def equiv(self):
+        equivs = []
+        for idx in self.symm.symm(self.idx):
+            tensor1 = deepcopy(self)
+            tensor1.set_idx(idx)
+            equivs.append(tensor1)
+        return equivs
+            
 
-def isindices(indices):
-    return reduce(lambda a,b: a and b, map(isidx, indices), True)
-
-class fermion(BaseTensor):
+class Fermion(BaseTensor):
     # a single fermion creation / destruction operator
     def __init__(self, cre, spin, idx = None):
-        self.nidx = 1
         assert(spin in ['A', 'B'])
         assert(cre in [True, False])
+        self.nidx = 1
+        self.symm = symm.IdxNoSymm(0)
         self.spin = spin
         self.cre = cre
         self.set_idx(idx)
@@ -45,7 +60,7 @@ class fermion(BaseTensor):
         return s * self.dn()
 
     def conj(self):
-        return fermion(not self.cre, self.spin, self.idx)
+        return Fermion(not self.cre, self.spin, self.idx)
 
     def replace_idx(self, idx, new_idx):
         if self.idx[0] == idx:
@@ -56,7 +71,7 @@ class fermion(BaseTensor):
 
     def __eq__(self, other):
         return self.spin == other.spin and self.cre == other.cre \
-                and self.idx == other.idx
+                and other.idx in self.symm.symm(self.idx)
 
     def __repr__(self):
         if self.cre:
@@ -68,14 +83,18 @@ class fermion(BaseTensor):
             s += "(%s)" % self.idx
         return s
 
-class num_tensor(BaseTensor):
-    def __init__(self, name, idx = None, nidx = None):
+class NumTensor(BaseTensor):
+    def __init__(self, name, idx = None, nidx = None, symm = None):
         if nidx is not None:
             self.nidx = nidx
         elif idx is not None:
             self.nidx = len(idx)
         else:
             raise Exception("One of idx and nidx must be provided")
+        if symm is None:
+            self.symm = symm.IdxNoSymm(self.nidx)
+        else:
+            self.symm = symm
         self.name = name
         self.set_idx(idx)
 
@@ -88,16 +107,13 @@ class num_tensor(BaseTensor):
     def conj(self):
         return deepcopy(self)
 
-    def replace_idx(self, idx, new_idx):
-        if idx in self.idx:
-            self.set_idx([new_idx if x == idx else x for x in list(self.idx)])
-
     def __hash__(self):
         return hash((self.name, self.nidx, self.idx))
 
     def __eq__(self, other):
+        # FIXME do we require the have the same symm class?
         return self.name == other.name and self.nidx == other.nidx \
-                and self.idx == other.idx
+                and other.idx in self.symm.symm(self.idx)
 
     def __repr__(self):
         s = self.name
@@ -105,21 +121,11 @@ class num_tensor(BaseTensor):
             s += "(" + ",".join(self.idx) + ")"
         return s
 
-class delta(BaseTensor):
+class Delta(BaseTensor):
     def __init__(self, idx = None):
         self.nidx = 2
+        self.symm = symm.IdxSymm()
         self.set_idx(idx)
-
-    def set_idx(self, idx):
-        if idx is not None:
-            assert(len(idx) == self.nidx and isindices(idx))
-            self.idx = set(idx)
-        else:
-            self.idx = None
-
-    def replace_idx(self, idx, new_idx):
-        if idx in self.idx:
-            self.set_idx([new_idx if x == idx else x for x in list(self.idx)])
 
     def dn(self):
         return 0
@@ -134,10 +140,19 @@ class delta(BaseTensor):
         return hash(self.idx)
 
     def __eq__(self, other):
-        return self.idx == other.idx
+        return other.idx in self.symm.symm(self.idx)
 
     def __repr__(self):
-        s = "delta"
+        s = "Delta"
         if self.idx is not None:
-            s += "(%s,%s)" % tuple(sorted(self.idx))
+            s += "(%s,%s)" % (self.idx)
         return s
+
+if __name__ == "__main__":
+    log.section("tensor.py: defines the basic tensor types")
+    log.result("This is a fermion creation operator, %s", Fermion(True, 'A', 'i'))
+    log.result("This is a delta function, %s", Delta('ij'))
+    log.result("Is %s equal to %s? %s", Delta('ij'), \
+            Delta('ji'), Delta('ij') == Delta('ji'))
+    w = NumTensor('w', 'ijkl', symm = symm.Idx8FoldSymm())
+    log.result("8-fold symmetry of (ij||kl):\n%s", w.equiv())
