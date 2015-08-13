@@ -8,15 +8,13 @@ import numpy.linalg as la
 import itertools as it
 import libdmet.utils.logger as log
 from libdmet.utils.misc import mdot
+from libdmet.routine.bcs_helper import extractRdm
 from scipy.optimize import minimize
 
 # thermal occupation
 # input in kspace
 # return density matrices in kspace, chemical potential
 
-
-def linearFit():
-    pass
 
 def DiagRHF(Fock, vcor):
     ncells = Fock.shape[0]
@@ -51,14 +49,14 @@ def DiagBdG(Fock, vcor, mu):
     nscsites = Fock.shape[1]
     ew = np.empty((ncells, nscsites * 2))
     ev = np.empty((ncells, nscsites * 2, nscsites * 2), dtype = complex)
-    temp = np.empty(nscsites * 2, nscsites * 2)
+    temp = np.empty((nscsites * 2, nscsites * 2), dtype = complex)
 
     for i in range(ncells):
-        temp[:nscsites, :nscsites] = Fock[0][i] + vcor.get(i, True)[0] - mu * np.eye(nscsites)
-        temp[nscsites:, nscsites:] = -H1[1][i] - vcor.get(i, True)[1] + mu * np.eye(nscsites)
+        temp[:nscsites, :nscsites] = Fock[i] + vcor.get(i, True)[0] - mu * np.eye(nscsites)
+        temp[nscsites:, nscsites:] = -Fock[i] - vcor.get(i, True)[1] + mu * np.eye(nscsites)
         temp[:nscsites, nscsites:] = vcor.get(i, True)[2]
         temp[nscsites:, :nscsites] = vcor.get(i, True)[2].T
-        ew[i], ev[i] = la.eigh(temp[i])
+        ew[i], ev[i] = la.eigh(temp)
     return ew, ev
 
 def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
@@ -77,7 +75,6 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
 
     ew_sorted = np.sort(np.ravel(ew))
     ewocc, mu, nerr = assignocc(ew, nelec, beta, mu0)
-
     rho = np.empty_like(ev)
     rhoT = np.empty_like(rho)
     for i in range(rho.shape[0]):  # spin
@@ -105,14 +102,62 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
         if vcor.islocal():
             E += 0.5 * np.sum(vcorT[0] * rhoT[0][0] + vcorT[1] * rhoT[1][0])
         else:
-            E += 0.5 * np.sum(vcorT[:,0,:,:] * rhoT[0] + vcorT[:,1,:,:] * rhoT[1])
-
+            E += 0.5 * np.sum(vcorT[:,0] * rhoT[0] + vcorT[:,1] * rhoT[1])
     if ires:
         homo, lumo = filter(lambda x: x <= mu, ew_sorted)[-1], filter(lambda x: x >= mu, ew_sorted)[0]
         res = {"gap": lumo - homo, "e": ew, "coef": ev, "nerr": nerr}
         return rhoT, mu, E, res
     else:
         return rhoT, mu, E
+
+def HFB(lattice, vcor, restricted, mu = 0., beta = np.inf, ires = False):
+    log.eassert(beta >= 0, "beta cannot be negative")
+    Fock = lattice.getFock(kspace = True)
+    if restricted:
+        log.error("restricted Hartree-Fock-Bogoliubov not implemented")
+    else:
+        log.debug(1, "unrestricted Hartree-Fock-Bogoliubov")
+        ew, ev = DiagBdG(Fock, vcor, mu)
+
+    ewocc = 1 * (ew < 0.)
+    #nocc = np.sum(ewocc)
+    # FIXME should it be a warning or an error?
+    #log.check(nocc*2 == ew.size, \
+    #        "number of negative and positive modes are not equal," \
+    #        "the difference is %d, this means total spin on lattice is nonzero", \
+    #        nocc*2 - ew.size)
+
+    GRho = np.empty_like(ev) # k-space
+    GRhoT = np.empty_like(GRho) # real space
+    for i in range(GRho.shape[0]): # kpoints
+        GRho[i] = mdot(ev[i], np.diag(ewocc[i]), ev[i].T.conj())
+    GRhoT = lattice.FFTtoT(GRho)
+
+    if np.allclose(GRhoT.imag, 0.):
+        GRhoT = GRhoT.real
+
+    FockT, H1T = lattice.getFock(kspace = False), lattice.getH1(kspace = False)
+    if vcor.islocal():
+        vcorT = vcor.get(0, kspace = False)
+    else:
+        vcorT = np.asarray(map(lambda i: vcor.get(i, kspace = False), range(lattice.ncells)))
+
+    rhoTA, rhoTB, kappaTBA = np.swapaxes(np.asarray(map(extractRdm, GRhoT)), 0, 1)
+
+    n = np.trace(rhoTA[0]) + np.trace(rhoTB[0])
+    E = 0.5 * np.sum((FockT+H1T) * (rhoTA + rhoTB))
+    if vcor.islocal():
+        E += 0.5 * np.sum(vcorT[0] * rhoTA[0] + vcorT[1] * rhoTB[0] + \
+                2 * vcorT[2] * kappaTBA[0])
+    else:
+        E += 0.5 * np.sum(vcorT[:,0] * rhoTA + vcorT[:,1] * rhoTB + \
+                2 * vcorT[:,2] * kappaTBA)
+
+    if ires:
+        res = {"gap": np.min(abs(ew)), "e": ew, "coef": ev}
+        return GRhoT, n, E, res
+    else:
+        return GRhoT, n, E
 
 def fermi(e, mu, beta):
     return 1./(1.+np.exp(beta * (e-mu)))

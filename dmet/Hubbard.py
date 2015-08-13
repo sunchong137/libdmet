@@ -13,7 +13,8 @@ def RHartreeFock(Lat, v, filling, mu0):
 
 def HartreeFock(Lat, v, filling, mu0):
     rho, mu, E, res = HF(Lat, v, filling, False, mu0 = mu0, beta = np.inf, ires = True)
-    log.result("Local density matrix (mean-field):\n%s\n%s", rho[0][0], rho[1][0])
+    log.result("Local density matrix (mean-field): alpha and beta\n%s\n%s", \
+            rho[0][0], rho[1][0])
     log.result("Chemical potential (mean-field) = %20.12f", mu)
     log.result("Energy per site (mean-field) = %20.12f", E/Lat.supercell.nsites)
     log.result("Gap (mean-field) = %20.12f" % res["gap"])
@@ -23,6 +24,7 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     spin = rhoEmb.shape[0]
     nscsites = basis.shape[2]
     rhoImp, Efrag, nelec = slater.transformResults(rhoEmb, E, basis, ImpHam, H1e)
+    log.debug(1, "impurity density matrix:\n%s", rhoImp)
     if Efrag is None:
         return nelec/nscsites
     else:
@@ -36,18 +38,19 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
 
 def apply_dmu(lattice, ImpHam, basis, dmu):
     nscsites = lattice.supercell.nsites  
+    nbasis = basis.shape[-1]
     if ImpHam.restricted:
         ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
     else:
         ImpHam.H1["cd"][0] -= transform_imp(basis[0], lattice, dmu * np.eye(nscsites))
         ImpHam.H1["cd"][1] -= transform_imp(basis[1], lattice, dmu * np.eye(nscsites))
-    ImpHam.H0 += dmu * nscsites * 2
+    ImpHam.H0 += dmu * nbasis
     return ImpHam
 
 def SolveImpHam_with_dmu(lattice, ImpHam, basis, dmu, solver, solver_args = {}):
     # H = H1 + Vcor - Mu
     # to keep H for mean-field Mu->Mu+dMu, Vcor->Vcor+dMu
-    # In impurity Ham, equivalent to substracting dMu from impurity, but not bath
+    # In impurity Ham, equivalent to subtracting dMu from impurity, but not bath
     # The evaluation of energy is not affected if using (corrected) ImpHam-dMu
     # alternatively, we can change ImpHam.H0 to compensate
     ImpHam = apply_dmu(lattice, ImpHam, basis, dmu)
@@ -89,16 +92,21 @@ def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, solver, \
             ImpHam = apply_dmu(lattice, ImpHam, basis, delta1)
             return rhoEmb2, EnergyEmb2, ImpHam, delta1
 
-def AFInitGuess(ImpSize, U, Filling, polar = None):
+def AFInitGuess(ImpSize, U, Filling, polar = None, bogoliubov = False, rand = 0.):
     subA, subB = BipartiteSquare(ImpSize)
     nscsites = len(subA) + len(subB)    
-    v = VcorLocal(False, False, nscsites)
     shift = U * Filling
     if polar is None:
         polar = shift * Filling
     init_v = np.eye(nscsites) * shift
     init_p = np.diag(map(lambda s: polar if s in subA else -polar, range(nscsites)))
-    v.assign(np.asarray([init_v+init_p, init_v-init_p]))
+    v = VcorLocal(False, bogoliubov, nscsites)
+    if bogoliubov:
+        np.random.seed(32499823)
+        init_d = (np.random.rand(nscsites, nscsites) - 0.5) * rand
+        v.assign(np.asarray([init_v+init_p, init_v-init_p, init_d]))
+    else:
+        v.assign(np.asarray([init_v+init_p, init_v-init_p]))
     return v
 
 def addDiag(v, scalar):
@@ -180,7 +188,7 @@ def VcorLocal(restricted, bogoliubov, nscsites):
                 self.grad = g
             return self.grad
 
-    else:
+    else: # not restricted and bogoliubov
         def evaluate(self):
             log.eassert(self.param.shape == (nV+nD,), "wrong parameter shape, require %s", (nV+nD,))
             V = np.zeros((3, nscsites, nscsites))
@@ -207,4 +215,4 @@ def VcorLocal(restricted, bogoliubov, nscsites):
     v.length = types.MethodType(lambda self: nV+nD, v)
     return v
 
-FitVcor = FitVcorTwoStep
+FitVcor = slater.FitVcorTwoStep

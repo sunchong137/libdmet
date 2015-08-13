@@ -1,5 +1,5 @@
 import libdmet.utils.logger as log
-import libdmet.dmet.Hubbard as dmet
+import libdmet.dmet.HubbardBCS as dmet
 import numpy as np
 import numpy.linalg as la
 
@@ -15,50 +15,50 @@ DiisStart = 4
 TraceStart = 2
 DiisDim = 4
 
-ntotal = Filling * np.product(LatSize)
-if ntotal - int(ntotal) > 1e-5:
-    log.warning("rounded total number of electrons to integer %d", int(ntotal))
-    Filling = float(int(ntotal)) / np.product(LatSize)
-
 Lat = dmet.SquareLattice(*(LatSize + ImpSize))
 Ham = dmet.Ham(Lat, U)
 Lat.setHam(Ham)
 
-vcor = dmet.AFInitGuess(ImpSize, U, Filling)
+vcor = dmet.AFInitGuess(ImpSize, U, Filling, rand = 0.001)
 Mu = U * Filling
-dc = dmet.FDiisContext(DiisDim)
+dc = dmet.FDiisContext(DiisDim) # I don't know yet whether diis needs to be changed
 
 conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.Block(nproc = 2, nnode = 1, tol = 1e-6)
+solver = dmet.impurity_solver.Block(nproc = 4, nnode = 1, \
+        bcs = True, reorder = True, tol = 1e-6)
+
+log.section("\nfitting chemical potential\n")
+_, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu)
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
 
-    log.section("\nsolving mean-field problem\n")
+    log.section ("\nsolving mean-field problem\n")
     log.result("Vcor =\n%s", vcor.get())
     log.result("Mu (guess) = %20.12f", Mu)
+    GRho, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, None, Mu)
 
-    rho, Mu = dmet.HartreeFock(Lat, vcor, Filling, Mu)
     log.section("\nconstructing impurity problem\n")
-    ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
+    ImpHam, H_energy, basis = dmet.ConstructImpHam(Lat, GRho, vcor, Mu)
+
     log.section("\nsolving impurity problem\n")
-    rhoEmb, EnergyEmb, ImpHam, dmu = \
+    GRhoEmb, EnergyEmb, ImpHam, dmu = \
             dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver, \
             solver_args = {"M": 400})
     Mu += dmu
     vcor = dmet.addDiag(vcor, dmu)
-    rhoImp, EnergyImp, nelecImp = \
-            dmet.transformResults(rhoEmb, EnergyEmb, basis, ImpHam, H1e)
+    GRhoImp, EnergyImp, nelecImp = \
+            dmet.transformResults(GRhoEmb, EnergyEmb, basis, ImpHam, H_energy)
 
     log.section("\nfitting correlation potential\n")
-    vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, \
-            vcor, np.inf, Filling, MaxIter2 = 0)
+    vcor_new, err = dmet.FitVcor(GRhoEmb, Lat, basis, vcor, Mu, \
+            MaxIter1 = 200, MaxIter2 = 0)
 
     log.section("\nfitting chemical potential\n")
-    rho, Mu_new = dmet.HartreeFock(Lat, vcor_new, Filling, Mu)
+    GRho, Mu_new = dmet.HartreeFockBogoliubov(Lat, vcor_new, Filling, Mu)
     log.result("dMu = %20.12f", Mu_new - Mu)
     if iter >= TraceStart: # we want to avoid spiral increase of vcor and mu
         log.result("dMu applied to vcor")
@@ -72,7 +72,7 @@ for iter in range(MaxIter):
     if np.max(abs(vcor.get() - vcor_new.get())) < 1e-5:
         conv = True
         break
-    # DIIS
+
     if not conv:
         skipDiis = (iter < DiisStart) and (la.norm(vcor_new.param - vcor.param) > 0.01)
         pvcor, _, _ = dc.Apply(vcor_new.param, \

@@ -1,7 +1,6 @@
 from libdmet.system.lattice import ChainLattice, SquareLattice, CubicLattice, HoneycombLattice, BipartiteSquare
 from libdmet.system.hamiltonian import HubbardHamiltonian as Ham
 from libdmet.routine import vcor, slater
-from libdmet.routine.slater import FitVcorTwoStep
 from libdmet.routine.mfd import HF
 from libdmet.routine.diis import FDiisContext
 import libdmet.utils.logger as log
@@ -53,11 +52,6 @@ def ConstructImpHam(Lat, rho, v, matching = True, local = True, split = False, *
     ImpHam, H1e = slater.embHam(Lat, basis, v, local = local, **kwargs)
 
     return ImpHam, H1e, basis
-
-def foldRho(rho, Lat, basis):
-    spin = rho.shape[0]
-    return np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], \
-            Lat, rho[s]), range(spin)))
 
 def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     spin = rhoEmb.shape[0]
@@ -160,7 +154,8 @@ def VcorLocalPhSymm(U, bogoliubov, subA, subB):
     return v
 
 def FitVcor(rho, lattice, basis, vcor, beta, MaxIter1 = 300, MaxIter2 = 20):
-    return FitVcorTwoStep(rho, lattice, basis, vcor, beta, 0.5, MaxIter1, MaxIter2)
+    return slater.FitVcorTwoStep(rho, lattice, basis, vcor, beta, 0.5, \
+            MaxIter1, MaxIter2)
 
 class IterHistory(object):
     def __init__(self):
@@ -174,3 +169,5 @@ class IterHistory(object):
         for idx, item in enumerate(self.history):
             log.result(" %3d %20.12f %20.12f %20.12f %20.12f  %2d %2d", idx, *item)
         log.result("")
+
+foldRho = slater.foldRho

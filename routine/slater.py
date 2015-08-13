@@ -36,7 +36,7 @@ def normalizeBasis1(b):
     return np.tensordot(b, norms, axes = (2,0))
 
 def orthonormalizeBasis(b):
-    nbasis = b.shape[2]
+    nbasis = b.shape[-1]
     ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
     log.debug(1, "basis overlap is\n%s", ovlp)
     if np.allclose(ovlp - np.diag(np.diag(ovlp)), 0.):
@@ -68,7 +68,7 @@ def getNonDiagBlocks(mat):
     return map(lambda b: sorted(list(b)), blocks)
 
 def orthonormalizeBasisPHsymm(b):
-    nbasis = b.shape[2]
+    nbasis = b.shape[-1]
     ovlp = np.tensordot(b, b, axes = ((0,1), (0,1)))
     log.debug(1, "basis overlap is\n%s", ovlp)
     if np.allclose(ovlp - np.eye(nbasis), 0.):
@@ -99,10 +99,7 @@ def __embBasis_proj(lattice, rho, **kwargs):
     basis = np.zeros((spin, ncells, nscsites, nscsites * 2))
     for s in range(spin):
         A = MatSqrt(rho[s,0])
-        #B1 = np.swapaxes(rho[s,1:], 0, 1).reshape((nscsites, -1))
-        #B1 = np.dot(la.inv(A), B1).T
-        #B1 = normalizeBasis(B1)
-        B = np.swapaxes(np.tensordot(la.inv(A), rho[s], axes = (1,1)), 0, 1)[1:]
+        B = np.swapaxes(np.tensordot(la.inv(A), rho[s, 1:], axes = (1,1)), 0, 1)
         B = np.swapaxes(B, 1, 2)
         B = orthonormalizeBasis(B)
         basis[s, 0, :, :nscsites] = np.eye(nscsites)
@@ -139,14 +136,14 @@ def embHam(lattice, basis, vcor, local = True, **kwargs):
     Int2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
 
     spin = basis.shape[0]
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     return integral.Integral(nbasis, spin == 1, False, 0, {"cd": Int1e}, {"ccdd": Int2e}), {"cd": Int1e_energy}
 
 def __embHam1e(lattice, basis, vcor, **kwargs):
     log.eassert(vcor.islocal(), "nonlocal correlation potential cannot be treated in this routine")
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     latFock = lattice.getFock(kspace = False)
     latH1 = lattice.getH1(kspace = False)
     ImpJK = lattice.getImpJK()
@@ -160,7 +157,7 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
         log.debug(1, "transform Fock")
         H1[s] = transform_trans_inv_sparse(basis[s], lattice, latFock)
         # then add Vcor only in environment
-        # need to substract impurity contribution
+        # need to subtract impurity contribution
         log.debug(1, "transform Vcor")
         H1[s] += transform_local(basis[s], lattice, vcor.get()[s])
 
@@ -168,7 +165,7 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
             # for fitting purpose, we need H1 with vcor on impurity
             H1[s] -= transform_imp(basis[s], lattice, vcor.get()[s])
 
-        # substract impurity Fock if necessary
+        # subtract impurity Fock if necessary
         # i.e. rho_kl[2(ij||kl)-(il||jk)] where i,j,k,l are all impurity
         if ImpJK is not None:
             log.debug(1, "transform impurity JK")
@@ -181,7 +178,7 @@ def __embHam1e(lattice, basis, vcor, **kwargs):
 
 def __embHam2e(lattice, basis, vcor, local, **kwargs):
     nscsites = lattice.supercell.nsites
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     spin = basis.shape[0]
 
     if "mmap" in kwargs.keys() and kwargs["mmap"]:
@@ -208,9 +205,14 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
                 basis[1,0], basis[1,0])
     return H2
 
+def foldRho(rho, Lat, basis):
+    spin = rho.shape[0]
+    return np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], \
+            Lat, rho[s]), range(spin)))
+
 def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
     spin = basis.shape[0]
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     nscsites = lattice.supercell.nsites
     nelec = nscsites * spin
 
@@ -233,6 +235,11 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
 
         return la.norm(rho - rho1) / sqrt(spin)
 
+    dV_dparam = np.empty((vcor.length(), spin, nbasis, nbasis))
+    for s in range(spin):
+        for ip in range(vcor.length()):
+            dV_dparam[ip, s] = transform_local_sparseH(basis[s], lattice, vcor.gradient()[ip,s])
+
     def gradfunc(param):
         # analytic gradient for beta = np.inf and local basis
         vcor.update(param)
@@ -253,8 +260,6 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
         # drho_ij/dV_ij
         drho_dV = np.empty((spin, nbasis, nbasis, nbasis, nbasis))
         dnorm_dV = np.empty((spin, nbasis, nbasis))
-        dV_dparam = np.zeros((vcor.length(), spin, nbasis, nbasis))
-        level_shift = 0.
         for s in range(spin):
             c_jln = np.einsum("jn,ln->jln", evocc[s], evocc[s])
             c_ikm = np.einsum("im,km->ikm", evvirt[s], evvirt[s])
@@ -264,8 +269,6 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
             drho_dV[s] += np.swapaxes(np.swapaxes(drho_dV[s], 0, 1), 2, 3)
             dnorm_dV[s] = np.tensordot(rho1[s]-rho[s], drho_dV[s], axes = ((0,1),(0,1))) \
                 / val / sqrt(spin)
-            for ip in range(vcor.length()):
-                dV_dparam[ip, s] = transform_local_sparseH(basis[s], lattice, vcor.gradient()[ip,s])
         # now only indices kl
         return np.tensordot(dV_dparam, dnorm_dV, axes = ((1,2,3), (0,1,2)))
     
@@ -280,7 +283,7 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
 
 def FitVcorFull(rho, lattice, basis, vcor, beta, filling, MaxIter = 20, **kwargs):
     spin = basis.shape[0]
-    nbasis = basis.shape[3]
+    nbasis = basis.shape[-1]
     rho1 = np.empty((spin, nbasis, nbasis))
 
     def errfunc(param):
@@ -289,8 +292,7 @@ def FitVcorFull(rho, lattice, basis, vcor, beta, filling, MaxIter = 20, **kwargs
         log.verbose = "RESULT"
         rhoT, _, _ = HF(lattice, vcor, filling, spin == 1, mu0 = 0., beta = beta)
         log.verbose = verbose
-        for s in range(spin):
-            rho1[s] = transform_trans_inv_sparse(basis[s], lattice, rhoT[s], thr = 1e-6)
+        rho1 = foldRho(rhoT, lattice, basis)
         return la.norm(rho - rho1) / sqrt(spin)
     
     err_begin = errfunc(vcor.param)
@@ -305,13 +307,13 @@ def FitVcorTwoStep(rho, lattice, basis, vcor, beta, filling, MaxIter1 = 300, Max
         log.info("Impurity model stage  max %d steps", MaxIter1)
         vcor_new, err_begin, err_end = FitVcorEmb(rho, lattice, basis, vcor_new, beta, \
             MaxIter = MaxIter1, serial = True)
-        log.result("residue(begin) = %20.12f", err_begin)
-        log.info("residue(end)   = %20.12f", err_end)
+        log.result("residue (begin) = %20.12f", err_begin)
+        log.info("residue (end)   = %20.12f", err_end)
     if MaxIter2 > 0:
         log.info("Full lattice stage  max %d steps", MaxIter2)
         vcor_new, _, err_end = FitVcorFull(rho, lattice, basis, vcor_new, beta, \
             filling, MaxIter = MaxIter2)
-    log.result("residue(end)   = %20.12f", err_end)
+    log.result("residue (end)   = %20.12f", err_end)
     return vcor_new, err_begin
 
 def transformResults(rhoEmb, E, basis, ImpHam, H1e):

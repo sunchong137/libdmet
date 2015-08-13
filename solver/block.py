@@ -356,19 +356,28 @@ class Block(object):
         return tuple(results)
 
     def onepdm(self):
+        norb = self.integral.norb
         if self.spinRestricted:
             rho = read1pdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
-            rho = rho.reshape((1, self.integral.norb, self.integral.norb))
+            rho = rho.reshape((1, norb, norb))
         else:
             rho0 = read1pdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
-            rho = np.empty((2, self.integral.norb, self.integral.norb))
+            rho = np.empty((2, norb, norb))
             rho[0] = rho0[::2, ::2]
             rho[1] = rho0[1::2, 1::2]
         if self.bogoliubov:
             kappa = read1pdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
             if self.spinRestricted:
                 kappa = (kappa + kappa.T) / 2
-            return (rho, kappa)
+            GRho = np.zeros((norb*2, norb*2))
+            GRho[:norb, :norb] = rho[0]
+            GRho[norb:, :norb] = -kappa.T
+            GRho[:norb, norb:] = -kappa
+            if self.spinRestricted:
+                GRho[norb:, norb:] = np.eye(norb) - rho[0]
+            else:
+                GRho[norb:, norb:] = np.eye(norb) - rho[1]
+            return GRho
         else:
             return rho
 

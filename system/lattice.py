@@ -151,7 +151,7 @@ class Lattice(object):
     def add(self, i, j):
         return self.cell_pos2idx(self.cell_idx2pos(i) + self.cell_idx2pos(j))
 
-    def substract(self, i, j):
+    def subtract(self, i, j):
         return self.cell_pos2idx(self.cell_idx2pos(i) - self.cell_idx2pos(j))
     """
     functions on matrices in the system
@@ -288,7 +288,7 @@ class Indexer(object):
     def add(self, i, j):
         return self.pos2idx(self.idx2pos(i) + self.idx2pos(j))
 
-    def substract(self, i, j):
+    def subtract(self, i, j):
         return self.pos2idx(self.idx2pos(i) - self.idx2pos(j))
 
 if __name__ == "__main__":

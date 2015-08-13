@@ -18,3 +18,11 @@ def mdot(*args):
 
 def find(x, l):
     return [i for i, v in enumerate(l) if v == x]
+
+def counted(fn):
+    def wrapper(*args, **kwargs):
+        wrapper.count+= 1
+        return fn(*args, **kwargs)
+    wrapper.count= 0
+    wrapper.__name__= fn.__name__
+    return wrapper
