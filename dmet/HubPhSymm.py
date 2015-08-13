@@ -5,6 +5,7 @@ from libdmet.routine.mfd import HF
 from libdmet.routine.diis import FDiisContext
 import libdmet.utils.logger as log
 from libdmet.solver import impurity_solver
+from libdmet.utils.misc import mdot
 import types
 import numpy as np
 import numpy.linalg as la
@@ -32,24 +33,53 @@ def basisMatching(basis):
     basisB = np.tensordot(basisB, vt, axes = (2, 1))
     return np.asarray([basisA, basisB])
 
-def ConstructImpHam(Lat, rho, v, matching = True, local = True, split = False, **kwargs):
+def afqmc_symmetrize(lattice, basis, h):
+    nbasis = basis.shape[-1]
+    nscsites = lattice.supercell.nsites
+    nbath = nbasis - nscsites
+    ewA, evA = la.eigh(h[0, -nbath:,-nbath:])
+    ewB, evB = la.eigh(h[1, -nbath:,-nbath:])
+    #log.check(la.norm(ewA + ewB[::-1]) < 1e-7, \
+    #        "bath spectra violate particle-hole symmetry")
+    log.debug(1, "bath spectra\n%s\n%s", ewA, ewB)
+    for i in range(nbath-1):
+        if abs(ewA[i] - ewA[i+1]) < 1e-7:
+            log.warning("energy spectra degenerate, may have sign problem")
+    basis[0,:,:,nscsites:] = np.tensordot(basis[0,:,:,nscsites:], evA, axes = (2, 0))
+    basis[1,:,:,nscsites:] = np.tensordot(basis[1,:,:,nscsites:], evB[:,::-1], axes = (2,0))
+    rot = np.zeros((nbasis,nbasis))
+    rot[:nscsites, :nscsites] = np.eye(nscsites)
+    rot[nscsites:, nscsites:] = evA
+    h[0] = mdot(rot.T, h[0], rot)
+    rot[nscsites:, nscsites:] = evB[:,::-1]
+    h[1] = mdot(rot.T, h[1], rot)
+    return basis, h
+
+def ConstructImpHam(Lat, rho, v, afqmc = False, matching = True, local = True, \
+        split = False, **kwargs):
     log.result("Making embedding basis")
     basis = slater.embBasis(Lat, rho, local = local)
-    if matching and basis.shape[0] == 2:
-        log.result("Rotate bath orbitals to match alpha and beta basis")
-        nscsites = Lat.supercell.nsites
-        if local:
-            basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
-        else:
-            # split matching occ and virt
-            if split:
-                basis[:, :, :, :nscsites] = basisMatching(basis[:, :, :, :nscsites])
+    if afqmc:
+        log.result("Constructing impurity Hamiltonian")
+        ImpHam, H1e = slater.embHam(Lat, basis, v, local = True, **kwargs)
+        log.info("rotate bath orbitals to achieve particle-hole symmetry")
+        basis, ImpHam.H1["cd"] = afqmc_symmetrize(Lat, basis, ImpHam.H1["cd"])
+    else:
+        if matching and basis.shape[0] == 2:
+            log.result("Rotate bath orbitals to match alpha and beta basis")
+            nscsites = Lat.supercell.nsites
+            if local:
                 basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
             else:
-                basis = basisMatching(basis)
+                # split matching occ and virt
+                if split:
+                    basis[:, :, :, :nscsites] = basisMatching(basis[:, :, :, :nscsites])
+                    basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+                else:
+                    basis = basisMatching(basis)
             
-    log.result("Constructing impurity Hamiltonian")
-    ImpHam, H1e = slater.embHam(Lat, basis, v, local = local, **kwargs)
+        log.result("Constructing impurity Hamiltonian")
+        ImpHam, H1e = slater.embHam(Lat, basis, v, local = local, **kwargs)
 
     return ImpHam, H1e, basis
 
