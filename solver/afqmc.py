@@ -13,7 +13,7 @@ def dumpH1(filename, H1):
     spin = H1.shape[0]
     log.eassert(spin == 2, "not implemented for restricted calculations")
     nsites = H1.shape[1]
-    eta = 1e-16
+    eta = 1e-12
     nH1 = map(lambda s: np.sum(abs(H1[s]) > eta), range(spin))
     log.check(nH1[0] == nH1[1], "number of nonzero elements in alpha hopping matrix"
             "does not equal to that in beta hopping matrix!")
@@ -128,7 +128,10 @@ class AFQMC(object):
         for f in os.listdir(self.tmpDir):
             if f.endswith(".dat"):
                 os.remove(os.path.join(self.tmpDir, f))
-        dumpH1(os.path.join(self.tmpDir, "latt_param.dat"), Ham.H1["cd"])
+        h = copy.deepcopy(Ham.H1["cd"])
+        for i in range(norbs):
+            h[:,i,i] += 0.5 * Ham.H2["ccdd"][2,i,i,i,i]
+        dumpH1(os.path.join(self.tmpDir, "latt_param.dat"), h)
         dumpH2(os.path.join(self.tmpDir, "model_param.dat"), Ham.H2["ccdd"])
         dumpOptions(os.path.join(self.tmpDir, "method_param.dat"), settings)
         outputfile = self.callAFQMC()
@@ -164,6 +167,7 @@ class AFQMC(object):
                 sub.check_call(["mpirun", "-np", "%d" % (AFQMC.nproc * AFQMC.nnode), \
                         os.path.join(AFQMC.execPath, "afqmc")], stdout = f)
         self.count += 1
+        os.chdir(cwd)
         return outputfile
 
     def cleanup(self):
