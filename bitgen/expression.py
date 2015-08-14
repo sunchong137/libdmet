@@ -1,10 +1,10 @@
 from tensor import *
 import numpy as np
+import itertools as it
 from copy import deepcopy
 import libdmet.utils.logger as log
 
 # for simplicity, we have product before sum, not the otherway around
-__all__ = ["OpProduct", "OpSum"]
 
 class OpProduct(object):
     # operator strings
@@ -120,6 +120,8 @@ def equiv(ops1, ops2):
 
 class OpSum(list):
     def __init__(self, op_terms):
+        if not hasattr(op_terms, "__iter__"):
+            op_terms = [op_terms]
         list.__init__(self, filter(lambda term: term is not None, \
                 map(self._format, op_terms)))
 
@@ -135,6 +137,8 @@ class OpSum(list):
                 return None
             assert(isinstance(ops, OpProduct))
             return tuple(term)
+        else:
+            raise Exception("cannot determine term type")
     
     def append(self, term):
         list.append(self, _format(term))
@@ -148,6 +152,19 @@ class OpSum(list):
 
     def __add__(self, other):
         return OpSum(list.__add__(self, other))
+
+    def __mul__(self, other):
+        return OpSum(map(lambda ((fac1, ops1), (fac2, ops2)): \
+                (fac1*fac2, ops1*ops2), it.product(self, other)))
+
+    def __rmul__(self, scalar):
+        return OpSum([(fac*scalar, ops) for (fac, ops) in self])
+
+    def __neg__(self):
+        return OpSum([(-fac, ops) for (fac, ops) in self])
+
+    def __sub__(self, other):
+        return self + (-other)
 
     def conj(self):
         return OpSum(map(lambda (factor, term): \
