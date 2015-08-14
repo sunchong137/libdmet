@@ -33,7 +33,7 @@ def basisMatching(basis):
     basisB = np.tensordot(basisB, vt, axes = (2, 1))
     return np.asarray([basisA, basisB])
 
-def afqmc_symmetrize(lattice, basis, h):
+def afqmc_symmetrize(lattice, basis, h, h1e):
     nbasis = basis.shape[-1]
     nscsites = lattice.supercell.nsites
     nbath = nbasis - nscsites
@@ -51,9 +51,11 @@ def afqmc_symmetrize(lattice, basis, h):
     rot[:nscsites, :nscsites] = np.eye(nscsites)
     rot[nscsites:, nscsites:] = evA
     h[0] = mdot(rot.T, h[0], rot)
+    h1e[0] = mdot(rot.T, h1e[0], rot)
     rot[nscsites:, nscsites:] = evB[:,::-1]
     h[1] = mdot(rot.T, h[1], rot)
-    return basis, h
+    h1e[1] = mdot(rot.T, h1e[1], rot)
+    return basis, h, h1e
 
 def ConstructImpHam(Lat, rho, v, afqmc = False, matching = True, local = True, \
         split = False, **kwargs):
@@ -63,7 +65,7 @@ def ConstructImpHam(Lat, rho, v, afqmc = False, matching = True, local = True, \
         log.result("Constructing impurity Hamiltonian")
         ImpHam, H1e = slater.embHam(Lat, basis, v, local = True, **kwargs)
         log.info("rotate bath orbitals to achieve particle-hole symmetry")
-        basis, ImpHam.H1["cd"] = afqmc_symmetrize(Lat, basis, ImpHam.H1["cd"])
+        basis, ImpHam.H1["cd"], H1e["cd"] = afqmc_symmetrize(Lat, basis, ImpHam.H1["cd"], H1e["cd"])
     else:
         if matching and basis.shape[0] == 2:
             log.result("Rotate bath orbitals to match alpha and beta basis")
@@ -87,7 +89,6 @@ def transformResults(rhoEmb, E, basis, ImpHam, H1e):
     spin = rhoEmb.shape[0]
     nscsites = basis.shape[2]
     rhoImp, Efrag, nelec = slater.transformResults(rhoEmb, E, basis, ImpHam, H1e)
-
     log.result("Local density matrix (impurity):")
     for s in range(spin):
         log.result("%s", rhoImp[s])

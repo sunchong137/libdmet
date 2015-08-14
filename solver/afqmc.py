@@ -74,7 +74,7 @@ def dumpOptions(filename, settings):
         "%d  #seed: 0 will random set the seed, otherwise use the value"
     ]) + "\n"
 
-    params = (settings["dt"], 1, 1, -1, settings["therm_sweep"], \
+    params = (settings["dt"], 1, 1, settings["bg_cap"], settings["therm_sweep"], \
             settings["meas_sweep"], 10, 0, int(settings["beta"]/settings["dt"]), \
             80, int(settings["meas_interval"]/settings["dt"]), \
             int(settings["meas_skip"]/settings["dt"])-1, \
@@ -110,6 +110,7 @@ class AFQMC(object):
         "meas_skip": 16,
         "therm_sweep": 10,
         "meas_sweep": 100,
+        "bg_cap": -1,
         "seed": 96384297,
     }
 
@@ -118,6 +119,8 @@ class AFQMC(object):
         AFQMC.nnode = nnode
         self.tmpDir = mkdtemp(prefix = "AFQMC", dir = TmpDir)
         log.info("AFQMC working dir %s", self.tmpDir)
+        log.info("running with %d nodes, %d processors per node", \
+            AFQMC.nnode, AFQMC.nproc)
         self.count = 0
 
     def run(self, Ham, onepdm = True, similar = False):
@@ -128,10 +131,7 @@ class AFQMC(object):
         for f in os.listdir(self.tmpDir):
             if f.endswith(".dat"):
                 os.remove(os.path.join(self.tmpDir, f))
-        h = copy.deepcopy(Ham.H1["cd"])
-        for i in range(norbs):
-            h[:,i,i] += 0.5 * Ham.H2["ccdd"][2,i,i,i,i]
-        dumpH1(os.path.join(self.tmpDir, "latt_param.dat"), h)
+        dumpH1(os.path.join(self.tmpDir, "latt_param.dat"), Ham.H1["cd"])
         dumpH2(os.path.join(self.tmpDir, "model_param.dat"), Ham.H2["ccdd"])
         dumpOptions(os.path.join(self.tmpDir, "method_param.dat"), settings)
         outputfile = self.callAFQMC()
