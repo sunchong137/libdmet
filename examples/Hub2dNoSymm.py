@@ -6,7 +6,7 @@ import numpy.linalg as la
 log.verbose = "INFO"
 
 U = 4
-LatSize = [36, 36]
+LatSize = [72, 72]
 ImpSize = [2, 2]
 Filling = 0.875/2
 MaxIter = 20
