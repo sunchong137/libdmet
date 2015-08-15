@@ -111,7 +111,6 @@ class NumTensor(BaseTensor):
         return hash((self.name, self.nidx, self.idx))
 
     def __eq__(self, other):
-        # FIXME do we require the have the same symm class?
         return self.name == other.name and self.nidx == other.nidx \
                 and other.idx in self.symm.symm(self.idx)
 

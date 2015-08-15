@@ -11,7 +11,10 @@ class IdxSymmetry(object):
         return tuple([indices[i] for i in order])
 
     def symm(self, indices):
-        return map(lambda p: self.permute(p, indices), self._symm)
+        if indices is None:
+            return [None]
+        else:
+            return map(lambda p: self.permute(p, indices), self._symm)
 
     def antisymm(self, indices):
         return map(lambda p: self.permute(p, indices), self._antisymm)

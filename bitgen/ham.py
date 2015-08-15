@@ -8,10 +8,10 @@ import libdmet.utils.logger as log
 def Coeff(name, idx, symmetry = None):
     return OpProduct(NumTensor(name, idx, symm = symmetry))
 
-def C(spin, idx):
+def C(spin, idx = None):
     return OpProduct(Fermion(True, spin, idx))
 
-def D(spin, idx):
+def D(spin, idx = None):
     return OpProduct(Fermion(False, spin, idx))
 
 def h0term(restricted = False):
