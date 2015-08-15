@@ -39,16 +39,16 @@ class OpProduct(object):
     
     # acess part of the operator product
     def nums(self):
-        return OpProduct(self.oplist[:self.n_num])
+        return OpProduct(self[:self.n_num])
 
     def deltas(self):
-        return OpProduct(self.oplist[self.n_num:self.n_num+self.n_del])
+        return OpProduct(self[self.n_num:self.n_num+self.n_del])
     
     def nonfermions(self):
-        return OpProduct(self.oplist[:self.n_num+self.n_del])
+        return OpProduct(self[:self.n_num+self.n_del])
 
     def fermions(self):
-        return OpProduct(self.oplist[self.n_num+self.n_del:])
+        return OpProduct(self[self.n_num+self.n_del:])
 
     def add_indices(self, indices = None):
         if indices is None:
@@ -76,7 +76,7 @@ class OpProduct(object):
         return np.sum(map(lambda op: op.ds(), self.oplist))
 
     def conj(self):
-        return OpProduct(map(lambda op: op.conj(), self.oplist[::-1]))
+        return OpProduct(map(lambda op: op.conj(), self[::-1]))
 
     def permute(self, i, j):
         assert(abs(i-j) == 1)
@@ -94,7 +94,7 @@ class OpProduct(object):
         sums.append((factor, OpProduct(oplist)))
         if delta is not None:
             sums.append((1, OpProduct([delta] + oplist[:i] + oplist[j+1:])))
-        return sums
+        return OpSum(sums)
 
     def __hash__(self):
         return hash(tuple([op.__hash__() for op in self.oplist]))
@@ -105,10 +105,22 @@ class OpProduct(object):
     def __repr__(self):
         return "*".join(map(lambda op: op.__repr__(), self.oplist))
 
+    def __getitem__(self, idx):
+        return self.oplist[idx]
+
+    def __setitem__(self, idx, val):
+        self.oplist[idx] = val
+
     def __mul__(self, other):
         res = deepcopy(self)
         res.append(other)
         return res
+
+    def __rmul__(self, scalar):
+        return OpSum([scalar, self])
+
+    def __len__(self):
+        return len(self.oplist)
 
 def rm_indices(ops):
     ops1 = deepcopy(ops)
@@ -116,7 +128,8 @@ def rm_indices(ops):
     return ops1
 
 def equiv(ops1, ops2):
-    return set(ops1.fermions()) == set(ops2.fermions())
+    return set(ops1.fermions().oplist) == \
+            set(ops2.fermions().oplist)
 
 class OpSum(list):
     def __init__(self, op_terms):
@@ -165,6 +178,9 @@ class OpSum(list):
 
     def __sub__(self, other):
         return self + (-other)
+
+    def __getslice__(self, i, j):
+        return OpSum(list.__getslice__(self, i, j))
 
     def conj(self):
         return OpSum(map(lambda (factor, term): \
