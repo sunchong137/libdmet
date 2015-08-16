@@ -18,12 +18,14 @@ def h0term(restricted = False):
     return OpSum(Coeff('H0', ''))
 
 def cdterm(restricted = False):
+    cdA = C('A', 'i') * D('A', 'j')
+    cdB = C('B', 'i') * D('B', 'j')
     if restricted:
-        return OpSum(Coeff("h", 'ij', symm.IdxSymm()) * C('A', 'i') * D('A', 'j')) + \
-                OpSum(Coeff("h", 'ij', symm.IdxSymm()) * C('B', 'i') * D('B', 'j'))
+        return OpSum(Coeff("h", 'ij', symm.IdxSymm()) * cdA) + \
+                OpSum(Coeff("h", 'ij', symm.IdxSymm()) * cdB)
     else:
-        return OpSum(Coeff("h_A", 'ij', symm.IdxSymm()) * C('A', 'i') * D('A', 'j')) + \
-                OpSum(Coeff("h_B", 'ij', symm.IdxSymm()) * C('B', 'i') * D('B', 'j'))
+        return OpSum(Coeff("h_A", 'ij', symm.IdxSymm()) * cdA) + \
+                OpSum(Coeff("h_B", 'ij', symm.IdxSymm()) * cdB)
 
 def ccterm(restricted = False):
     if restricted:
