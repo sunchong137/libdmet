@@ -3,7 +3,7 @@ from copy import deepcopy
 import tensor_symm as symmetry
 import libdmet.utils.logger as log
 
-__all__ = ["BaseTensor", "Fermion", "NumTensor", "Delta"]
+__all__ = ["isindices", "BaseTensor", "Fermion", "NumTensor", "Delta"]
 
 def isidx(i):
     # an index should be a lower case letter, eg. i,j,k,l, ...

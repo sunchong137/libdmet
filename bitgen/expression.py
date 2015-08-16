@@ -50,6 +50,9 @@ class OpProduct(object):
     def fermions(self):
         return OpProduct(self[self.n_num+self.n_del:])
 
+    def get_indices(self):
+        return map(lambda op: "".join(op.idx), self.oplist)
+
     def add_indices(self, indices = None):
         if indices is None:
             indices = "ijklmn"
@@ -65,8 +68,12 @@ class OpProduct(object):
     def replace_indices(self, *pairs):
         oplist = deepcopy(self.oplist)
         for idx, new_idx in pairs:
-            for op in oplist:
-                op.replace_idx(idx, new_idx)
+            if idx == new_idx:
+                continue
+            for op, op1 in zip(oplist, self.oplist):
+                new_indices = [new_idx if y == idx else x \
+                        for x, y in zip(op.idx, op1.idx)]
+                op.set_idx(new_indices)
         return OpProduct(oplist)
 
     def dn(self):
@@ -206,6 +213,9 @@ class OpSum(list):
 
     def __repr__(self):
         return "term(" + list.__repr__(self) + ")"
+
+Unity = OpSum(OpProduct([]))
+Zero = OpSum([])
 
 if __name__ == "__main__":
     log.section("expression.py defines OpProduct and OpSum classes")
