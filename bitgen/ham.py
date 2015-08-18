@@ -15,7 +15,7 @@ def D(spin, idx = None):
     return OpProduct(Fermion(False, spin, idx))
 
 def h0term(restricted = False):
-    return OpSum(Coeff('H0', ''))
+    return OpSum(Coeff('h_0', ''))
 
 def cdterm(restricted = False):
     cdA = C('A', 'i') * D('A', 'j')
@@ -29,9 +29,9 @@ def cdterm(restricted = False):
 
 def ccterm(restricted = False):
     if restricted:
-        D = Coeff("Delta", 'ij', symm.IdxSymm())
+        D = Coeff("D", 'ij', symm.IdxSymm())
     else:
-        D = Coeff("Delta", 'ij')
+        D = Coeff("D", 'ij')
     cc = OpSum(D * C('A', 'i') * C('B', 'j'))
     return cc + cc.conj()
 
@@ -67,7 +67,20 @@ def ccccterm(restricted):
         X = Coeff('x', 'ijkl', symm.Idx8FoldAntisymm())
     else:
         X = Coeff('x', 'ijkl', symm.Idx4FoldAntisymm())
-    return 0.25 * OpSum(X * C('A','i') * C('A','j') * C('B','k') * D('B','l'))
+    return 0.25 * OpSum(X * C('A','i') * C('A','j') * C('B','k') * C('B','l'))
+
+def H1(restricted = False, bogoliubov = False):
+    if bogoliubov:
+        return cdterm(restricted) + ccterm(restricted)
+    else:
+        return cdterm(restricted)
+
+def H2(restricted = False, bogoliubov = False):
+    if bogoliubov:
+        return ccddterm(restricted) + cccdterm(restricted) + ccccterm(restricted)
+    else:
+        return ccddterm(restricted)
+
 
 if __name__ == "__main__":
     log.section("ham.py defines components of Hamiltonian")

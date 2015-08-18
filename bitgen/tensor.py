@@ -142,7 +142,7 @@ class Delta(BaseTensor):
         return other.idx in self.symm.symm(self.idx)
 
     def __repr__(self):
-        s = "Delta"
+        s = "delta"
         if self.idx is not None:
             s += "(%s,%s)" % (self.idx)
         return s

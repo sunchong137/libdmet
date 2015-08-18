@@ -7,7 +7,12 @@ import libdmet.utils.logger as log
 # we define the reduced form of operator products here
 _reduced = {}
 _reduced[0] = [OpProduct([])]
-_reduced[2] = [C('A') * D('A'), C('B') * D('B'), C('A') * C('B'), D('A') * D('B')]
+_reduced[2] = [
+    C('A') * D('A'),
+    C('B') * D('B'),
+    C('A') * C('B'),
+    D('B') * D('A')
+]
 _reduced[4] = [
     # ccdd
     C('A') * C('A') * D('A') * D('A'),
@@ -29,7 +34,7 @@ def get_reduced_type(ops):
     ops1 = rm_indices(ops.fermions())
     for r in _reduced[len(ops1)]:
         if equiv(r, ops1):
-            return r
+            return deepcopy(r)
     raise Exception("Reduced form for this operator %s not defined", ops1)
 
 def is_reduced(ops):
@@ -78,7 +83,7 @@ def reduced(obj):
 def _reduced_OpProduct(ops):
     permutations = get_reduce_permutations(ops)
     ops1 = deepcopy(ops)
-    factor = 1
+    factor = 1.
     other = OpSum([])
     for p in permutations:
           raw = ops1.permute(*p)

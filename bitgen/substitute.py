@@ -33,7 +33,7 @@ class FermionSub(object):
 
     def _replace_p(self, ops):
         assert(isinstance(ops, basic.OpProduct))
-        self.reset()
+        self.reset(ops)
         return reduce(basic.OpSum.__mul__, map(lambda op: \
                 self._replace_t(op), ops), basic.Unity)
 
@@ -60,8 +60,12 @@ class FermionSub(object):
         else:
             return basic.OpSum(op)
 
-    def reset(self):
-        self.used = map(lambda *args: [], self.sum_indices)
+    def reset(self, ops = None):
+        if ops is None:
+            self.used = map(lambda *args: [], self.sum_indices)
+        else:
+            self.used = map(lambda *args: list(set("".join(ops.get_indices()))), \
+                    self.sum_indices)
 
     def __str__(self):
         return self.f.__str__() + " ==> " + self.expr.__str__()

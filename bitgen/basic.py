@@ -1,5 +1,5 @@
 from tensor_symm import *
 from tensor import *
-from expression import OpProduct, OpSum, rm_indices, Unity, Zero
+from expression import *
 from ham import *
-from reduction import reduced
+from reduction import reduced, get_reduced_type, _reduced
