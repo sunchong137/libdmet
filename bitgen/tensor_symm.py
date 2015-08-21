@@ -19,6 +19,9 @@ class IdxSymmetry(object):
     def antisymm(self, indices):
         return map(lambda p: self.permute(p, indices), self._antisymm)
 
+    def __str__(self):
+        return "Symm: %s\nAntisymm: %s" % (self._symm, self._antisymm)
+
 class IdxNoSymm(IdxSymmetry):
     def __init__(self, n):
         symm = [tuple(range(n))]
