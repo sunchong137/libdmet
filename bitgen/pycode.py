@@ -1,11 +1,170 @@
 import basic
 from copy import deepcopy
+import numpy as np
+import itertools as it
+import libdmet.utils.logger as log
 
-def pyH0fromH0(H0_H0, indices = "pqrs"):
-    assert(len(H0_H0) == 1)
-    terms = H0_H0[H0_H0.keys()[0]]
-    return "H0_H0 =" + " + ".join(map(lambda (fac, term): \
-            str(fac) + "*" + term[0].name ,terms))
+__all__ = ["define", "reg", "contract", "sumover", "dump", "registered"]
+
+dim = 6
+np.random.seed(123)
+registered = []
+
+def randMatrix(nidx, symm, antisymm):
+    mat = np.random.rand(*([dim] * nidx)) * 2 - 1
+    mat1 = np.zeros_like(mat)
+    for s in symm:
+        mat1 += np.transpose(mat, s)
+    mat1 /= len(symm)
+    for a in antisymm:
+        mat1 = 0.5 * (mat1 - np.transpose(mat1, a))
+    return mat1
+
+class Intermediate(basic.NumTensor):
+    def __init__(self, expr, ops, nidx, symm = None, name = None, \
+            val = None, final = False):
+        self._dup = -1
+        for i in range(len(ops)):
+            assert("@%02d" % (i+1) in expr)
+        if len(ops) == 0:
+            # then is an initial operator
+            for i, r in enumerate(registered):
+                if r.expr == expr:
+                    self._dup = i
+                    return
+            # if not registered yet
+            if name is None:
+                name = expr
+            basic.NumTensor.__init__(self, None, nidx = nidx, symm = symm)
+            self.val = randMatrix(nidx, symm._symm, symm._antisymm)
+            self.expr = expr
+            self.ops = ops
+            self.refcount = 0
+            self.final = final
+        else:
+            for op in ops:
+                assert(op in registered)
+            if val is None:
+                # then compute
+                expr1 = deepcopy(expr)
+                for i in range(len(ops)):
+                    expr1 = expr1.replace("@%02d" % (i+1), "ops[%d].val" % i)
+                val = eval(expr1)
+            # now check existence
+            if not final:
+                for i, r in enumerate(registered):
+                    if np.allclose(val, r.val):
+                        self._dup = i
+                        return
+
+                found = False
+                for i, r in enumerate(registered):
+                    if np.allclose(val, -r.val):
+                        expr = "(-@01)"
+                        ops = [r]
+                        found = True
+                        break
+                if not found:
+                    for i, r in enumerate(registered):
+                        for reorder in it.permutations(range(r.nidx)):
+                            if np.allclose(val, np.transpose(r.val, reorder)):
+                                if reorder == (1,0):
+                                    expr = "@01.T"
+                                else:
+                                    expr = "np.transpose(@01, %s)" % str(reorder)
+                                ops = [r]
+                                found = True
+                                break
+                            elif np.allclose(-val, np.transpose(r.val, reorder)):
+                                if reorder == (1,0):
+                                    expr = "(-@01.T)"
+                                else:
+                                    expr = "(-np.transpose(@01, %s))" % str(reorder)
+                                ops = [r]
+                                found = True
+                                break
+                        if found:
+                            break
+            # now find symmetry
+            if symm is None:
+                s = []
+                a = []
+                for reorder in it.permutations(range(nidx)):
+                    if np.allclose(val, np.transpose(val, reorder)):
+                        s.append(reorder)
+                    elif np.allclose(-val, np.transpose(val, reorder)):
+                        a.append(reorder)
+                symm = basic.IdxSymmetry(s, a)
+            basic.NumTensor.__init__(self, name, nidx = nidx, symm = symm)
+            for i, op in enumerate(ops):
+                op.refcount += expr.count("@%02d" % (i+1))
+            self.val = val
+            if final:
+                assert(name is not None)
+                self.name = name
+            else:
+                if name is not None:
+                    self.name = name
+            self.expr = expr
+            self.ops = ops
+            self.refcount = 0
+            self.final = final
+        registered.append(self)
+
+    def __eq__(self, other):
+        if len(self.ops) == 0 and len(other.ops) == 0:
+            return self.name == other.name
+        else:
+            return np.allclose(self.val, other.val)
+
+    def __hash__(self):
+        if len(self.ops) == 0:
+            return hash(self.name)
+        else:
+            return hash(tuple(self.val.ravel()))
+
+    def __str__(self):
+        if self.name is None:
+            return self.get_expr()
+        else:
+            return self.name + " = " + self.get_expr()
+
+    def __repr__(self):
+        return self.__str__() + \
+                " (refcount = %d, symm = %s, antisymm = %s)" % \
+                (self.refcount, self.symm._symm, self.symm._antisymm)
+
+    def get_expr(self):
+        # generate name using expr
+        _name = deepcopy(self.expr)
+        for i, op in enumerate(self.ops):
+            _name = _name.replace("@%02d" % (i+1), op._get_name())
+        return _name
+
+    def _get_name(self):
+        if self.name is None:
+            return self.get_expr()
+        else:
+            return self.name
+
+# really badly written
+def define(*args, **kwargs):
+    instance = Intermediate(*args, **kwargs)
+    if instance._dup < 0:
+        return instance
+    else:
+        return registered[instance._dup]
+
+def reg(Op, idx = None, **kwargs):
+    if isinstance(Op, Intermediate):
+        return (Op, idx)
+    elif isinstance(Op, basic.NumTensor):
+        return (define(Op.name, [], \
+                Op.nidx, symm = Op.symm, **kwargs), list(Op.idx))
+    elif isinstance(Op, basic.OpProduct) and len(Op) == 1:
+        return reg(Op[0], idx)
+    else:
+        raise Exception
 
 def T(trans):
     if trans:
@@ -13,148 +172,193 @@ def T(trans):
     else:
         return ""
 
-def Trace(term, indices = "pqrs"):
-    assert(len(term) == 3)
-    left, center, right = None, None, None
-    transl, transc, transr = False, False, False
-    for mat in term:
-        if mat.name.startswith(("h", "D", "w", "v", "x")) \
-                and center is None:
-            center = mat
-        elif indices[0] in mat.idx and left is None:
-            left = mat
-        elif indices[0] in mat.idx and right is None:
-            right = mat
+def build_tuple(idx1, idx2):
+    if len(idx2) > len(idx1):
+        _idx1, _idx2 = idx2, idx1
+    else:
+        _idx1, _idx2 = idx1, idx2
+    t1, t2 = [], []
+    for i, idx in enumerate(_idx1):
+        if idx in _idx2:
+            t1.append(i)
+            t2.append(_idx2.index(idx))
+    if len(idx2) > len(idx1):
+        return tuple(t2), tuple(t1)
+    else:
+        return tuple(t1), tuple(t2)
+
+def contract(_Op1, _Op2, **kwargs):
+    Op1, idx1 = _Op1
+    Op2, idx2 = _Op2
+    sumover = set(idx1).intersection(idx2)
+    if len(sumover) == 0:
+        raise Exception("No common indices")
+    elif len(sumover) == 1 and len(idx1) == 2 and len(idx2) == 2:
+        # use np.dot
+        idx_sum = list(sumover)[0]
+        transl =  (idx1.index(idx_sum) == 0) and (not (1,0) in Op1.symm._symm)
+        transr = (idx2.index(idx_sum) == 1) and (not (1,0) in Op2.symm._symm)
+        expr = "np.dot(@01%s, @02%s)" % (T(transl), T(transr))
+        idx = [i for i in idx1 + idx2 if i != idx_sum]
+        return define(expr, [Op1, Op2], len(idx), **kwargs), idx
+    elif len(sumover) == 2 and len(idx1) == 2 and len(idx2) == 2:
+        # this is trace
+        trans = (idx1 == idx2) and not ((1,0) in Op1.symm._symm or \
+                (1,0) in Op2.symm._symm)
+        if "rightT" in kwargs:
+            expr = "np.trace(np.dot(@01, @02%s))" % T(trans)
+            del kwargs["rightT"]
         else:
-            raise Exception()
-    assert(len(left.idx) == 2 and len(right.idx) == 2 \
-            and len(center.idx) == 2)
-    transl = indices[0] != left.idx[0]
-    transr = indices[0] != right.idx[1]
-    i1 = left.idx[0] if transl else left.idx[1]
-    i2 = right.idx[1] if transr else right.idx[0]
-    assert(set([i1, i2]) == set(center.idx))
-    transc = (not (1,0) in center.symm._symm) and i1 != center.idx[0]
-    text = "np.trace(mdot(%s%s, %s%s, %s%s))"
-    return  text % (left.name, T(transl), center.name, \
-            T(transc), right.name, T(transr))
+            expr = "np.trace(np.dot(@01%s, @02))" % T(trans)
+        return define(expr, [Op1, Op2], 0, **kwargs), ""
+    elif len(sumover) == 1 and min(len(idx1), len(idx2)) == 2:
+        # use tensordot
+        idx_sum = list(sumover)[0]
+        best1, best2 = None, None
+        for ridx1 in Op1.symm.symm(idx1) + Op1.symm.antisymm(idx1):
+            if ridx1 in Op1.symm.symm(idx1):
+                fac1 = 1
+            else:
+                fac1 = -1
+            for ridx2 in Op2.symm.symm(idx2) + Op2.symm.antisymm(idx2):
+                if ridx2 in Op2.symm.symm(idx2):
+                    fac2 = 1
+                else:
+                    fac2 = -1
+                pos1 = ridx1.index(idx_sum)
+                pos2 = ridx2.index(idx_sum)
+                if len(idx1) == 2:
+                    if best2 is None or pos2 < best2: # as left as possible
+                        best1, best2 = pos1, pos2
+                        bidx1, bidx2 = ridx1, ridx2
+                        factor = fac1 * fac2
+                else:
+                    if best1 is None or pos1 > best1: # as right as possible
+                        best1, best2 = pos1, pos2
+                        bidx1, bidx2 = ridx1, ridx2
+                        factor = fac1 * fac2
+        expr = "np.tensordot(@01, @02, axes=(%s,%s))" % \
+                (best1, best2)
+        if factor == -1:
+            expr = "(-" + expr + ")"
+        idx = [i for i in bidx1 + bidx2 if not i in sumover]
+        return define(expr, [Op1, Op2], len(idx), **kwargs), idx
+    elif len(sumover) == 2 and min(len(idx1), len(idx2)) == 2:
+        best1, best2 = None, None
+        if len(idx1) == 2:
+            def compare(_idx1,_idx2):
+                if _idx1[0] < _idx2[0]:
+                    return -1
+                elif _idx1[0] == _idx2[0] and _idx1[1] < _idx2[1]:
+                    return -1
+                elif _idx1 == _idx2:
+                    return 0
+                else:
+                    return 1
+            def better(_t1, _t2, _best1, _best2):
+                return _best1 is None or compare(_t2, _best2) < 0 or \
+                        (compare(_t2, _best2) == 0 and compare(_t1, _best1) < 0)
+        elif len(idx2) == 2:
+            # FIXME also use antisymmetry
+            def compare(_idx1,_idx2):
+                if _idx1[1] < _idx2[1]:
+                    return -1
+                elif _idx1[1] == _idx2[1] and _idx1[0] < _idx2[0]:
+                    return -1
+                elif _idx1 == _idx2:
+                    return 0
+                else:
+                    return 1
+            def better(_t1, _t2, _best1, _best2):
+                return _best1 is None or compare(_t1, _best1) > 0 or \
+                        (compare(_t1, _best1) == 0 and compare(_t2, _best2) > 0)
 
-def pyH0fromH1(H0_H1, indices = "pqrs"):
-    assert(len(H0_H1) == 1)
-    terms = H0_H1[H0_H1.keys()[0]]
-    textterms = {}
-    for fac, term in terms:
-        text = Trace(term, indices)[9:-1]
-        if text in textterms:
-            textterms[text] += fac
+        for ridx1 in Op1.symm.symm(idx1) + Op1.symm.antisymm(idx1):
+            if ridx1 in Op1.symm.symm(idx1):
+                fac1 = 1
+            else:
+                fac1 = -1
+            for ridx2 in Op2.symm.symm(idx2) + Op2.symm.antisymm(idx2):
+                if ridx2 in Op2.symm.symm(idx2):
+                    fac2 = 1
+                else:
+                    fac2 = -1
+                t1, t2 = build_tuple(ridx1, ridx2)
+                if better(t1, t2, best1, best2):
+                    best1, best2 = t1, t2
+                    bidx1, bidx2 = ridx1, ridx2
+                    factor = fac1 * fac2
+        if "indices_only" in kwargs:
+            return best1, best2
+        expr = "np.tensordot(@01, @02, axes=(%s,%s))" % \
+                (best1, best2)
+        if factor == -1:
+            expr = "(-" + expr + ")"
+        idx = [i for i in bidx1 + bidx2 if not i in sumover]
+        return define(expr, [Op1, Op2], len(idx), **kwargs), idx
+    else:
+        raise Exception
+
+def sumover(toSum):
+    # deal with repeated terms
+    sum_dict = {}
+    def add_to_dict(key, val):
+        if key in sum_dict:
+            sum_dict[key] += val
         else:
-            textterms[text] = fac
-    return "H0_H1 = np.trace(%s)" % (" + ".join(map(lambda (text, fac): \
-            str(fac) + "*" + text, textterms.items())))
+            sum_dict[key] = val
 
-def contract2op(ops, replaced, prodtensor):
-    opl, opr = replaced
-    del ops.oplist[ops.oplist.index(opl)]
-    del ops.oplist[ops.oplist.index(opr)]
-    i = list(set(opl.idx) - set(opr.idx))[0]
-    j = list(set(opr.idx) - set(opl.idx))[0]
-    if opl.name == opr.name and opl.idx.index(i) == opr.idx.index(j):
-        symm = basic.IdxSymm()
-    else:
-        symm = basic.IdxNoSymm(2)
-    return ops * basic.OpProduct(basic.NumTensor(prodtensor, \
-            [i,j], symm = symm))
+    for (fac, ops) in toSum:
+        if ops.expr == "(-@01)":
+            ops1 = ops.ops[0]
+            ops1.refcount -= 1
+            add_to_dict(ops1, -fac)
+        else:
+            add_to_dict(ops, fac)
 
-def doubleTrace(ops, indices = "pqrs"):
-    assert(len(ops) == 3)
-    left, center, right = None, None, None
-    for mat in ops:
-        if len(mat.idx) == 4 and center is None:
-            center = mat
-    for mat in ops:
-        if len(mat.idx) == 2 and center.idx[0] in mat.idx:
-            left = mat
-        elif len(mat.idx) == 2:
-            right = mat
-    idx1 = map(center.idx.index, left.idx)
-    if idx1[0] > idx1[1]:
-        idx1 = ((1,0), (idx1[1], idx1[0]))
-    else:
-        idx1 = ((0,1), tuple(idx1))
-    idx2 = map(center.idx.index, right.idx)
-    if idx2[0] > idx2[1]:
-        idx2 = ((1,0), (0,1))
-    else:
-        idx2 = ((0,1), (0,1))
-    fmt = "np.tensordot(%s, np.tensordot(%s, %s, axes = %s), axes = %s)"
-    return fmt % (right.name, left.name, center.name, idx1, idx2)
+    expr = " + \\\n        ".join([str(sum_dict[ops]) + "*@%02d" % (i+1) \
+            for i, ops in enumerate(sum_dict)])
+    oplist = sum_dict.keys()
+    return expr, oplist
 
-def pyH0fromH2(H0_H2, indices = "pqrs"):
-    assert(len(H0_H2) == 1)
-    terms = H0_H2[H0_H2.keys()[0]]
-    terms_precont = []
-    precontracts = set([])
-    for fac, term in terms:
-        newterm = deepcopy(term)
-        for idx in indices:
-            prod = [mat for mat in term if idx in mat.idx]
-            if len(prod) == 2:
-                name = prod[0].name + "__" + prod[1].name
-                idx1 = prod[0].idx.index(idx)
-                idx2 = prod[1].idx.index(idx)
-                precontracts.add((name, idx1, idx2))
-                newterm = contract2op(newterm, prod, name)
-        terms_precont.append((fac, newterm))
+
+def add_intermediates():
+    log.info("Removing unused intermediates")
+    while True:
+        unused = []
+        # firt find unused intermediates
+        for i, inter in enumerate(registered):
+            if not inter.final and inter.refcount == 0:
+                unused.append(i)
+
+        if len(unused) == 0:
+            break
+
+        log.info("remove %d intermediates", len(unused))
+        # delete their reference count
+        for i in unused:
+            inter = registered[i]
+            for j, op in enumerate(inter.ops):
+                op.refcount -= inter.expr.count("@%02d" % (j+1))
+
+        # delete them
+        for k, i in enumerate(unused):
+            del registered[i-k]
+
+    count = 0
+    for inter in registered:
+        if not (inter.final or len(inter.ops) == 0) \
+                and inter.refcount > 1:
+            count += 1
+            inter.name = "val%03d" % count
+    log.info("%d intermediates will be stored", count)
+
+def dump():
+    add_intermediates()
+
+    log.result("dump code")
     code = []
-    fmt = "%s = np.dot(%s%s, %s%s)"
-    for pre in precontracts:
-        matl, matr = pre[0].split("__")
-        transl = pre[1] == 0
-        transr = pre[2] == 1
-        code.append(fmt % (pre[0], matl, T(transl), matr, T(transr)))
-    # FIXME further optimization by combining terms is possible
-    code.append("H0_H2 = " + " + \\\n        ".join(map(lambda (fac, ops): \
-            str(fac) + "*" + doubleTrace(ops, indices), \
-            terms_precont)))
-    return "\n".join(code)
-
-def prod3op(term, indices = "pqrs"):
-    assert(len(term) == 3)
-    left, center, right = None, None, None
-    transl, transc, transr = False, False, False
-    for mat in term:
-        if mat.name.startswith(("h", "D", "w", "v", "x")) \
-                and center is None:
-            center = mat
-        elif indices[0] in mat.idx and left is None:
-            left = mat
-        elif indices[1] in mat.idx and right is None:
-            right = mat
-        else:
-            raise Exception()
-    assert(len(left.idx) == 2 and len(right.idx) == 2 \
-            and len(center.idx) == 2)
-    transl = indices[0] != left.idx[0]
-    transr = indices[1] != right.idx[1]
-    i1 = left.idx[0] if transl else left.idx[1]
-    i2 = right.idx[1] if transr else right.idx[0]
-    assert(set([i1, i2]) == set(center.idx))
-    transc = (not (1,0) in center.symm._symm) and i1 != center.idx[0]
-    text = "mdot(%s%s, %s%s, %s%s)"
-    return text % (left.name, T(transl), center.name, \
-            T(transc), right.name, T(transr))
-
-def pyH1fromH1(H1_H1, indices = "pqrs"):
-    code = []
-    for key in H1_H1:
-        if key.dn() < 0:
-            continue
-        if basic.rm_indices(key) == basic.C('A') * basic.C('B'):
-            res = "H1D_H1"
-        elif basic.rm_indices(key) == basic.C('A') * basic.D('A'):
-            res = "H1A_H1"
-        elif basic.rm_indices(key) == basic.C('B') * basic.D('B'):
-            res = "H1B_H1"
-        code.append(res + " = " + " + ".join(map(lambda (fac, ops): \
-                str(fac) + "*" + prod3op(ops, indices), H1_H1[key])))
+    for inter in registered:
+        if inter.final or inter.name is not None:
+            code.append(inter.__str__())
     return "\n".join(code)
