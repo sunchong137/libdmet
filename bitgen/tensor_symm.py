@@ -40,6 +40,12 @@ class IdxAntisymm(IdxSymmetry):
         asymm = [(1,0)]
         IdxSymmetry.__init__(self, symm, asymm)
 
+class Idx2FoldSymm(IdxSymmetry):
+    def __init__(self):
+        symm = [(0,1,2,3), (2,3,0,1)]
+        asymm = []
+        IdxSymmetry.__init__(self, symm, asymm)
+
 class Idx4FoldSymm(IdxSymmetry):
     def __init__(self):
         symm = [(0,1,2,3), (1,0,2,3), (0,1,3,2), (1,0,3,2)]
