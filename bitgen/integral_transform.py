@@ -1,6 +1,72 @@
 import basic
 from pycode import *
+from substitute import FermionSub, Substitution
+from merge import merge, eval_delta
 import libdmet.utils.logger as log
+
+def transform(sub, Ham):
+    # first replace the terms
+    H = sub.replace(Ham)
+    # then reduce to primary Operator products
+    H = basic.reduced(H)
+    # merge terms: classify according to fermion operators
+    H = merge(H, indices = "pqrs")
+    # evaluate delta functions
+    H = eval_delta(H)
+    return H
+
+def _addto(dictionary, key, content):
+    if key in dictionary:
+        dictionary[key].append(content)
+    else:
+        dictionary[key] = [content]
+
+def generate_code(H, indices = "pqrs"):
+    H0fromH0 = {}
+    H0fromH1 = {}
+    H0fromH2 = {}
+    H1fromH1 = {}
+    H1fromH2 = {}
+    H2fromH2 = {}
+    for key, expr in H.items():
+        if len(key) == 0: # H0 terms
+            for fac, term in expr:
+                if len(term) == 1: # H0fromH0
+                    _addto(H0fromH0, key, (fac, term))
+                elif len(term) == 3:
+                    _addto(H0fromH1, key, (fac, term))
+                elif len(term) == 5:
+                    _addto(H0fromH2, key, (fac, term))
+                else:
+                    raise Exception()
+        elif len(key) == 2:
+            for fac, term in expr:
+                if len(term) == 3:
+                    _addto(H1fromH1, key, (fac, term))
+                elif len(term) == 5:
+                    _addto(H1fromH2, key, (fac, term))
+                else:
+                    raise Exception()
+        elif len(key) == 4:
+            for fac, term in expr:
+                if len(term) == 5:
+                    _addto(H2fromH2, key, (fac, term))
+                else:
+                    raise Exception()
+
+    if len(H0fromH0) != 0:
+        pyH0_H0 = pyH0fromH0(H0fromH0, indices)
+    if len(H0fromH1) != 0:
+        pyH0_H1 = pyH0fromH1(H0fromH1, indices)
+    if len(H0fromH2) != 0:
+        pyH0_H2 = pyH0fromH2(H0fromH2, indices)
+    if len(H1fromH1) != 0:
+        pyH1_H1 = pyH1fromH1(H1fromH1, indices)
+    if len(H1fromH2) != 0:
+        pyH1_H2 = pyH1fromH2(H1fromH2, indices)
+    if len(H2fromH2) != 0:
+        pyH2_H2 = pyH2fromH2(H2fromH2, indices)
+    return dump()
 
 def pyH0fromH0(H0_H0, indices = "pqrs"):
     log.result("transform H0 to H0")
