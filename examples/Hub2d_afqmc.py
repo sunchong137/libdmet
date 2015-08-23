@@ -6,10 +6,9 @@ import numpy.linalg as la
 log.verbose = "DEBUG1"
 
 U = 4
-LatSize = [24, 24]
+LatSize = [72, 72]
 ImpSize = [2,2]
 MaxIter = 20
-M = 400
 DiisStart = 4
 DiisDim = 4
 
@@ -24,7 +23,9 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.AFQMC(nproc = 4, nnode = 1)
+dmet.impurity_solver.AFQMC.settings["meas_sweep"] = 200
+solver = dmet.impurity_solver.AFQMC(nproc = 4, nnode = 1, \
+        TmpDir = "/scratch/boxiao/DMETTemp")
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)

@@ -6,10 +6,9 @@ import numpy.linalg as la
 log.verbose = "INFO"
 
 U = 4
-LatSize = [24, 24]
+LatSize = [72, 72]
 ImpSize = [2,2]
 MaxIter = 20
-M = 400
 DiisStart = 4
 DiisDim = 4
 
@@ -24,7 +23,7 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.Block(nproc = 2, nnode = 1, tol = 1e-6)
+solver = dmet.impurity_solver.Block(nproc = 4, nnode = 1, MaxM = 400, tol = 1e-6)
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
@@ -36,7 +35,7 @@ for iter in range(MaxIter):
     log.section("\nconstructing impurity problem\n")
     ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
     log.section("\nsolving impurity problem\n")
-    rhoEmb, EnergyEmb = solver.run(ImpHam, M = 400)
+    rhoEmb, EnergyEmb = solver.run(ImpHam)
     rhoImp, EnergyImp, nelecImp = \
             dmet.transformResults(rhoEmb, EnergyEmb, basis, ImpHam, H1e)
 
