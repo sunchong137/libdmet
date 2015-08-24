@@ -275,9 +275,11 @@ def pyH2fromH2(H2_H2, indices = "pqrs"):
                 basic.D('B') * basic.D('A'):
             name = "H2wAB_H2"
         if key.dn() == 0:
-            indices = "psqr"
+            _indices = "".join(map(lambda i: indices[i], [0,3,1,2]))
+        else:
+            _indices = indices
         log.info("working on term %s", name)
         toSum = map(lambda (fac, ops): (fac, \
-                contract_ijkl_ip_jq_kr_ls(ops, indices)), H2_H2[key])
+                contract_ijkl_ip_jq_kr_ls(ops, _indices)), H2_H2[key])
         expr, oplist = sumover(toSum)
         defineH2symmetrized(expr, oplist, name)
