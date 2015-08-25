@@ -56,11 +56,10 @@ def dumpOptions(filename, settings):
         "%d  #decomposit 1.d s;2.d c;3.c s;4.c c for different kinds of decomposition",
         # 1 for Hubbard with positive U
         "%d  #background 0. mean field 1. dynamic background walker",
-        "%d  #bg_cap cap the background, bg_cap<0 means do not cap",
+        "%.2f  #bg_cap cap the background, bg_cap<0 means do not cap",
         "%d  #therm_sweep number of therm",
         "%d  #meas_sweep of measurement",
         "%d  #mgs_step number of steps when we do modified GS",
-        # I don't know what it is
         "%d  #init_phi_aux_flag:0 phi and aux from code,1 aux from code read phi,2 read aux and phi",
         # initial guess
         "%d  #timeslice_size for the length of the beta",
@@ -75,8 +74,10 @@ def dumpOptions(filename, settings):
     ]) + "\n"
 
     params = (settings["dt"], 1, 1, settings["bg_cap"], settings["therm_sweep"], \
-            settings["meas_sweep"], 10, 0, int(settings["beta"]/settings["dt"]), \
-            80, int(settings["meas_interval"]/settings["dt"]), \
+            settings["meas_sweep"], settings["mgs_step"], 0, \
+            int(settings["beta"]/settings["dt"]), \
+            int(settings["blksize"]/settings["dt"]), \
+            int(settings["meas_interval"]/settings["dt"]), \
             int(settings["meas_skip"]/settings["dt"])-1, \
             1 if settings["onepdm"] else 0, 0, 0, 1, settings["seed"])
 
@@ -105,12 +106,14 @@ class AFQMC(object):
     env_slurm = "SLURM_JOBID" in os.environ
     settings = {
         "dt": 0.01,
-        "beta": 64,
-        "meas_interval": 0.8,
-        "meas_skip": 16,
+        "beta": 50,
+        "blksize": 0.1,
+        "meas_interval": 0.5,
+        "meas_skip": 10,
         "therm_sweep": 10,
-        "meas_sweep": 100,
-        "bg_cap": -1,
+        "meas_sweep": 200,
+        "bg_cap": 3.6,
+        "mgs_step": 10,
         "seed": 96384297,
     }
 
