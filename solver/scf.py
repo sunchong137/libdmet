@@ -335,12 +335,11 @@ class SCF(object):
         self.doneHF = True
         return E, rho
 
-    def HFB(self, DiisDim = 12, MaxIter = 30, InitGuess = None, tol = 1e-6, Mu = None):
+    def HFB(self, Mu, DiisDim = 12, MaxIter = 30, InitGuess = None, tol = 1e-6):
         log.eassert(self.sys_initialized and self.integral_initialized, \
                 "components for Hartree-Fock Bogoliubov calculation are not ready"
                 "\nsys_init = %s\nint_init = %s", \
                 self.sys_initialized, self.integral_initialized)
-        log.eassert(Mu is not None, "must specify chemical potential")
 
         norb = self.integral.norb
         if not self.spinRestricted:

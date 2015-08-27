@@ -10,6 +10,8 @@ import libdmet.utils.logger as log
 from libdmet.utils.misc import mdot
 from libdmet.routine.localizer import Localizer
 from libdmet.utils.munkres import Munkres, make_cost_matrix
+from libdmet.routine.bcs_helper import extractRdm
+from libdmet.integral.integral_emb_casci import transform
 
 def cas_from_1pdm(rho, ncas, nelecas, nelec):
     assert(nelecas <= nelec)
@@ -388,6 +390,161 @@ class DmrgCI(object):
                 mdot(cas[1], casRho[1], cas[1].T)]) + coreRho
 
         return rho, E
+
+    def cleanup(self):
+        self.cisolver.cleanup()
+
+def get_qps(casci, Ham, guess):
+    # get quasiparticles by solving scf
+    casci.scfsolver.set_system(None, 0, True, False)
+    casci.scfsolver.set_integral(Ham)
+
+    E_HFB, GRho_HFB = casci.scfsolver.HFB(Mu = 0, tol = 1e-5, \
+            MaxIter = 30, InitGuess = guess)
+
+    mo = casci.scfsolver.get_mo()
+    mo_energy = casci.scfsolver.get_mo_energy()
+    norb = mo_energy.size / 2
+    ncas = casci.ncas
+    core = mo[:, :norb - ncas]
+    virt = mo[:, norb + ncas:]
+
+    cas0 = mo[:, norb - ncas: norb + ncas]
+    cas_energy = mo_energy[norb - ncas: norb + ncas]
+    cas = [{"o": [], "v": [], "p": []}, {"o": [], "v": [], "p": []}]
+    for i in range(ncas*2):
+        v, u = la.norm(cas0[:norb, i]), la.norm(cas0[norb:, i])
+        if v > u:
+            if cas_energy[i] < -1e-4:
+                cas[0]['o'].append(cas0[:, i])
+            elif cas_energy[i] > 1e-4:
+                cas[0]['v'].append(cas0[:, i])
+            else:
+                cas[0]['p'].append(cas0[:, i])
+        else:
+            core = np.hstack((core, cas0[:, i:i+1]))
+            if cas_energy[i] < -1e-4:
+                cas[1]['v'].append(np.concatenate(\
+                        (cas0[norb:, i], cas0[:norb, i]), 0))
+            elif cas_energy[i] > 1e-4:
+                cas[1]['o'].append(np.concatenate(\
+                        (cas0[norb:, i], cas0[:norb, i]), 0))
+            else:
+                cas[1]['p'].append(np.concatenate(\
+                        (cas0[norb:, i], cas0[:norb, i]), 0))
+
+    casinfo = map(lambda i: (len(cas[i]['o']), len(cas[i]['p']), len(cas[i]['v'])), \
+            range(2))
+    cas = map(lambda i: np.asarray(cas[i]['o'] + cas[i]['p'] + cas[i]['v']).T, \
+            range(2))
+    log.eassert(cas[0].shape[1] == cas[1].shape[1], \
+            "Number of alpha and beta quasiparticles are not equal")
+    return core, np.asarray(cas), virt, casinfo
+
+def buildBCSCasHamiltonian(Ham, core, cas):
+    norb = core.shape[0] / 2
+    coreGRdm = np.dot(core, core.T)
+    cRhoA, cRhoB, cKappaBA = extractRdm(coreGRdm)
+    # zero-energy
+    _H0 = Ham.H0
+    # core-core one-body
+    _H0 += np.sum(cRhoA * Ham.H1["cd"][0] + cRhoB * Ham.H1["cd"][1] + \
+            2 * cKappaBA.T * Ham.H1["cc"][0])
+    # core-fock
+    assert(Ham.H2["cccd"] is None or la.norm(Ham.H2["cccd"]) == 0)
+    assert(Ham.H2["cccc"] is None or la.norm(Ham.H2["cccc"]) == 0)
+    _eriA, _eriB, _eriAB = Ham.H2["ccdd"]
+
+    vj00 = np.tensordot(cRhoA, _eriA, ((0,1), (0,1)))
+    vj11 = np.tensordot(cRhoB, _eriB, ((0,1), (0,1)))
+    vj10 = np.tensordot(cRhoA, _eriAB, ((0,1), (0,1)))
+    vj01 = np.tensordot(_eriAB, cRhoB, ((2,3), (0,1)))
+    vk00 = np.tensordot(cRhoA, _eriA, ((0,1), (0,3)))
+    vk11 = np.tensordot(cRhoB, _eriB, ((0,1), (0,3)))
+    vl10 = np.tensordot(cKappaBA, _eriAB, ((0,1), (0,2)))# wrt kappa_ba
+    v = np.asarray([vj00+vj01-vk00, vj11+vj10-vk11, vl10.T])
+    # core-core two-body
+    _H0 += 0.5 * np.sum(cRhoA * v[0] + cRhoB * v[1] + 2 * cKappaBA.T * v[2])
+
+    VA, VB, UA, UB = cas[0,:norb], cas[1,:norb], cas[1,norb:], cas[0,norb:]
+    H0, CD, CC, CCDD, CCCD, CCCC = transform(VA, VB, UA, UB, _H0, \
+            Ham.H1["cd"][0] + v[0], Ham.H1["cd"][1] + v[1], Ham.H1["cc"][0] + \
+            v[2][0], Ham.H2["ccdd"][0], Ham.H2["ccdd"][1], Ham.H2["ccdd"][2])
+    return integral.Integral(cas.shape[2], False, True, H0, {"cd": CD, "cc": CC}, \
+            {"ccdd": CCDD, "cccd": CCCD, "cccc": CCCC})
+
+class BCSDmrgCI(object):
+    def __init__(self, ncas, splitloc = False, cisolver = None, \
+            mom_reorder = False, tmpDir = "/tmp"):
+        self.ncas = ncas
+        self.splitloc = splitloc
+        log.eassert(cisolver is not None, "No default ci solver is available" \
+                " with CASCI, you have to use Block")
+        self.cisolver = cisolver
+        self.scfsolver = scf.SCF()
+
+        # reorder scheme for restart block calculations
+        if mom_reorder:
+            if block.Block.reorder:
+                log.warning("Using maximal overlap method (MOM) to reorder localized "\
+                        "orbitals, turning off Block reorder option")
+                block.Block.reoder = False
+
+        self.mom_reorder = mom_reorder
+        self.localized_cas = None
+        self.tmpDir = tmpDir
+
+    def run(self, Ham, ci_args = {}, guess = None, basis = None, similar = False):
+        # ci_args is a list or dict for ci solver, or None
+
+        # FIXME think about choosing number of electron/hole freely
+        core, cas, virt, casinfo = get_qps(self, Ham, guess)
+        coreGRho = np.dot(core, core.T)
+
+        BCSCasHam = buildBCSCasHamiltonian(Ham, core, cas)
+        #if self.splitloc:
+        #    casHam, cas, _ = \
+        #            split_localize(cas, casinfo, casHam, basis = basis)
+        #
+        #if self.mom_reorder:
+        #    log.eassert(basis is not None, \
+        #            "maximum overlap method (MOM) requires embedding basis")
+        #    if self.localized_cas is None:
+        #        order = gaopt(casHam, tmp = self.tmpDir)
+        #    else:
+        #        # define cas_basis
+        #        cas_basis = np.asarray([
+        #            np.tensordot(basis[0], cas[0], (2,0)),
+        #            np.tensordot(basis[1], cas[1], (2,0))
+        #        ])
+        #        # cas_basis and self.localized_cas are both in
+        #        # atomic representation now
+        #        order, q = momopt(self.localized_cas, cas_basis)
+        #        # if the quality of mom is too bad, we reorder the orbitals
+        #        # using genetic algorithm
+        #        # FIXME seems larger q is a better choice
+        #        if q < 0.7:
+        #            order = gaopt(casHam, tmp = self.tmpDir)
+
+        #    log.info("Orbital order: %s", order)
+        #    # reorder casHam and cas
+        #    casHam, cas = reorder(order, casHam, cas)
+        #    # store cas in atomic basis
+        #    self.localized_cas = np.asarray([
+        #        np.tensordot(basis[0], cas[0], (2,0)),
+        #        np.tensordot(basis[1], cas[1], (2,0))
+        #    ])
+
+        casGRho, E = self.cisolver.run(BCSCasHam, **ci_args)
+        norb = core.shape[0] / 2
+
+        cas1 = np.empty((norb*2, self.ncas * 2))
+        cas1[:, :self.ncas] = cas[0]
+        cas1[:norb, self.ncas:] = cas[1, norb:]
+        cas1[norb:, self.ncas:] = cas[1, :norb]
+        GRho = mdot(cas1, casGRho, cas1.T) + coreGRho
+
+        return GRho, E
 
     def cleanup(self):
         self.cisolver.cleanup()
