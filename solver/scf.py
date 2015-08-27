@@ -9,7 +9,7 @@ import pyscf.lib.logger as pyscflogger
 import libdmet.utils.logger as log
 from libdmet.system import integral
 from libdmet.utils.misc import mdot
-
+from libdmet.routine.bcs_helper import extractRdm, extractH1
 
 class flush(object):
     def __init__(self, keywords):
@@ -55,7 +55,7 @@ class UIHF(UHF):
             vj00 = np.tensordot(dm[0], self._eri[0], ((0,1), (0,1)))
             vj11 = np.tensordot(dm[1], self._eri[1], ((0,1), (0,1)))
             vj10 = np.tensordot(dm[0], self._eri[2], ((0,1), (0,1)))
-            vj01 = np.tensordot(dm[1], self._eri[2], ((1,0), (3,2)))
+            vj01 = np.tensordot(self._eri[2], dm[1], ((2,3), (0,1)))
             vk00 = np.tensordot(dm[0], self._eri[0], ((0,1), (0,3)))
             vk11 = np.tensordot(dm[1], self._eri[1], ((0,1), (0,3)))
             va = vj00 + vj01 - vk00
@@ -64,27 +64,6 @@ class UIHF(UHF):
         else:
             log.error("Direct SCF not implemented")
         return vhf
-
-    def get_fock(self, h1e, s1e, vhf, dm, cycle = -1, adiis = None, *args):
-        f = h1e + vhf
-        if 0 <= cycle < self.diis_start_cycle - 1:
-            f = np.asarray([
-                hf.damping(s1e, dm[0], f[0], self.damp_factor),
-                hf.damping(s1e, dm[1], f[1], self.damp_factor),
-            ])
-            f = np.asarray([
-                hf.level_shift(s1e, dm[0], f[0], self.level_shift_factor),
-                hf.level_shift(s1e, dm[1], f[1], self.level_shift_factor),
-            ])
-        elif 0 <= cycle:
-            fac = self.level_shift_factor * np.exp(self.diis_start_cycle - cycle - 1)
-            f = np.asarray([
-                hf.level_shift(s1e, dm[0], f[0], fac),
-                hf.level_shift(s1e, dm[1], f[1], fac)
-            ])
-        if adiis is not None and cycle >= self.diis_start_cycle:
-            f = adiis.update(s1e, dm, np.array(f))
-        return f
 
     def energy_elec(self, dm, h1e, vhf):
         e1 = np.sum(h1e * dm)
@@ -97,6 +76,89 @@ class UIHF(UHF):
 
     def get_ovlp(self, *args):
         return self.ovlp
+
+def _UHFB_get_grad(mo_coeff, mo_occ, fock_ao):
+    '''RHF Gradients'''
+    occidx = np.where(mo_occ> 0)[0]
+    viridx = np.where(mo_occ==0)[0]
+
+    fock = reduce(np.dot, (mo_coeff.T.conj(), fock_ao, mo_coeff))
+    g = fock[viridx[:,None],occidx]
+    return g.reshape(-1)
+
+class UHFB(hf.RHF):
+    def __init__(self, mol, DiisDim = 12, MaxIter = 30):
+        hf.RHF.__init__(self, mol)
+        self._keys = self._keys.union(["h1e", "ovlp", "norb", "Mu"])
+        self.direct_scf = False
+        self.diis_space = DiisDim
+        self.max_cycle = MaxIter
+        self.h1e = None
+        self.ovlp = None
+        hf.get_grad = _UHFB_get_grad
+
+    def get_veff(self, mol, dm, dm_last = 0, vhf_last = 0, hermi = 1):
+        rhoA, rhoB, kappaBA = extractRdm(dm)
+        norb = self.norb
+        assert(self._eri is not None)
+        assert(self._eri["cccd"] is None or la.norm(self._eri["cccd"]) == 0)
+        assert(self._eri["cccc"] is None or la.norm(self._eri["cccc"]) == 0)
+        _eriA, _eriB, _eriAB = self._eri["ccdd"]
+
+        vj00 = np.tensordot(rhoA, _eriA, ((0,1), (0,1)))
+        vj11 = np.tensordot(rhoB, _eriB, ((0,1), (0,1)))
+        vj10 = np.tensordot(rhoA, _eriAB, ((0,1), (0,1)))
+        vj01 = np.tensordot(_eriAB, rhoB, ((2,3), (0,1)))
+        vk00 = np.tensordot(rhoA, _eriA, ((0,1), (0,3)))
+        vk11 = np.tensordot(rhoB, _eriB, ((0,1), (0,3)))
+        vl10 = np.tensordot(kappaBA, _eriAB, ((0,1), (0,2)))# wrt kappa_ba
+        va = vj00 + vj01 - vk00
+        vb = vj11 + vj10 - vk11
+        vd = vl10.T
+        vhf = np.empty((norb*2, norb*2))
+        vhf[:norb, :norb] = va
+        vhf[norb:, norb:] = -vb
+        vhf[:norb, norb:] = vd
+        vhf[norb:, :norb] = vd.T
+        return vhf
+
+    def energy_elec(self, dm, h1e, vhf):
+        rhoA, rhoB, kappaBA = extractRdm(dm)
+        HA, HB, DT = extractH1(h1e)
+        HA += np.eye(self.norb) * self.Mu
+        HB += np.eye(self.norb) * self.Mu
+        VA, VB, VDT = extractH1(vhf)
+        e1 = np.sum(rhoA * HA + rhoB * HB + 2 * DT * kappaBA)
+        e_coul = 0.5 * np.sum(rhoA * VA + rhoB * VB + 2 * VDT * kappaBA)
+        return e1 + e_coul, e_coul
+
+    def get_hcore(self, *args):
+        return self.h1e
+
+    def get_ovlp(self, *args):
+        return self.ovlp
+
+    def get_occ(self, mo_energy = None, mo_coeff = None):
+        if mo_energy is None: mo_energy = self.mo_energy
+        mo_occ = np.zeros_like(mo_energy)
+        nocc = self.mol.nelectron // 2
+        mo_occ[:nocc] = 1
+        pyscflogger.info(self, 'HOMO = %.12g  LUMO = %.12g',
+                    mo_energy[nocc-1], mo_energy[nocc])
+        if mo_energy[nocc-1]+1e-3 > mo_energy[nocc]:
+            pyscflogger.warn(self, '!! HOMO %.12g == LUMO %.12g',
+                        mo_energy[nocc-1], mo_energy[nocc])
+        if self.verbose >= pyscflogger.DEBUG:
+            np.set_printoptions(threshold=len(mo_energy))
+            pyscflogger.debug(self, '  mo_energy = %s', mo_energy)
+            np.set_printoptions()
+        return mo_occ
+
+    def get_fock(self, h1e, s1e, vhf, dm, cycle = -1, adiis = None, \
+            diis_start_cycle = None, level_shift_factor = None, \
+            damp_factor = None):
+        return self.get_fock_(h1e, s1e, vhf, dm*2., cycle, adiis, \
+                diis_start_cycle, level_shift_factor, damp_factor)
 
 def incore_transform(eri_, c):
     eriA = np.tensordot(c[0][0], eri_[0], (0, 0))
@@ -157,7 +219,7 @@ class UMP2(MP2):
         if mo_energy is None:
             mo_energy = self._scf.mo_energy
         if nocc is None:
-            nocc = (self._scf.nelectron_alpha, self._scf.mol.nelectron - self._scf.nelectron_alpha)
+            nocc = self._scf.nelec
 
         self.E, self.t2 = kernel(self, mo, mo_energy, nocc)
 
@@ -194,6 +256,7 @@ class UMP2(MP2):
         rdm_b[nocc[1]:, nocc[1]:] = rdm_v_b
         return np.asarray([rdm_a, rdm_b])
 
+
 class SCF(object):
     def __init__(self, tmp = "/tmp"):
         self.sys_initialized = False
@@ -206,8 +269,9 @@ class SCF(object):
             pyscflogger.flush = flush([""])
 
     def set_system(self, nelec, spin, bogoliubov, spinRestricted):
-        log.eassert(not bogoliubov, "Hartree-Fock-Bogoliubov and MP2 not implemented yet")
         log.eassert(not spinRestricted, "Only spin-unrestricted version is implemented")
+        if bogoliubov:
+            log.eassert(nelec is None, "nelec cannot be specified when doing BCS calculations")
         self.nelec = nelec
         self.spin = spin
         self.bogoliubov = bogoliubov
@@ -226,6 +290,8 @@ class SCF(object):
     def set_integral(self, *args):
         log.eassert(self.sys_initialized, "set_integral() should be used after initializing set_system()")
         if len(args) == 1:
+            log.eassert(self.bogoliubov == args[0].bogoliubov, \
+                    "Integral is not consistent with system type")
             self.integral = args[0]
         elif len(args) == 4:
             self.integral = integral.Integral(args[0], self.spinRestricted, self.bogoliubov, *args[1:])
@@ -233,11 +299,18 @@ class SCF(object):
             log.error("input either an integral object, or (norb, H0, H1, H2)")
         self.integral_initialized = True
         self.mol.nuclear_repulsion = lambda *args: self.integral.H0
+        if self.bogoliubov:
+            self.mol.nelectron = self.integral.norb*2
 
-    def HF(self, DiisDim = 12, MaxIter = 30, InitGuess = None, tol = 1e-6):
+    def HF(self, DiisDim = 12, MaxIter = 30, InitGuess = None, tol = 1e-6, Mu = None):
         log.eassert(self.sys_initialized and self.integral_initialized, \
-            "components for Hartree-Fock calculation are not ready\nsys_init = %s\nint_init = %s", \
-            self.sys_initialized, self.integral_initialized)
+                "components for Hartree-Fock (Bogoliubov) calculation are not ready"
+                "\nsys_init = %s\nint_init = %s", \
+                self.sys_initialized, self.integral_initialized)
+        if self.bogoliubov:
+            return self.HFB(DiisDim, MaxIter, InitGuess, tol, Mu = Mu)
+
+        # otherwise do UHF
         if not self.spinRestricted:
             log.result("Unrestricted Hartree-Fock with pyscf")
             self.mf = UIHF(self.mol, DiisDim = DiisDim, MaxIter = MaxIter)
@@ -261,6 +334,43 @@ class SCF(object):
         log.result("Hartree-Fock energy = %20.12f", E)
         self.doneHF = True
         return E, rho
+
+    def HFB(self, DiisDim = 12, MaxIter = 30, InitGuess = None, tol = 1e-6, Mu = None):
+        log.eassert(self.sys_initialized and self.integral_initialized, \
+                "components for Hartree-Fock Bogoliubov calculation are not ready"
+                "\nsys_init = %s\nint_init = %s", \
+                self.sys_initialized, self.integral_initialized)
+        log.eassert(Mu is not None, "must specify chemical potential")
+
+        norb = self.integral.norb
+        if not self.spinRestricted:
+            log.result("Unrestricted Hartree-Fock-Bogoliubov with pyscf")
+            self.mf = UHFB(self.mol, DiisDim = DiisDim, MaxIter = MaxIter)
+            h1e = np.empty((norb*2, norb*2))
+            self.mf.Mu = Mu
+            self.mf.norb = norb
+            h1e[:norb, :norb] = self.integral.H1["cd"][0] - np.eye(norb) * Mu
+            h1e[norb:, norb:] = -(self.integral.H1["cd"][1] - np.eye(norb) * Mu)
+            h1e[:norb, norb:] = self.integral.H1["cc"][0]
+            h1e[norb:, :norb] = self.integral.H1["cc"][0].T
+            self.mf.h1e = h1e
+            self.mf.ovlp = np.eye(norb*2)
+            self.mf._eri = self.integral.H2 # we can have cccd and cccc terms
+            self.mf.conv_tol = tol
+            if InitGuess is not None:
+                E = self.mf.scf(InitGuess)
+            else:
+                E = self.mf.scf(np.zeros(norb*2, norb*2))
+            coefs = self.mf.mo_coeff
+            occs = self.mf.mo_occ
+            GRho = mdot(coefs, np.diag(occs), coefs.T)
+        else:
+            log.error("Restricted Hartree-Fock-Bogoliubov not implemented yet")
+
+        log.result("Hartree-Fock-Bogoliubov convergence: %s", self.mf.converged)
+        log.result("Hartree-Fock-Bogoliubov energy = %20.12f", E)
+        self.doneHF = True
+        return E, GRho
 
     def MP2(self, mo = False):
         if not self.spinRestricted:
@@ -302,11 +412,24 @@ if __name__ == "__main__":
         Int2e[2,i,i,i,i] = 4
 
     scf = SCF()
-    scf.set_system(8, 0, False, False)
-    scf.set_integral(8, 0, {"cd": Int1e}, {"ccdd": Int2e})
-    _, rhoHF = scf.HF(MaxIter = 100, tol = 1e-3, \
-        InitGuess = (np.diag([0.5, 0, 0.5, 0, 0.5, 0, 0.5, 0]), np.diag([0, 0.5, 0, 0.5, 0, 0.5, 0, 0.5])))
-    log.result("HF density matrix:\n%s\n%s", rhoHF[0], rhoHF[1])
-    _, rhoMP = scf.MP2()
-    log.result("MP2 density matrix:\n%s\n%s", rhoMP[0], rhoMP[1])
 
+    # UHF
+    scf.set_system(8, 0, False, False)
+    scf.set_integral(8, 0, {"cd": Int1e}, \
+            {"ccdd": Int2e})
+    _, rhoHF = scf.HF(MaxIter = 100, tol = 1e-3, \
+        InitGuess = (
+            np.diag([1,0,1,0,1,0,1,0]),
+            np.diag([0,1,0,1,0,1,0,1])
+        ))
+    log.result("HF density matrix:\n%s\n%s", rhoHF[0], rhoHF[1])
+
+    # UHFB
+    np.random.seed(8)
+    scf.set_system(None, 0, True, False)
+    scf.set_integral(8, 0, {"cd": Int1e, "cc": np.random.rand(1,8,8) * 0.1}, \
+            {"ccdd": Int2e, "cccd": None, "cccc": None})
+    _, GRhoHFB = scf.HF(MaxIter = 100, tol = 1e-3, Mu = 2.02, \
+        InitGuess = np.diag([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]))
+    rhoA, rhoB, kappaBA = extractRdm(GRhoHFB)
+    log.result("HFB density matrix:\n%s\n%s\n%s", rhoA, rhoB, -kappaBA.T)

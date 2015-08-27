@@ -10,7 +10,13 @@ class Integral(object):
         self.restricted = restricted
         self.bogoliubov = bogoliubov
         self.H0 = H0
+        for key in H1:
+            log.eassert(H1[key] is None or len(H1[key].shape) == 3, \
+                    "invalid shape")
         self.H1 = H1
+        for key in H2:
+            log.eassert(H2[key] is None or len(H2[key].shape) == 5, \
+                    "invalid shape")
         self.H2 = H2
 
     def pairNoSymm(self):

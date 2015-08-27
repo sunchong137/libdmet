@@ -3,15 +3,25 @@ import numpy.linalg as la
 import itertools as it
 import libdmet.utils.logger as log
 from libdmet.utils.misc import mdot, find, counted
+from copy import deepcopy
 
 def extractRdm(GRho):
     norbs = GRho.shape[0] / 2
     log.eassert(norbs * 2 == GRho.shape[0], \
             "generalized density matrix dimension error")
-    rhoA = GRho[:norbs, :norbs]
+    rhoA = deepcopy(GRho[:norbs, :norbs])
     rhoB = np.eye(norbs) - GRho[norbs:, norbs:]
     kappaBA = GRho[norbs:,:norbs]
     return rhoA, rhoB, kappaBA
+
+def extractH1(GFock):
+    norbs = GFock.shape[0] / 2
+    log.eassert(norbs * 2 == GFock.shape[0], \
+            "generalized density matrix dimension error")
+    HA = deepcopy(GFock[:norbs, :norbs])
+    HB =  - GFock[norbs:, norbs:]
+    HDT = deepcopy(GFock[norbs:,:norbs])
+    return HA, HB, HDT
 
 def combineRdm(rhoA, rhoB, kappaAB):
     norbs = rhoA.shape[0]
