@@ -58,11 +58,11 @@ def dumpFCIDUMP(filename, integral, thr = 1e-8):
     def insert_cccc(fout, matrix, t, symm_spin = True):
         if symm_spin:
             for (i,j), (k,l) in list(it.combinations_with_replacement(integral.pairAntiSymm()[::-1], 2))[::-1]:
-                writeInt(fout, matrix[t,i,j,k,l], i, j, k, l)
+                writeInt(fout, matrix[t,i,j,l,k], i, j, k, l)
 
         else:
             for (i,j), (k,l) in it.product(integral.pairAntiSymm(), repeat = 2):
-                writeInt(fout, matrix[t,i,j,k,l], i, j, k, l)
+                writeInt(fout, matrix[t,i,j,l,k], i, j, k, l)
 
     def insert_2dArray(fout, matrix, t, symm_herm = True):
         if symm_herm:
@@ -214,10 +214,10 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
                   H2["cccd"][0,i,j,k,l] = val
                   H2["cccd"][0,j,i,k,l] = -val
               elif section == 2:
-                  H2["cccc"][0,i,j,k,l] = H2["cccc"][0,j,i,l,k] = \
-                      H2["cccc"][0,k,l,i,j] = H2["cccc"][0,l,k,j,i] = val
-                  H2["cccc"][0,j,i,k,l] = H2["cccc"][0,i,j,l,k] = \
-                      H2["cccc"][0,k,l,j,i] = H2["cccc"][0,l,k,i,j] = -val
+                  H2["cccc"][0,i,j,l,k] = H2["cccc"][0,j,i,k,l] = \
+                      H2["cccc"][0,l,k,i,j] = H2["cccc"][0,k,l,j,i] = val
+                  H2["cccc"][0,j,i,l,k] = H2["cccc"][0,i,j,k,l] = \
+                      H2["cccc"][0,l,k,j,i] = H2["cccc"][0,k,l,i,j] = -val
         else: # bogoliubov, not restricted
             H0 = 0
             H1 = {
@@ -246,8 +246,8 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
                     H2["cccd"][section-3,i,j,k,l] = val
                     H2["cccd"][section-3,j,i,k,l] = -val
                 elif section == 5:
-                    H2["cccc"][0,i,j,k,l] = H2["cccc"][0,j,i,l,k] = val
-                    H2["cccc"][0,j,i,k,l] = H2["cccc"][0,i,j,l,k] = -val
+                    H2["cccc"][0,i,j,l,k] = H2["cccc"][0,j,i,k,l] = val
+                    H2["cccc"][0,j,i,l,k] = H2["cccc"][0,i,j,k,l] = -val
                 elif section == 6 or section == 7:
                     log.eassert(k == -1 and l == -1, "Integral Syntax unrecognized")
                     H1["cd"][section-6,i,j] = H1["cd"][section-6,j,i] = val

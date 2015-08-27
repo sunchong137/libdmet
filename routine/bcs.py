@@ -59,7 +59,7 @@ def __embBasis_phsymm(lattice, GRho, **kwargs):
     AB2 = np.swapaxes(AB2, 1, 2)
     AB2 = orthonormalizeBasis(AB2)
     basis[1, :, :nscsites], basis[1, :, nscsites:] = \
-            AB2[:, nscsites:], AB2[:, nscsites:]
+            AB2[:, nscsites:], AB2[:, :nscsites]
     return basis
 
 def embHam(lattice, basis, vcor, mu, local = True, **kwargs):
@@ -125,7 +125,10 @@ def __embHam1e(lattice, basis, vcor, mu, **kwargs):
 
     log.debug(1, "transform native H1")
     H1energy["cd"], H1energy["cc"][0], H0energy = transform_imp_env(basis, lattice, latH1)
-
+    tempCD, tempCC, tempH0 = transform_local(basis, lattice, mu * np.eye(nscsites))
+    H1energy["cd"] -= tempCD
+    H1energy["cc"] -= tempCC
+    H0energy -= tempH0
     return (H1, H0), (H1energy, H0energy)
 
 def __embHam2e(lattice, basis, vcor, local, **kwargs):
@@ -139,7 +142,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         cccd = np.memmap(NamedTemporaryFile(dir = TmpDir), dtype = float, \
             mode = 'w+', shape = (2, nbasis, nbasis, nbasis, nbasis))
         cccc = np.memmap(NamedTemporaryFile(dir = TmpDir), dtype = float, \
-            mode = 'w+', shape = (nbasis, nbasis, nbasis, nbasis))
+            mode = 'w+', shape = (1, nbasis, nbasis, nbasis, nbasis))
     else:
         ccdd = np.zeros((3, nbasis, nbasis, nbasis, nbasis))
         cccd = np.zeros((2, nbasis, nbasis, nbasis, nbasis))
@@ -147,7 +150,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
 
     log.info("H2 memory allocated size = %d MB", ccdd.size * 2 * 8. / 1024 / 1024)
     
-    if local:
+    if local and 0:
         for s in range(2):
             log.eassert(la.norm(basis[s,0,:nscsites,:nscsites] - np.eye(nscsites)) \
                     < 1e-10, "the embedding basis is not local")
@@ -157,7 +160,15 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         cc = np.zeros((1, nbasis, nbasis))
         H0 = 0.
     else:
-        log.error("Int2e for nonlocal embedding basis not implemented yet")
+        from libdmet.integral.integral_nonlocal_emb import transform
+        VA, VB, UA, UB = separate_basis(basis)
+        #np.save("va.npy", VA)
+        #np.save("vb.npy", VB)
+        #np.save("ua.npy", UA)
+        #np.save("ub.npy", UB)
+        H0, cd, cc, ccdd, cccd, cccc = \
+                transform(VA[0], VB[0], UA[0], UB[0], lattice.getH2())
+        # FIXME the definition of UA and UB
     return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, {"cd": cd, "cc": cc}, H0
 
 def foldRho(GRho, Lat, basis):
@@ -301,7 +312,7 @@ def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
         H0eff = ImpHam.H0 - H0energy
         rhoA, rhoB, kappaBA = extractRdm(GRhoEmb)
         Efrag = E - np.sum(CDeff[0] * rhoA) - np.sum(CDeff[1] * rhoB) - \
-                np.sum(CCeff.T * kappaBA) - H0eff
+                2 * np.sum(CCeff.T * kappaBA) - H0eff
     else:
         Efrag = None
     return GRhoImp, Efrag, nelec
