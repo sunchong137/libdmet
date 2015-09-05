@@ -291,12 +291,20 @@ void save_spatial_twopdm_binary(const array_4d<double>& twopdm, const int &i, co
   }
 }
 
-void save_twopdm_binary(const array_4d<double>& twopdm, const int &i, const int &j)
+void save_twopdm_binary(const array_4d<double>& twopdm, const int &i, const int &j, int type)
 {
   if(!mpigetrank())
   {
     char file[5000];
-    sprintf (file, "%s%s%d.%d", dmrginp.save_prefix().c_str(),"/twopdm.", i, j);
+    if (type == 0) {
+      sprintf (file, "%s%s%d.%d", dmrginp.save_prefix().c_str(),"/twopdm.", i, j);
+    } else if (type == 2) {
+      sprintf (file, "%s%s%d.%d", dmrginp.save_prefix().c_str(),"/cccdpdm.", i, j);
+    } else if (type == 4) {
+      sprintf (file, "%s%s%d.%d", dmrginp.save_prefix().c_str(),"/ccccpdm.", i, j);
+    } else {
+      abort();
+    }
     std::ofstream ofs(file, std::ios::binary);
     boost::archive::binary_oarchive save(ofs);
     save << twopdm;
@@ -304,12 +312,20 @@ void save_twopdm_binary(const array_4d<double>& twopdm, const int &i, const int 
   }
 }
 
-void load_twopdm_binary(array_4d<double>& twopdm, const int &i, const int &j)
+void load_twopdm_binary(array_4d<double>& twopdm, const int &i, const int &j, int type)
 {
   if(!mpigetrank())
   {
     char file[5000];
-    sprintf (file, "%s%s%d.%d", dmrginp.save_prefix().c_str(),"/twopdm.", i, j);
+    if (type == 0) {
+      sprintf (file, "%s%s%d.%d", dmrginp.save_prefix().c_str(),"/twopdm.", i, j);
+    } else if (type == 2) {
+      sprintf (file, "%s%s%d.%d", dmrginp.save_prefix().c_str(),"/cccdpdm.", i, j);
+    } else if (type == 4) {
+      sprintf (file, "%s%s%d.%d", dmrginp.save_prefix().c_str(),"/ccccpdm.", i, j);
+    } else {
+      abort();
+    }
     std::ifstream ifs(file, std::ios::binary);
     boost::archive::binary_iarchive load(ifs);
     load >> twopdm;
@@ -389,19 +405,65 @@ void assign_antisymmetric(array_4d<double>& twopdm, const int i, const int j, co
 
   if ( twopdm(i, j, k, l) != 0.0 && (twopdm(i,j,k,l)-val) > 2e-4)
     {
-      void *array[10];
-      size_t size;
-      size = backtrace(array, 10);
       cout << "Already calculated "<<i<<" "<<j<<" "<<k<<" "<<l<<endl;
-      //backtrace_symbols_fd(array, size, 2);
       cout << "earlier value: "<<twopdm(i,j,k,l)<<endl<<"new value: "<<val<<endl;
-      assert(1 == 0);
+      abort();
     }
   //cout << i << " " << j << " " << k << " " << l << " " << val << endl;
   twopdm(i, j, k, l) = val;
   twopdm(i, j, l, k) = -val;
   twopdm(j, i, k, l) = -val;
   twopdm(j, i, l, k) = val;
+}
+
+void assign_antisymmetric_cccd(array_4d<double>& cccdpdm, const int i, const int j, const int k, const int l, const double val) {
+  if ( cccdpdm(i, j, k, l) != 0.0 && (cccdpdm(i,j,k,l)-val) > 2e-4)
+    {
+      cout << "Already calculated (cccd)"<<i<<" "<<j<<" "<<k<<" "<<l<<endl;
+      cout << "earlier value: "<<cccdpdm(i,j,k,l)<<endl<<"new value: "<<val<<endl;
+      abort();
+    }
+  cout << "cccd " << i << " " << j << " " << k << " " << l << " " << val << endl;
+  cccdpdm(i,j,k,l) = val;
+  cccdpdm(i,k,j,l) = -val;
+  cccdpdm(j,i,k,l) = -val;
+  cccdpdm(k,i,j,l) = val;
+  cccdpdm(j,k,i,l) = val;
+  cccdpdm(k,j,i,l) = -val;
+}
+
+void assign_antisymmetric_cccc(array_4d<double>& ccccpdm, const int i, const int j, const int k, const int l, const double val) {
+  if ( ccccpdm(i, j, k, l) != 0.0 && (ccccpdm(i,j,k,l)-val) > 2e-4)
+    {
+      cout << "Already calculated "<<i<<" "<<j<<" "<<k<<" "<<l<<endl;
+      cout << "earlier value: "<<ccccpdm(i,j,k,l)<<endl<<"new value: "<<val<<endl;
+      abort();
+    }
+  cout << "cccc " << i << " " << j << " " << k << " " << l << " " << val << endl;
+  ccccpdm(i,j,k,l) = val;
+  ccccpdm(i,j,l,k) = -val;
+  ccccpdm(i,k,j,l) = -val;
+  ccccpdm(i,l,j,k) = val;
+  ccccpdm(i,k,l,j) = val;
+  ccccpdm(i,l,k,j) = -val;
+  ccccpdm(j,i,k,l) = -val;
+  ccccpdm(j,i,l,k) = val;
+  ccccpdm(k,i,j,l) = val;
+  ccccpdm(l,i,j,k) = -val;
+  ccccpdm(k,i,l,j) = -val;
+  ccccpdm(l,i,k,j) = val;
+  ccccpdm(j,k,i,l) = val;
+  ccccpdm(j,l,i,k) = -val;
+  ccccpdm(k,j,i,l) = -val;
+  ccccpdm(l,j,i,k) = val;
+  ccccpdm(k,l,i,j) = val;
+  ccccpdm(l,k,i,j) = -val;
+  ccccpdm(j,k,l,i) = -val;
+  ccccpdm(j,l,k,i) = val;
+  ccccpdm(k,j,l,i) = val;
+  ccccpdm(l,j,k,i) = -val;
+  ccccpdm(k,l,j,i) = -val;
+  ccccpdm(l,k,j,i) = val;
 }
 
 double DotProduct(const Wavefunction& w1, const Wavefunction& w2, double Sz, const SpinBlock& big)

@@ -171,10 +171,6 @@ void SweepTwopdm::BlockAndDecimate (SweepParams &sweepParams, SpinBlock& system,
 
 double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const bool &forward, const bool &restart, const int &restartSize, int state)
 {
-  if (dmrginp.hamiltonian() == BCS) {
-    cout << "Two PDM with BCS calculations is not implemented" << endl;
-    abort();
-  }
   cout.precision(12);
   SpinBlock system;
   const int nroots = dmrginp.nroots();
@@ -200,8 +196,17 @@ double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const b
   int nspinorb = dmrginp.spinAdapted() ? 2*dmrginp.last_site() : dmrginp.last_site();
   array_4d<double> twopdm(nspinorb, nspinorb, nspinorb, nspinorb);
   twopdm.Clear();
+  save_twopdm_binary(twopdm, state, state);
 
-  save_twopdm_binary(twopdm, state, state); 
+  if (dmrginp.hamiltonian() == BCS) {
+    array_4d<double> cccdpdm(nspinorb, nspinorb, nspinorb, nspinorb);
+    array_4d<double> ccccpdm(nspinorb, nspinorb, nspinorb, nspinorb);
+    cccdpdm.Clear();
+    ccccpdm.Clear();
+
+    save_twopdm_binary(cccdpdm, state, state, 2);
+    save_twopdm_binary(ccccpdm, state, state, 4);
+  }
 
 
   for (; sweepParams.get_block_iter() < sweepParams.get_n_iters(); )
