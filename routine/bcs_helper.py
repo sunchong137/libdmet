@@ -32,6 +32,29 @@ def combineRdm(rhoA, rhoB, kappaAB):
     GRho[:norbs, norbs:] = -kappaAB
     return GRho
 
+def basisToCanonical(basis):
+    assert(basis.shape[0] == 2)
+    shape = list(basis.shape[1:])
+    nbasis = shape[-1]
+    nsites = shape[-2] / 2
+    shape[-1] *= 2
+    newbasis = np.empty(tuple(shape))
+    newbasis[...,:nbasis] = basis[0]
+    newbasis[...,:nsites,nbasis:], newbasis[...,nsites:,nbasis:] = \
+            basis[1,...,nsites:,:], basis[1,...,:nsites,:]
+    return newbasis
+
+def basisToSpin(basis):
+    shape = [2] + list(basis.shape)
+    shape[-1] /= 2
+    nbasis = shape[-1]
+    nsites = shape[-2] / 2
+    newbasis = np.empty(tuple(shape))
+    newbasis[0] = basis[...,:nbasis]
+    newbasis[1,...,:nsites,:], newbasis[1,...,nsites:,:] = \
+            basis[...,nsites:,nbasis:], basis[...,:nsites,nbasis:]
+    return newbasis
+
 def mono_fit(fn, y0, x0, thr, increase = True):
     if not increase:
         return mono_fit(lambda x: -fn(x), -y0, x0, thr, True)

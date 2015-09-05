@@ -111,10 +111,10 @@ class UHFB(hf.RHF):
         vj01 = np.tensordot(_eriAB, rhoB, ((2,3), (0,1)))
         vk00 = np.tensordot(rhoA, _eriA, ((0,1), (0,3)))
         vk11 = np.tensordot(rhoB, _eriB, ((0,1), (0,3)))
-        vl10 = np.tensordot(kappaBA, _eriAB, ((0,1), (0,2)))# wrt kappa_ba
+        vl10 = np.tensordot(kappaBA, _eriAB, ((1,0), (0,2)))# wrt kappa_ba
         va = vj00 + vj01 - vk00
         vb = vj11 + vj10 - vk11
-        vd = vl10.T
+        vd = vl10
         vhf = np.empty((norb*2, norb*2))
         vhf[:norb, :norb] = va
         vhf[norb:, norb:] = -vb
@@ -298,7 +298,7 @@ class SCF(object):
         else:
             log.error("input either an integral object, or (norb, H0, H1, H2)")
         self.integral_initialized = True
-        self.mol.nuclear_repulsion = lambda *args: self.integral.H0
+        self.mol.energy_nuc = lambda *args: self.integral.H0
         if self.bogoliubov:
             self.mol.nelectron = self.integral.norb*2
 
@@ -359,7 +359,7 @@ class SCF(object):
             if InitGuess is not None:
                 E = self.mf.scf(InitGuess)
             else:
-                E = self.mf.scf(np.zeros(norb*2, norb*2))
+                E = self.mf.scf(np.zeros((norb*2, norb*2)))
             coefs = self.mf.mo_coeff
             occs = self.mf.mo_occ
             GRho = mdot(coefs, np.diag(occs), coefs.T)

@@ -25,7 +25,7 @@ class Block(object):
         self.spinAdapted = spinAdapted
         self.bcs = bcs
 
-    def run(self, Ham, M = None, nelec = None, schedule = None, similar = False):
+    def run(self, Ham, M = None, nelec = None, schedule = None, similar = False, restart = True):
         if M is None:
             M = self.maxM
         if nelec is None:
@@ -39,10 +39,11 @@ class Block(object):
 
         if schedule is None:
             schedule = self.schedule
-            if self.cisolver.optimized:
+            if self.cisolver.optimized and restart:
                 schedule.maxiter = 16
                 schedule.gen_restart(M)
             else:
+                self.cisolver.optimized = False
                 schedule.gen_initial(minM = self.minM, maxM = M)
 
         self.cisolver.set_schedule(schedule)

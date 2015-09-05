@@ -10,7 +10,6 @@ LatSize = [36, 36]
 ImpSize = [2, 2]
 Filling = 0.875/2
 MaxIter = 20
-M = 400
 DiisStart = 4
 TraceStart = 2
 DiisDim = 4
@@ -27,8 +26,10 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.Block(nproc = 4, nnode = 1, \
-        bcs = True, reorder = True, tol = 1e-7, maxM = M)
+block = dmet.impurity_solver.Block(nproc = 4, nnode = 1, \
+        bcs = True, reorder = True, tol = 1e-7, maxM = 400)
+
+solver = dmet.impurity_solver.BCSDmrgCI(ncas = 8, cisolver = block, splitloc = True)
 
 log.section("\nfitting chemical potential\n")
 _, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu)
@@ -43,10 +44,10 @@ for iter in range(MaxIter):
 
     log.section("\nconstructing impurity problem\n")
     ImpHam, H_energy, basis = dmet.ConstructImpHam(Lat, GRho, vcor, Mu)
-
     log.section("\nsolving impurity problem\n")
     GRhoEmb, EnergyEmb, ImpHam, dmu = \
-            dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver)
+            dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver, \
+            solver_args = {"guess": dmet.foldRho(GRho, Lat, basis), "basis": basis})
     Mu += dmu
     vcor = dmet.addDiag(vcor, dmu)
     GRhoImp, EnergyImp, nelecImp = \

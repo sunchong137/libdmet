@@ -10,8 +10,9 @@ import libdmet.utils.logger as log
 from libdmet.utils.misc import mdot
 from libdmet.routine.localizer import Localizer
 from libdmet.utils.munkres import Munkres, make_cost_matrix
-from libdmet.routine.bcs_helper import extractRdm
+from libdmet.routine.bcs_helper import extractRdm, basisToCanonical, basisToSpin
 from libdmet.integral.integral_emb_casci import transform
+from libdmet.integral.integral_localize import transform as transform_local
 
 def cas_from_1pdm(rho, ncas, nelecas, nelec):
     assert(nelecas <= nelec)
@@ -191,17 +192,17 @@ def split_localize(orbs, info, Ham, basis = None):
         ovlp_sq = ovlp ** 2
         cost_matrix = make_cost_matrix(ovlp_sq, lambda cost: 1. - cost)
         m = Munkres()
-        indexes = m.compute(cost_matrix)
-        indexes = sorted(indexes, key = lambda idx: idx[0])
-        vals = map(lambda idx: ovlp_sq[idx], indexes)
+        indices = m.compute(cost_matrix)
+        indices = sorted(indices, key = lambda idx: idx[0])
+        vals = map(lambda idx: ovlp_sq[idx], indices)
         log.debug(1, "Orbital pairs and their overlap:")
         for i in range(norbs):
-            log.debug(1, "(%2d, %2d) -> %12.6f", indexes[i][0], indexes[i][1], vals[i])
+            log.debug(1, "(%2d, %2d) -> %12.6f", indices[i][0], indices[i][1], vals[i])
         log.info("Match localized orbitals: max %5.2f min %5.2f ave %5.2f", \
                 np.max(vals), np.min(vals), np.average(vals))
 
         # update localorbs and rotmat
-        orderb = map(lambda idx: idx[1], indexes)
+        orderb = map(lambda idx: idx[1], indices)
         localorbs[1] = localorbs[1][:,orderb]
         rotmat[1] = rotmat[1][:,orderb]
 
@@ -286,13 +287,13 @@ def momopt(old_basis, new_basis):
     cost_matrix = make_cost_matrix(ovlp_sq, lambda cost: 1. - cost)
 
     m = Munkres()
-    indexes = m.compute(cost_matrix)
-    indexes = sorted(indexes, key = lambda idx: idx[0])
-    vals = map(lambda idx: ovlp_sq[idx], indexes)
+    indices = m.compute(cost_matrix)
+    indices = sorted(indices, key = lambda idx: idx[0])
+    vals = map(lambda idx: ovlp_sq[idx], indices)
     log.info("MOM reorder quality: max %5.2f min %5.2f ave %5.2f", \
             np.max(vals), np.min(vals), np.average(vals))
 
-    reorder = [idx[1] for idx in indexes]
+    reorder = [idx[1] for idx in indices]
     return reorder, np.average(vals)
 
 def reorder(order, Ham, orbs, rot = None):
@@ -401,50 +402,62 @@ def get_qps(casci, Ham, guess):
 
     E_HFB, GRho_HFB = casci.scfsolver.HFB(Mu = 0, tol = 1e-5, \
             MaxIter = 30, InitGuess = guess)
-
     mo = casci.scfsolver.get_mo()
     mo_energy = casci.scfsolver.get_mo_energy()
     norb = mo_energy.size / 2
     ncas = casci.ncas
-    core = mo[:, :norb - ncas]
-    virt = mo[:, norb + ncas:]
+    log.info("ncore = %d ncas = %d", norb-ncas, ncas)
+    log.info("core orbital energy cut-off = %20.12f", \
+            max(mo_energy[norb-ncas-1], mo_energy[norb+ncas]) \
+            if ncas < norb else float("Inf"))
+    log.info("active orbital energy cut-off = %20.12f", \
+            max(mo_energy[norb-ncas], mo_energy[norb+ncas-1]))
 
-    cas0 = mo[:, norb - ncas: norb + ncas]
+    core = np.empty((2, norb*2, norb - ncas))
+    core[0] = mo[:, :norb - ncas]
+    core[1, :norb] = mo[norb:, norb + ncas:]
+    core[1, norb:] = mo[:norb, norb + ncas:]
+    cas_temp = mo[:, norb - ncas: norb + ncas]
     cas_energy = mo_energy[norb - ncas: norb + ncas]
     cas = [{"o": [], "v": [], "p": []}, {"o": [], "v": [], "p": []}]
-    for i in range(ncas*2):
-        v, u = la.norm(cas0[:norb, i]), la.norm(cas0[norb:, i])
-        if v > u:
-            if cas_energy[i] < -1e-4:
-                cas[0]['o'].append(cas0[:, i])
-            elif cas_energy[i] > 1e-4:
-                cas[0]['v'].append(cas0[:, i])
-            else:
-                cas[0]['p'].append(cas0[:, i])
+    cas_v = map(lambda i: la.norm(cas_temp[:,i]), range(ncas*2))
+    order = np.argsort(cas_v)
+    for idx in order[ncas:]: # alpha
+        if cas_energy[idx] < -1e-4:
+            cas[0]['o'].append(cas_temp[:, idx])
+        elif cas_energy[idx] > 1e-4:
+            cas[0]['v'].append(cas_temp[:, idx])
         else:
-            core = np.hstack((core, cas0[:, i:i+1]))
-            if cas_energy[i] < -1e-4:
-                cas[1]['v'].append(np.concatenate(\
-                        (cas0[norb:, i], cas0[:norb, i]), 0))
-            elif cas_energy[i] > 1e-4:
-                cas[1]['o'].append(np.concatenate(\
-                        (cas0[norb:, i], cas0[:norb, i]), 0))
-            else:
-                cas[1]['p'].append(np.concatenate(\
-                        (cas0[norb:, i], cas0[:norb, i]), 0))
+            cas[0]['p'].append(cas_temp[:, idx])
+    for idx in order[:ncas]:
+        if cas_energy[idx] < -1e-4:
+            cas[1]['v'].append(cas_temp[range(norb, norb*2) + \
+                    range(norb), idx])
+        elif cas_energy[idx] > 1e-4:
+            cas[1]['o'].append(cas_temp[range(norb, norb*2) + \
+                    range(norb), idx])
+        else:
+            cas[1]['p'].append(cas_temp[range(norb, norb*2) + \
+                    range(norb), idx])
+    casinfo = map(lambda i: (len(cas[i]['o']), len(cas[i]['p']), \
+            len(cas[i]['v'])), range(2))
+    cas = np.asarray(map(lambda i: np.asarray(cas[i]['o'] + \
+            cas[i]['p'] + cas[i]['v']).T, range(2)))
 
-    casinfo = map(lambda i: (len(cas[i]['o']), len(cas[i]['p']), len(cas[i]['v'])), \
-            range(2))
-    cas = map(lambda i: np.asarray(cas[i]['o'] + cas[i]['p'] + cas[i]['v']).T, \
-            range(2))
-    log.eassert(cas[0].shape[1] == cas[1].shape[1], \
-            "Number of alpha and beta quasiparticles are not equal")
-    return core, np.asarray(cas), virt, casinfo
+    for s in range(2):
+        log.info("In CAS (spin %d):\n"
+                "Occupied (e<mu): %d\n""Virtual  (e>mu): %d\n"
+                "Partial Occupied: %d\n", s, casinfo[s][0], \
+                casinfo[s][2], casinfo[s][1])
+    return core, np.asarray(cas), casinfo
 
 def buildBCSCasHamiltonian(Ham, core, cas):
-    norb = core.shape[0] / 2
-    coreGRdm = np.dot(core, core.T)
-    cRhoA, cRhoB, cKappaBA = extractRdm(coreGRdm)
+    norb = Ham.norb
+    cVA, cVB, cUA, cUB = core[0, :norb], core[1, :norb], \
+            core[1, norb:], core[0, norb:]
+    cRhoA = np.dot(cVA, cVA.T)
+    cRhoB = np.dot(cVB, cVB.T)
+    cKappaBA = np.dot(cUB, cVA.T)
     # zero-energy
     _H0 = Ham.H0
     # core-core one-body
@@ -461,17 +474,88 @@ def buildBCSCasHamiltonian(Ham, core, cas):
     vj01 = np.tensordot(_eriAB, cRhoB, ((2,3), (0,1)))
     vk00 = np.tensordot(cRhoA, _eriA, ((0,1), (0,3)))
     vk11 = np.tensordot(cRhoB, _eriB, ((0,1), (0,3)))
-    vl10 = np.tensordot(cKappaBA, _eriAB, ((0,1), (0,2)))# wrt kappa_ba
-    v = np.asarray([vj00+vj01-vk00, vj11+vj10-vk11, vl10.T])
+    vl10 = np.tensordot(cKappaBA, _eriAB, ((1,0), (0,2))) # wrt kappa_ba.T
+    v = np.asarray([vj00+vj01-vk00, vj11+vj10-vk11, vl10])
     # core-core two-body
     _H0 += 0.5 * np.sum(cRhoA * v[0] + cRhoB * v[1] + 2 * cKappaBA.T * v[2])
-
     VA, VB, UA, UB = cas[0,:norb], cas[1,:norb], cas[1,norb:], cas[0,norb:]
     H0, CD, CC, CCDD, CCCD, CCCC = transform(VA, VB, UA, UB, _H0, \
             Ham.H1["cd"][0] + v[0], Ham.H1["cd"][1] + v[1], Ham.H1["cc"][0] + \
-            v[2][0], Ham.H2["ccdd"][0], Ham.H2["ccdd"][1], Ham.H2["ccdd"][2])
+            v[2], Ham.H2["ccdd"][0], Ham.H2["ccdd"][1], Ham.H2["ccdd"][2])
     return integral.Integral(cas.shape[2], False, True, H0, {"cd": CD, "cc": CC}, \
             {"ccdd": CCDD, "cccd": CCCD, "cccc": CCCC})
+
+def bcs_split_localize(orbs, info, Ham, basis = None):
+    spin = 2
+    norbs = Ham.H1["cd"].shape[1]
+    localorbs = np.empty_like(orbs)
+    rotmat = np.zeros_like(Ham.H1["cd"])
+    for s in range(spin):
+        occ, part, virt = info[s]
+        if occ > 0:
+            localizer = Localizer(Ham.H2["ccdd"][s, \
+                    :occ, :occ, :occ, :occ])
+            log.info("Localization: Spin %d, occupied", s)
+            localizer.optimize()
+            occ_coefs = localizer.coefs.T
+            localorbs[s, :, :occ] = np.dot(orbs[s,:,:occ], occ_coefs)
+            rotmat[s, :occ, :occ] = occ_coefs
+        if virt > 0:
+            localizer = Localizer(Ham.H2["ccdd"][s, \
+                    -virt:, -virt:, -virt:, -virt:])
+            log.info("Localization: Spin %d, virtual", s)
+            localizer.optimize()
+            virt_coefs = localizer.coefs.T
+            localorbs[s, :, -virt:] = np.dot(orbs[s,:,-virt:], virt_coefs)
+            rotmat[s, -virt:, -virt:] = virt_coefs
+        if part > 0:
+            localizer = Localizer(Han.H2["ccdd"][s, occ:norbs-virt, \
+                occ:norbs-virt, occ:norbs-virt, occ:nobrs-virt])
+            log.info("Localization: Spin %d, partially occupied:", s)
+            localizer.optimize()
+            part_coefs = localizer.ceofs.T
+            localorbs[s, :, occ:norbs-virt] = \
+                    np.dot(orbs[s,:,occ:norbs-virt], part_coefs)
+            rotmat[s, occ:norbs-virt, occ:norbs-virt] = part_coefs
+
+    if basis is not None:
+        # match alpha, beta basis
+        # localorbs contain v and u parts with respect to embedding quasiparticles
+        localbasis = basisToSpin(np.dot(basisToCanonical(basis), \
+                basisToCanonical(localorbs)))
+        ovlp = np.tensordot(np.abs(localbasis[0]), np.abs(localbasis[1]), ((0,1), (0,1)))
+        ovlp_sq = ovlp ** 2
+        cost_matrix = make_cost_matrix(ovlp_sq, lambda cost: 1. - cost)
+        m = Munkres()
+        indices = m.compute(cost_matrix)
+        indices = sorted(indices, key = lambda idx: idx[0])
+        vals = map(lambda idx: ovlp_sq[idx], indices)
+        log.debug(1, "Quasiparticle pairs and their overlap:")
+        for i in range(norbs):
+            log.debug(1, "(%2d, %2d) -> %12.6f", indices[i][0], indices[i][1], vals[i])
+        log.info("Match localized quasiparticles: max %5.2f min %5.2f ave %5.2f", \
+                np.max(vals), np.min(vals), np.average(vals))
+
+        # update localorbs and rotmat
+        orderb = map(lambda idx: idx[1], indices)
+        localorbs[1] = localorbs[1][:, orderb]
+        rotmat[1] = rotmat[1][:, orderb]
+
+        localbasis[1] = localbasis[1][:,:,orderb]
+        # make spin up and down basis have the same sign, i.e.
+        # inner product larger than 1
+        for i in range(norbs):
+            if np.sum(localbasis[0,:,:,i] * localbasis[1,:,:,i]) < 0:
+                localorbs[1,:,i] *= -1.
+                rotmat[1,:,i] *= -1
+
+    H0, CD, CC, CCDD, CCCD, CCCC = transform_local(rotmat[0], rotmat[1], Ham.H0, \
+            Ham.H1["cd"][0], Ham.H1["cd"][1], Ham.H1["cc"][0], Ham.H2["ccdd"][0], \
+            Ham.H2["ccdd"][1], Ham.H2["ccdd"][2], Ham.H2["cccd"][0], \
+            Ham.H2["cccd"][1], Ham.H2["cccc"][0])
+    HamLocal = integral.Integral(norbs, False, True, H0, {"cd": CD, "cc": CC}, \
+            {"ccdd": CCDD, "cccd": CCCD, "cccc": CCCC})
+    return HamLocal, localorbs, rotmat
 
 class BCSDmrgCI(object):
     def __init__(self, ncas, splitloc = False, cisolver = None, \
@@ -498,14 +582,14 @@ class BCSDmrgCI(object):
         # ci_args is a list or dict for ci solver, or None
 
         # FIXME think about choosing number of electron/hole freely
-        core, cas, virt, casinfo = get_qps(self, Ham, guess)
-        coreGRho = np.dot(core, core.T)
+        core, cas, casinfo = get_qps(self, Ham, guess)
+        coreGRho = np.dot(core[0], core[0].T)
+        casHam = buildBCSCasHamiltonian(Ham, core, cas)
 
-        BCSCasHam = buildBCSCasHamiltonian(Ham, core, cas)
-        #if self.splitloc:
-        #    casHam, cas, _ = \
-        #            split_localize(cas, casinfo, casHam, basis = basis)
-        #
+        if self.splitloc:
+            casHam, cas, _ = \
+                    bcs_split_localize(cas, casinfo, casHam, basis = basis)
+
         #if self.mom_reorder:
         #    log.eassert(basis is not None, \
         #            "maximum overlap method (MOM) requires embedding basis")
@@ -534,16 +618,9 @@ class BCSDmrgCI(object):
         #        np.tensordot(basis[0], cas[0], (2,0)),
         #        np.tensordot(basis[1], cas[1], (2,0))
         #    ])
-
-        casGRho, E = self.cisolver.run(BCSCasHam, **ci_args)
-        norb = core.shape[0] / 2
-
-        cas1 = np.empty((norb*2, self.ncas * 2))
-        cas1[:, :self.ncas] = cas[0]
-        cas1[:norb, self.ncas:] = cas[1, norb:]
-        cas1[norb:, self.ncas:] = cas[1, :norb]
+        casGRho, E = self.cisolver.run(casHam, **ci_args)
+        cas1 = basisToCanonical(cas)
         GRho = mdot(cas1, casGRho, cas1.T) + coreGRho
-
         return GRho, E
 
     def cleanup(self):
