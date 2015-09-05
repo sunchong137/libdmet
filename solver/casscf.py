@@ -13,7 +13,9 @@ class CASSCF(mc1step_uhf.CASSCF):
     def __init__(self, mf, ncas, nelecas, ncore = None, frozen = []):
         mc1step_uhf.CASSCF.__init__(self, mf, ncas, nelecas, ncore, frozen)
         casci_uhf.CASCI.get_hcore = lambda *args: mf.h1e
-        if log.Level[log.verbose] >= log.Level["RESULT"]:
+        if log.Level[log.verbose] >= log.Level["DEBUG1"]:
+            self.verbose = 5
+        elif log.Level[log.verbose] >= log.Level["RESULT"]:
             self.verbose = 4
         else:
             self.verbose = 2
@@ -69,6 +71,22 @@ class CASSCF(mc1step_uhf.CASSCF):
 
         return eris
 
+    def approx_cas_integral(self, mo, u, eris):
+        if self.exact_integral:
+            # new mo
+            mo1 = map(np.dot, mo, u)
+            # h1e
+            h1cas, ecore = self.h1e_for_cas(mo1)
+            _, ecore0 = self.h1e_for_cas(mo)
+            ecore -= ecore0
+            # h2e
+            _, cas, _ = casci_uhf.extract_orbs(mo1, self.ncas, \
+                    self.nelecas, self.ncore)
+            eriaa, eribb, eriab = incore_transform(self._scf._eri, \
+                    (cas, cas, cas, cas))
+            return ecore, h1cas, (eriaa, eriab, eribb)
+        else:
+            return mc1step_uhf.CASSCF.approx_cas_integral(self, mo, u, eris)
 
 def proj_rho(orbs, rho):
     spin = rho.shape[0]
@@ -289,14 +307,13 @@ class DMRGSCF(CASSCF):
 
         self.rot = rot
 
-        # solve dmrg for a few steps, 2 twodot with noise,
-        # 2 twodot without noise and 2 onedot
-        schedule = block.Schedule(maxiter = 6)
+        # solve dmrg for a few steps, 2 onedot with noise and 2 onedot without noise
+        schedule = block.Schedule(maxiter = 4)
         M = self.fcisolver.maxM
         tol = self.fcisolver.schedule.sweeptol * 0.1
         schedule.gen_custom(arrayM = [self.fcisolver.maxM, self.fcisolver.maxM], \
                 arraySweep = [0, 2], arrayTol = [tol, tol], arrayNoise = [tol, 0], \
-                twodot_to_onedot = 4)
+                twodot_to_onedot = 0)
 
         cas_local_1pdm, E = self.fcisolver.run(casHam, \
                 nelec = np.sum(self.nelecas), schedule = schedule)

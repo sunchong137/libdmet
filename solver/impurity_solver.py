@@ -85,6 +85,7 @@ class CASSCF(object):
         "ah_decay_rate": 0.7, # augmented hessian decay
         "ci_repsonse_space": 3,
         "dynamic_micro_step": False,
+        "exact_integral": True,
     }
 
     def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
