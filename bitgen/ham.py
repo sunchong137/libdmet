@@ -35,18 +35,22 @@ def ccterm(restricted = False):
     cc = OpSum(D * C('A', 'i') * C('B', 'j'))
     return cc + cc.conj()
 
-def ccddterm(restricted = False):
+def ccddterm(restricted = False, lowsymm = False):
     if restricted:
         W = Coeff('w', 'iljk', symm.Idx8FoldSymm())
         return 0.5 * OpSum(W * C('A','i') * C('A','j') * D('A','k') * D('A','l')) + \
                 0.5 * OpSum(W * C('B','i') * C('B','j') * D('B','k') * D('B','l')) + \
                 OpSum(W * C('A','i') * C('B','j') * D('B','k') * D('A','l'))
     else:
+        if lowsymm:
+            symmAB = symm.IdxSymmetry(symm = [(0,1,2,3), (1,0,3,2)], antisymm = [])
+        else:
+            symmAB = symm.Idx4FoldSymm()
         return 0.5 * OpSum(Coeff('w_A', 'iljk', symm.Idx8FoldSymm()) * C('A','i') * \
                 C('A','j') * D('A','k') * D('A','l')) + \
                 0.5 * OpSum(Coeff('w_B', 'iljk', symm.Idx8FoldSymm()) * C('B','i') * \
                 C('B','j') * D('B','k') * D('B','l')) + \
-                OpSum(Coeff('w_AB', 'iljk', symm.Idx4FoldSymm()) * C('A','i') * C('B','j') * \
+                OpSum(Coeff('w_AB', 'iljk', symmAB) * C('A','i') * C('B','j') * \
                 D('B','k') * D('A','l')) # not sure about the symmetry
 
 
@@ -79,7 +83,8 @@ def H1(restricted = False, bogoliubov = False):
 
 def H2(restricted = False, bogoliubov = False):
     if bogoliubov:
-        return ccddterm(restricted) + cccdterm(restricted) + ccccterm(restricted)
+        return ccddterm(restricted, lowsymm = True) + cccdterm(restricted) + \
+                ccccterm(restricted)
     else:
         return ccddterm(restricted)
 

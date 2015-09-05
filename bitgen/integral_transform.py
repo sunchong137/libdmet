@@ -236,19 +236,31 @@ def defineH2symmetrized(expr, oplist, name):
         define(expr, oplist, 4, name = name, final = "True")
     elif name in ["H2wA_H2", "H2wB_H2"]:
         op1 = define(expr, oplist, 4)
-        expr1 = "@01 + np.transpose(@01, (2,3,0,1))"
+        if (2,3,0,1) in op1.symm._symm:
+            expr1 = "2.*@01"
+        else:
+            expr1 = "@01 + np.transpose(@01, (2,3,0,1))"
         # since we have a factor of 0.5 in the definition
         define(expr1, [op1], 4, name = name, final = True)
     elif name in ["H2yA_H2", "H2yB_H2"]:
-        op1 = define(expr, oplist, 4, name)
-        expr1 = "@01 - np.transpose(@01, (1,0,2,3))"
+        op1 = define(expr, oplist, 4, name = name)
+        if (1,0,2,3) in op1.symm._antisymm:
+            expr1 = "2.*@01"
+        else:
+            expr1 = "@01 - np.transpose(@01, (1,0,2,3))"
         # since we have a factor of 0.5 in the definition
         define(expr1, [op1], 4, name = name, final = True)
     elif name == "H2x_H2":
-        op1 = define(expr, oplist, 4, name)
-        expr1 = "@01 - np.transpose(@01, (1,0,2,3))"
-        op2 = define(expr1, [op1], 4, name)
-        expr2 = "@01 - np.transpose(@01, (0,1,3,2))"
+        op1 = define(expr, oplist, 4, name = name)
+        if (1,0,2,3) in op1.symm._antisymm:
+            expr1 = "2.*@01"
+        else:
+            expr1 = "@01 - np.transpose(@01, (1,0,2,3))"
+        op2 = define(expr1, [op1], 4, name = name)
+        if (0,1,3,2) in op1.symm._antisymm:
+            expr2 = "2.*@01"
+        else:
+            expr2 = "@01 - np.transpose(@01, (0,1,3,2))"
         # a factor of 1/4
         define(expr2, [op2], 4, name = name, final = True)
     else:

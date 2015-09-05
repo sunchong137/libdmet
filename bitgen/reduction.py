@@ -7,6 +7,12 @@ import libdmet.utils.logger as log
 # we define the reduced form of operator products here
 _reduced = {}
 _reduced[0] = [OpProduct([])]
+_reduced[1] = [
+    C('A'),
+    C('B'),
+    D('A'),
+    D('B')
+]
 _reduced[2] = [
     C('A') * D('A'),
     C('B') * D('B'),

@@ -18,7 +18,7 @@ class FermionSub(object):
         for indices in self.indices:
             assert("".join(indices).count(f.idx[0]) == 1)
         self.sum_indices = map(lambda indices: \
-                list(set("".join(indices)).difference(set(['i']))), \
+                list(set("".join(indices)).difference(set(self.f.idx))), \
                 self.indices)
         for dumb, indices in zip(self.sum_indices, self.indices):
             for idx in dumb:
