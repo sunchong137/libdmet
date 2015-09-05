@@ -520,8 +520,8 @@ def bcs_split_localize(orbs, info, Ham, basis = None):
     if basis is not None:
         # match alpha, beta basis
         # localorbs contain v and u parts with respect to embedding quasiparticles
-        localbasis = basisToSpin(np.dot(basisToCanonical(basis), \
-                basisToCanonical(localorbs)))
+        localbasis = basisToSpin(np.tensordot(basisToCanonical(basis), \
+                basisToCanonical(localorbs), (2, 0)))
         ovlp = np.tensordot(np.abs(localbasis[0]), np.abs(localbasis[1]), ((0,1), (0,1)))
         ovlp_sq = ovlp ** 2
         cost_matrix = make_cost_matrix(ovlp_sq, lambda cost: 1. - cost)
@@ -556,9 +556,35 @@ def bcs_split_localize(orbs, info, Ham, basis = None):
             {"ccdd": CCDD, "cccd": CCCD, "cccc": CCCC})
     return HamLocal, localorbs, rotmat
 
+def reorder(order, Ham, orbs, rot = None):
+    # order 4 1 3 2 means 4 to 1, 1 to 2, 3 to 3, 2 to 4
+    # reorder in place
+    orbs = orbs[:, :, order]
+    Ham.H1["cd"] = Ham.H1["cd"][:, order, :]
+    Ham.H1["cd"] = Ham.H1["cd"][:, :, order]
+    Ham.H1["cc"] = Ham.H1["cc"][:, order, :]
+    Ham.H1["cc"] = Ham.H1["cc"][:, :, order]
+    Ham.H2["ccdd"] = Ham.H2["ccdd"][:, order, :, :, :]
+    Ham.H2["ccdd"] = Ham.H2["ccdd"][:, :, order, :, :]
+    Ham.H2["ccdd"] = Ham.H2["ccdd"][:, :, :, order, :]
+    Ham.H2["ccdd"] = Ham.H2["ccdd"][:, :, :, :, order]
+    Ham.H2["cccd"] = Ham.H2["cccd"][:, order, :, :, :]
+    Ham.H2["cccd"] = Ham.H2["cccd"][:, :, order, :, :]
+    Ham.H2["cccd"] = Ham.H2["cccd"][:, :, :, order, :]
+    Ham.H2["cccd"] = Ham.H2["cccd"][:, :, :, :, order]
+    Ham.H2["cccc"] = Ham.H2["cccc"][:, order, :, :, :]
+    Ham.H2["cccc"] = Ham.H2["cccc"][:, :, order, :, :]
+    Ham.H2["cccc"] = Ham.H2["cccc"][:, :, :, order, :]
+    Ham.H2["cccc"] = Ham.H2["cccc"][:, :, :, :, order]
+    if rot is not None:
+        rot = rot[:, :, order]
+        return Ham, orbs, rot
+    else:
+        return Ham, orbs
+
 class BCSDmrgCI(object):
     def __init__(self, ncas, splitloc = False, cisolver = None, \
-            mom_reorder = False, tmpDir = "/tmp"):
+            mom_reorder = True, tmpDir = "/tmp"):
         self.ncas = ncas
         self.splitloc = splitloc
         log.eassert(cisolver is not None, "No default ci solver is available" \
@@ -589,34 +615,31 @@ class BCSDmrgCI(object):
             casHam, cas, _ = \
                     bcs_split_localize(cas, casinfo, casHam, basis = basis)
 
-        #if self.mom_reorder:
-        #    log.eassert(basis is not None, \
-        #            "maximum overlap method (MOM) requires embedding basis")
-        #    if self.localized_cas is None:
-        #        order = gaopt(casHam, tmp = self.tmpDir)
-        #    else:
-        #        # define cas_basis
-        #        cas_basis = np.asarray([
-        #            np.tensordot(basis[0], cas[0], (2,0)),
-        #            np.tensordot(basis[1], cas[1], (2,0))
-        #        ])
-        #        # cas_basis and self.localized_cas are both in
-        #        # atomic representation now
-        #        order, q = momopt(self.localized_cas, cas_basis)
-        #        # if the quality of mom is too bad, we reorder the orbitals
-        #        # using genetic algorithm
-        #        # FIXME seems larger q is a better choice
-        #        if q < 0.7:
-        #            order = gaopt(casHam, tmp = self.tmpDir)
+        if self.mom_reorder:
+            log.eassert(basis is not None, \
+                    "maximum overlap method (MOM) requires embedding basis")
+            if self.localized_cas is None:
+                order = gaopt(casHam, tmp = self.tmpDir)
+            else:
+                # define cas_basis
+                cas_basis = basisToSpin(np.tensordot(basisToCanonical(basis), \
+                        basisToCanonical(cas), (2,0)))
+                # cas_basis and self.localized_cas are both in
+                # atomic representation now
+                order, q = momopt(self.localized_cas, cas_basis)
+                # if the quality of mom is too bad, we reorder the orbitals
+                # using genetic algorithm
+                # FIXME seems larger q is a better choice
+                if q < 0.7:
+                    order = gaopt(casHam, tmp = self.tmpDir)
 
-        #    log.info("Orbital order: %s", order)
-        #    # reorder casHam and cas
-        #    casHam, cas = reorder(order, casHam, cas)
-        #    # store cas in atomic basis
-        #    self.localized_cas = np.asarray([
-        #        np.tensordot(basis[0], cas[0], (2,0)),
-        #        np.tensordot(basis[1], cas[1], (2,0))
-        #    ])
+            log.info("Orbital order: %s", order)
+            # reorder casHam and cas
+            casHam, cas = reorder(order, casHam, cas)
+            # store cas in atomic basis
+            self.localized_cas = basisToSpin(np.tensordot(basisToCanonical(basis), \
+                        basisToCanonical(cas), (2,0)))
+
         casGRho, E = self.cisolver.run(casHam, **ci_args)
         cas1 = basisToCanonical(cas)
         GRho = mdot(cas1, casGRho, cas1.T) + coreGRho
