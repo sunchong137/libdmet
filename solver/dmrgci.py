@@ -420,7 +420,7 @@ def get_qps(casci, Ham, guess):
     cas_temp = mo[:, norb - ncas: norb + ncas]
     cas_energy = mo_energy[norb - ncas: norb + ncas]
     cas = [{"o": [], "v": [], "p": []}, {"o": [], "v": [], "p": []}]
-    cas_v = map(lambda i: la.norm(cas_temp[:,i]), range(ncas*2))
+    cas_v = map(lambda i: la.norm(cas_temp[:norb,i]), range(ncas*2))
     order = np.argsort(cas_v)
     for idx in order[ncas:]: # alpha
         if cas_energy[idx] < -1e-4:
@@ -517,7 +517,6 @@ def bcs_split_localize(orbs, info, Ham, basis = None):
             localorbs[s, :, occ:norbs-virt] = \
                     np.dot(orbs[s,:,occ:norbs-virt], part_coefs)
             rotmat[s, occ:norbs-virt, occ:norbs-virt] = part_coefs
-
     if basis is not None:
         # match alpha, beta basis
         # localorbs contain v and u parts with respect to embedding quasiparticles
@@ -625,4 +624,3 @@ class BCSDmrgCI(object):
 
     def cleanup(self):
         self.cisolver.cleanup()
-
