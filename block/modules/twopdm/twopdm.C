@@ -149,7 +149,15 @@ void compute_twopdm_final(std::vector<Wavefunction>& wavefunctions, const SpinBl
     array_4d<double> ccccpdm(big.size()*2, big.size()*2, big.size()*2, big.size()*2);
 	  load_twopdm_binary(cccdpdm, i ,j, 2);
 	  load_twopdm_binary(ccccpdm, i ,j, 4);
-    // do stuff
+
+    pout << "compute 0_0_4"<<endl;
+	  if(mpigetrank() == distribute_work[0])
+	    compute_two_pdm_0_0_4_bcs(wavefunction1, wavefunction2, big, twopdm, cccdpdm, ccccpdm);
+
+	  pout << "compute 1_3"<<endl;
+	  if(mpigetrank() == distribute_work[1])
+	    compute_two_pdm_1_3_bcs(wavefunction1, wavefunction2, big, twopdm, cccdpdm, ccccpdm);
+
     accumulate_twopdm(cccdpdm);
     accumulate_twopdm(ccccpdm);
 	  save_twopdm_binary(cccdpdm, i ,j, 2);
@@ -2938,4 +2946,117 @@ void compute_two_pdm_1_1_2_bcs(Wavefunction& wave1, Wavefunction& wave2, const S
   }
 }
 
+void compute_two_pdm_0_0_4_bcs(Wavefunction& wave1, Wavefunction& wave2, const SpinBlock& big, array_4d<double>& twopdm, array_4d<double>& cccdpdm, array_4d<double>& ccccpdm) {
+  // cccc, cccd all zero when localized on the same site
+  compute_two_pdm_0_0_4_nospin(wave1, wave2, big, twopdm);
+}
+
+void compute_two_pdm_1_3_bcs(Wavefunction& wave1, Wavefunction& wave2, const SpinBlock& big, array_4d<double>& twopdm, array_4d<double>& cccdpdm, array_4d<double>& ccccpdm) {
+  // cccc is zero, cccd: c_ia c_ja c_ib d_ia, and c_ib c_jb c_ia d_ib,
+  // so we need to build c_ia*c_ib*d_ia and c_ib*c_ia*d_ib on right block
+  // and c_ja or c_jb on the left and dot
+  SpinBlock* leftBlock = big.get_leftBlock()->get_leftBlock();
+  SpinBlock* rightBlock = big.get_rightBlock();
+  SpinBlock* dotBlock = big.get_leftBlock()->get_rightBlock();
+
+  for (int ij = 0; ij < rightBlock->get_op_array(CRE_CRE).get_size(); ++ij) {
+    boost::shared_ptr<SparseMatrix> rightop0 = rightBlock->get_op_array(CRE_CRE).get_local_element(ij)[0];
+    int ix = rightop0->get_orbs(0);
+    int jx = rightop0->get_orbs(1);
+    if (ix == jx) {
+      continue;
+    }
+    boost::shared_ptr<SparseMatrix> rightop1 = rightBlock->get_op_rep(CRE, getSpinQuantum(ix), ix);
+    boost::shared_ptr<SparseMatrix> rightop2 = rightBlock->get_op_rep(CRE, getSpinQuantum(jx), jx);
+    Cre Rightop1, Rightop2;
+    Rightop1.set_orbs() = rightop0->get_orbs();
+    Rightop1.set_orbs().push_back(ix);
+    Rightop1.set_initialised() = true;
+    Rightop1.set_fermion() = true;
+    Rightop1.set_deltaQuantum(1, (rightop0->get_deltaQuantum(0) - rightop1->get_deltaQuantum(0))[0]);
+    Rightop1.allocate(rightBlock->get_stateInfo());
+    operatorfunctions::Product(rightBlock, *rightop0, Transposeview(*rightop1), Rightop1, 1.);
+    Rightop2.set_orbs() = rightop0->get_orbs();
+    Rightop2.set_orbs().push_back(jx);
+    Rightop2.set_initialised() = true;
+    Rightop2.set_fermion() = true;
+    Rightop2.set_deltaQuantum(1, (rightop0->get_deltaQuantum(0) - rightop2->get_deltaQuantum(0))[0]);
+    Rightop2.allocate(rightBlock->get_stateInfo());
+    operatorfunctions::Product(rightBlock, *rightop0, Transposeview(*rightop2), Rightop2, 1.);
+
+    // 0_1_3
+    for (int l = 0; l < dotBlock->get_op_array(CRE).get_size(); ++l) {
+      boost::shared_ptr<SparseMatrix> dotop = dotBlock->get_op_array(CRE).get_local_element(l)[0];
+      int lx = dotop->get_orbs(0);
+      Transposeview tdop = Transposeview(*dotop);
+      boost::shared_ptr<SparseMatrix> leftop = 0;
+      // ccdd
+      if ((Rightop1.get_deltaQuantum(0) + tdop.get_deltaQuantum(0))[0].get_s().getirrep() == 0) {
+        vector<double> expectations;
+        spinExpectation(wave1, wave2, leftop, boost::make_shared<Transposeview>(tdop), boost::make_shared<Cre>(Rightop1), big, expectations, false); // d_l c_i c_j d_i
+        assign_antisymmetric(twopdm, ix, jx, ix, lx, -1.*expectations[0]);
+        assign_antisymmetric(twopdm, lx, ix, jx, ix, -1.*expectations[0]);
+      }
+      if ((Rightop2.get_deltaQuantum(0) + tdop.get_deltaQuantum(0))[0].get_s().getirrep() == 0) {
+        vector<double> expectations;
+        spinExpectation(wave1, wave2, leftop, boost::make_shared<Transposeview>(tdop), boost::make_shared<Cre>(Rightop2), big, expectations, false); // d_l c_i c_j d_j
+        assign_antisymmetric(twopdm, ix, jx, jx, lx, -1.*expectations[0]);
+        assign_antisymmetric(twopdm, lx, jx, jx, ix, -1.*expectations[0]);
+      }
+      // cccd
+      if ((Rightop1.get_deltaQuantum(0) + dotop->get_deltaQuantum(0))[0].get_s().getirrep() == 0) {
+        vector<double> expectations;
+        spinExpectation(wave1, wave2, leftop, dotop, boost::make_shared<Cre>(Rightop1), big, expectations, false); // c_l c_i c_j d_i
+        assign_antisymmetric_cccd(cccdpdm, lx, ix, jx, ix, expectations[0]);
+
+      }
+      if ((Rightop2.get_deltaQuantum(0) + dotop->get_deltaQuantum(0))[0].get_s().getirrep() == 0) {
+        vector<double> expectations;
+        spinExpectation(wave1, wave2, leftop, dotop, boost::make_shared<Cre>(Rightop2), big, expectations, false); // c_l c_i c_j d_j
+        assign_antisymmetric_cccd(cccdpdm, lx, ix, jx, jx, expectations[0]);
+      }
+    }
+
+    // 1_0_3
+#ifdef _OPENMP
+#pragma omp parallel default(shared)
+#endif
+    {
+#ifdef _OPENMP
+#pragma omp for schedule(guided) nowait
+#endif
+      for (int l = 0; l < leftBlock->get_op_array(CRE).get_size(); ++l) {
+        boost::shared_ptr<SparseMatrix> leftop = leftBlock->get_op_array(CRE).get_local_element(l)[0];
+        int lx = leftop->get_orbs(0);
+        Transposeview tlop = Transposeview(*leftop);
+        boost::shared_ptr<SparseMatrix> dotop = 0;
+        // ccdd
+        if ((Rightop1.get_deltaQuantum(0) + tlop.get_deltaQuantum(0))[0].get_s().getirrep() == 0) {
+          vector<double> expectations;
+          spinExpectation(wave1, wave2, boost::make_shared<Transposeview>(tlop), dotop, boost::make_shared<Cre>(Rightop1), big, expectations, false); // d_l c_i c_j d_i
+          assign_antisymmetric(twopdm, ix, jx, ix, lx, -1.*expectations[0]);
+          assign_antisymmetric(twopdm, lx, ix, jx, ix, -1.*expectations[0]);
+        }
+        if ((Rightop2.get_deltaQuantum(0) + tlop.get_deltaQuantum(0))[0].get_s().getirrep() == 0) {
+          vector<double> expectations;
+          spinExpectation(wave1, wave2, boost::make_shared<Transposeview>(tlop), dotop, boost::make_shared<Cre>(Rightop2), big, expectations, false); // d_l c_i c_j d_j
+          assign_antisymmetric(twopdm, ix, jx, jx, lx, -1.*expectations[0]);
+          assign_antisymmetric(twopdm, lx, jx, jx, ix, -1.*expectations[0]);
+        }
+        // cccd
+        if ((Rightop1.get_deltaQuantum(0) + leftop->get_deltaQuantum(0))[0].get_s().getirrep() == 0) {
+          vector<double> expectations;
+          spinExpectation(wave1, wave2, leftop, dotop, boost::make_shared<Cre>(Rightop1), big, expectations, false); // c_l c_i c_j d_i
+          assign_antisymmetric_cccd(cccdpdm, lx, ix, jx, ix, expectations[0]);
+
+        }
+        if ((Rightop2.get_deltaQuantum(0) + leftop->get_deltaQuantum(0))[0].get_s().getirrep() == 0) {
+          vector<double> expectations;
+          spinExpectation(wave1, wave2, leftop, dotop, boost::make_shared<Cre>(Rightop2), big, expectations, false); // c_l c_i c_j d_j
+          assign_antisymmetric_cccd(cccdpdm, lx, ix, jx, jx, expectations[0]);
+        }
+      }
+    }
+  }
+}
 }

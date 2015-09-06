@@ -423,7 +423,7 @@ void assign_antisymmetric_cccd(array_4d<double>& cccdpdm, const int i, const int
       cout << "earlier value: "<<cccdpdm(i,j,k,l)<<endl<<"new value: "<<val<<endl;
       abort();
     }
-  cout << "cccd " << i << " " << j << " " << k << " " << l << " " << val << endl;
+  //cout << "cccd " << i << " " << j << " " << k << " " << l << " " << val << endl;
   cccdpdm(i,j,k,l) = val;
   cccdpdm(i,k,j,l) = -val;
   cccdpdm(j,i,k,l) = -val;
@@ -439,7 +439,7 @@ void assign_antisymmetric_cccc(array_4d<double>& ccccpdm, const int i, const int
       cout << "earlier value: "<<ccccpdm(i,j,k,l)<<endl<<"new value: "<<val<<endl;
       abort();
     }
-  cout << "cccc " << i << " " << j << " " << k << " " << l << " " << val << endl;
+  //cout << "cccc " << i << " " << j << " " << k << " " << l << " " << val << endl;
   ccccpdm(i,j,k,l) = val;
   ccccpdm(i,j,l,k) = -val;
   ccccpdm(i,k,j,l) = -val;
