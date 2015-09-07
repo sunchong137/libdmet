@@ -272,7 +272,9 @@ double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const b
     load_twopdm_binary(cccdpdm, i, j, 2);
     load_twopdm_binary(ccccpdm, i, j, 4);
   }
-  //calcenergy(twopdm, i); FIXME calcenergy is wrong
+  if (!dmrginp.hamiltonian() == BCS) {
+    calcenergy(twopdm, i); // FIXME calcenergy is wrong for bcs
+  }
   save_twopdm_text(twopdm, i, j);
   if (dmrginp.hamiltonian() == BCS) {
     save_cccdpdm_text(cccdpdm, i, j);

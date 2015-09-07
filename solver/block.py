@@ -171,6 +171,20 @@ def read2pdm(filename):
 
     return pdm
 
+def read2pdm_bcs(filename):
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    nsites = int(lines[0])
+    pdm = np.zeros((nsites, nsites, nsites, nsites))
+
+    for line in lines[1:]:
+        tokens = line.split()
+        pdm[int(tokens[0]), int(tokens[1]), int(tokens[2]), int(tokens[3])] = \
+                float(tokens[4])
+
+    return pdm
+
 class Block(object):
 
     execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
@@ -381,43 +395,56 @@ class Block(object):
         else:
             return rho
 
-    def twopdm(self):
+    def twopdm(self, computed = False):
         log.eassert(self.optimized, "2pdm is computed using restart")
-        log.eassert(not self.bogoliubov, \
-                "2pdm with non particle number conservation is not implemented in BLOCK")
-        log.debug(0, "Run BLOCK with restart_twopdm")
+        #log.eassert(not self.bogoliubov, \
+        #        "2pdm with non particle number conservation is not implemented in BLOCK")
 
-        if Block.nnode == 1:
-            startPath = self.tmpDir
-        else:
-            startPath = self.tmpShared
+        if not computed:
+            log.debug(0, "Run BLOCK with restart_twopdm")
 
-        # copy configure file and add a line
-        sub.check_call(["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
-            os.path.join(startPath, "dmrg.conf.%03d" % self.count)])
+            if Block.nnode == 1:
+                startPath = self.tmpDir
+            else:
+                startPath = self.tmpShared
 
-        with open(os.path.join(startPath, "dmrg.conf.%03d" % self.count), "a") as f:
-            f.write("restart_twopdm\n")
+            # copy configure file and add a line
+            sub.check_call(["cp", os.path.join(startPath, "dmrg.conf.%03d" % (self.count-1)), \
+                os.path.join(startPath, "dmrg.conf.%03d" % self.count)])
 
-        if Block.nnode > 1:
-            self.broadcast()
+            with open(os.path.join(startPath, "dmrg.conf.%03d" % self.count), "a") as f:
+                f.write("restart_twopdm\n")
 
-        self.callBlock()
+            if Block.nnode > 1:
+                self.broadcast()
+
+            self.callBlock()
 
         norb = self.integral.norb
         if self.spinRestricted:
+            log.eassert(not self.bogoliubov, "2pdm with Bogoliubov Hamiltonian is" \
+                    " only implemented for non spinadapted case")
             # read spatial twopdm
-            gamma = read2pdm(os.path.join(self.tmpDir, "spatial_twopdm.0.0.txt")) / 2
+            gamma0 = read2pdm(os.path.join(self.tmpDir, "spatial_twopdm.0.0.txt")) / 2
             # gamma_ijkl=0.25*sum_{s,t}<c_is c_jt d_kt d_ls>
-            gamma = gamma.reshape((1, norb, norb, norb, norb))
+            gamma0 = gamma0.reshape((1, norb, norb, norb, norb))
         else:
-            gamma0 = read2pdm(os.path.join(self.tmpDir, "twopdm.0.0.txt"))
-            gamma = np.empty((3, norb, norb, norb, norb))
-            gamma[0] = gamma0[::2,::2,::2,::2] # alpha-alpha
-            gamma[1] = gamma0[1::2,1::2,1::2,1::2] # beta-beta
-            gamma[2] = gamma0[::2,::2,1::2,1::2] # alpha-beta
-
-        return gamma
+            temp = read2pdm(os.path.join(self.tmpDir, "twopdm.0.0.txt"))
+            gamma0 = np.empty((3, norb, norb, norb, norb))
+            gamma0[0] = temp[::2,::2,::2,::2] # alpha-alpha
+            gamma0[1] = temp[1::2,1::2,1::2,1::2] # beta-beta
+            gamma0[2] = temp[::2,::2,1::2,1::2] # alpha-beta
+            if self.bogoliubov:
+                temp = read2pdm_bcs(os.path.join(self.tmpDir, "cccdpdm.0.0.txt"))
+                gamma2 = np.empty((2, norb, norb, norb, norb))
+                gamma2[0] = temp[::2, ::2, 1::2, ::2]
+                gamma2[1] = temp[1::2, 1::2, ::2, 1::2]
+                temp = read2pdm_bcs(os.path.join(self.tmpDir, "ccccpdm.0.0.txt"))
+                gamma4 = np.empty((1, norb, norb, norb, norb))
+                gamma4[0] = temp[::2, ::2, 1::2, 1::2]
+                return (gamma0, gamma2, gamma4)
+            else:
+                return gamma0
 
     def just_run(self, onepdm = True, dry_run = False):
         log.debug(0, "Run BLOCK")
