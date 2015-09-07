@@ -86,6 +86,8 @@ void FormLeftOp(const SpinBlock* leftBlock, const boost::shared_ptr<SparseMatrix
 void spin_to_nonspin(vector<int>& indices, vector<double>& coeffs, array_4d<double>& twopdm, Oporder order, bool dotranspose);  // Done
 
 void save_twopdm_text(const array_4d<double>& twopdm, const int &i, const int &j);
+void save_cccdpdm_text(const array_4d<double>& cccdpdm, const int &i, const int &j);
+void save_ccccpdm_text(const array_4d<double>& ccccpdm, const int &i, const int &j);
 void save_spatial_twopdm_text(const array_4d<double>& twopdm, const int &i, const int &j);
 void save_spatial_twopdm_binary(const array_4d<double>& twopdm, const int &i, const int &j);
 void save_twopdm_binary(const array_4d<double>& twopdm, const int &i, const int &j, int type = 0);

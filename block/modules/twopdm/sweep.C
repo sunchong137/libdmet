@@ -195,12 +195,13 @@ double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const b
 
   int nspinorb = dmrginp.spinAdapted() ? 2*dmrginp.last_site() : dmrginp.last_site();
   array_4d<double> twopdm(nspinorb, nspinorb, nspinorb, nspinorb);
+  array_4d<double> cccdpdm, ccccpdm;
   twopdm.Clear();
   save_twopdm_binary(twopdm, state, state);
 
   if (dmrginp.hamiltonian() == BCS) {
-    array_4d<double> cccdpdm(nspinorb, nspinorb, nspinorb, nspinorb);
-    array_4d<double> ccccpdm(nspinorb, nspinorb, nspinorb, nspinorb);
+    cccdpdm.resize(nspinorb, nspinorb, nspinorb, nspinorb);
+    ccccpdm.resize(nspinorb, nspinorb, nspinorb, nspinorb);
     cccdpdm.Clear();
     ccccpdm.Clear();
 
@@ -267,8 +268,16 @@ double SweepTwopdm::do_one(SweepParams &sweepParams, const bool &warmUp, const b
   int i = state, j = state;
   //for (int j=0; j<=i; j++) {
   load_twopdm_binary(twopdm, i, j);
-  calcenergy(twopdm, i);
+  if (dmrginp.hamiltonian() == BCS) {
+    load_twopdm_binary(cccdpdm, i, j, 2);
+    load_twopdm_binary(ccccpdm, i, j, 4);
+  }
+  //calcenergy(twopdm, i); FIXME calcenergy is wrong
   save_twopdm_text(twopdm, i, j);
+  if (dmrginp.hamiltonian() == BCS) {
+    save_cccdpdm_text(cccdpdm, i, j);
+    save_ccccpdm_text(ccccpdm, i, j);
+  }
   save_spatial_twopdm_text(twopdm, i, j);
   save_spatial_twopdm_binary(twopdm, i, j);
 

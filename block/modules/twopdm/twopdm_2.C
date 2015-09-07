@@ -229,6 +229,55 @@ void save_twopdm_text(const array_4d<double>& twopdm, const int &i, const int &j
   }
 }
 
+void save_cccdpdm_text(const array_4d<double>& cccdpdm, const int &i, const int &j) {
+  if(!mpigetrank())
+  {
+    std::vector<int> reorder;
+    reorder.resize(cccdpdm.dim1()/2);
+    for (int k = 0; k < cccdpdm.dim2()/2; ++k) {
+      reorder.at(dmrginp.reorder_vector()[k]) = k;
+    }
+    char file[5000];
+    sprintf (file, "%s%s%d.%d%s", dmrginp.save_prefix().c_str(),"/cccdpdm.", i, j, ".txt");
+    ofstream ofs(file);
+    ofs << cccdpdm.dim1() << endl;
+    for (int s=0; s<2; ++s)
+      for(int k=0;k<cccdpdm.dim1()/2;++k)
+        for(int l=0;l<cccdpdm.dim2()/2;++l)
+          for(int m=0;m<cccdpdm.dim3()/2;++m)
+            for(int n=0;n<cccdpdm.dim4()/2;++n) {
+              // only store aaba, bbab elements
+              ofs << boost::format("%d %d %d %d %20.14e\n") % (2*k+s) % (2*l+s) % (2*m+1-s) % (2*n+s) \
+                % cccdpdm(2*reorder.at(k)+s, 2*reorder.at(l)+s, 2*reorder.at(m)+1-s, 2*reorder.at(n)+s);
+            }
+    ofs.close();
+  }
+}
+
+void save_ccccpdm_text(const array_4d<double>& ccccpdm, const int &i, const int &j) {
+  if(!mpigetrank())
+  {
+    std::vector<int> reorder;
+    reorder.resize(ccccpdm.dim1()/2);
+    for (int k = 0; k < ccccpdm.dim2()/2; ++k) {
+      reorder.at(dmrginp.reorder_vector()[k]) = k;
+    }
+    char file[5000];
+    sprintf (file, "%s%s%d.%d%s", dmrginp.save_prefix().c_str(),"/ccccpdm.", i, j, ".txt");
+    ofstream ofs(file);
+    ofs << ccccpdm.dim1() << endl;
+    for(int k=0;k<ccccpdm.dim1()/2;++k)
+      for(int l=0;l<ccccpdm.dim2()/2;++l)
+        for(int m=0;m<ccccpdm.dim3()/2;++m)
+          for(int n=0;n<ccccpdm.dim4()/2;++n) {
+            // only store aabb
+            ofs << boost::format("%d %d %d %d %20.14e\n") % (2*k) % (2*l) % (2*m+1) % (2*n+1) \
+              % ccccpdm(2*reorder.at(k), 2*reorder.at(l), 2*reorder.at(m)+1, 2*reorder.at(n)+1);
+          }
+    ofs.close();
+  }
+}
+
 void save_spatial_twopdm_text(const array_4d<double>& twopdm, const int &i, const int &j)
 {
   //the spatial has a factor of 1/2 in front of it 
