@@ -61,30 +61,32 @@ class Intermediate(basic.NumTensor):
                     if np.allclose(val, r.val):
                         self._dup = i
                         return
-
-                found = []
-                for i, r in enumerate(registered):
-                    if np.allclose(val, -r.val):
-                        found.append((r.refcount, "(-@01)", [r]))
+            found = []
+            for i, r in enumerate(registered):
+                if np.allclose(val, r.val):
+                    found.append((r.refcount, "@01", [r]))
+                    break
+                if np.allclose(val, -r.val):
+                    found.append((r.refcount, "(-@01)", [r]))
+                    break
+            for i, r in enumerate(registered):
+                for reorder in it.permutations(range(r.nidx)):
+                    if np.allclose(val, np.transpose(r.val, reorder)):
+                        if reorder == (1,0):
+                            found.append((r.refcount, "@01.T", [r]))
+                        else:
+                            found.append((r.refcount, "np.transpose(@01, %s)" \
+                                    % str(reorder), [r]))
                         break
-                for i, r in enumerate(registered):
-                    for reorder in it.permutations(range(r.nidx)):
-                        if np.allclose(val, np.transpose(r.val, reorder)):
-                            if reorder == (1,0):
-                                found.append((r.refcount, "@01.T", [r]))
-                            else:
-                                found.append((r.refcount, "np.transpose(@01, %s)" \
-                                        % str(reorder), [r]))
-                            break
-                        elif np.allclose(-val, np.transpose(r.val, reorder)):
-                            if reorder == (1,0):
-                                found.append((r.refcount, "(-@01.T)", [r]))
-                            else:
-                                found.append((r.refcount, "(-np.transpose(@01, %s))" \
-                                        % str(reorder), [r]))
-                            break
-                if len(found) > 0:
-                    _, expr, ops = sorted(found, key = lambda (c, e, _): c * 50 - len(e))[-1]
+                    elif np.allclose(-val, np.transpose(r.val, reorder)):
+                        if reorder == (1,0):
+                            found.append((r.refcount, "(-@01.T)", [r]))
+                        else:
+                            found.append((r.refcount, "(-np.transpose(@01, %s))" \
+                                    % str(reorder), [r]))
+                        break
+            if len(found) > 0:
+                _, expr, ops = sorted(found, key = lambda (c, e, _): c * 50 - len(e))[-1]
 
             # now find symmetry
             if symm is None:
@@ -293,9 +295,18 @@ def contract(_Op1, _Op2, **kwargs):
             return best1, best2
         expr = "np.tensordot(@01, @02, axes=(%s,%s))" % \
                 (best1, best2)
+        idx = [i for i in bidx1 + bidx2 if not i in sumover]
+        if "indices" in kwargs:
+            assert(sorted(kwargs["indices"]) == sorted(idx))
+            if kwargs["indices"] != idx:
+                order = tuple(map(lambda i: idx.index(i), kwargs["indices"]))
+                if len(idx) == 2:
+                    expr = "%s.T" % expr
+                else:
+                    expr = "np.transpose(%s, %s)" % (expr, order)
+            del kwargs["indices"]
         if factor == -1:
             expr = "(-" + expr + ")"
-        idx = [i for i in bidx1 + bidx2 if not i in sumover]
         return define(expr, [Op1, Op2], len(idx), **kwargs), idx
     elif len(sumover) == 3 and len(idx1) == 4 and len(idx2) == 4:
         i1 = filter(lambda i: not i in sumover, idx1)[0]
