@@ -134,9 +134,23 @@ def rm_indices(ops):
     ops1.rm_indices()
     return ops1
 
+def add_indices(ops, indices):
+    ops1 = deepcopy(ops)
+    ops1.add_indices(indices)
+    return ops1
+
+def set_rep(ops):
+    op_dict = {}
+    for op in ops.fermions().oplist:
+        if op in op_dict:
+            op_dict[op] += 1
+        else:
+            op_dict[op] = 1
+    return set(op_dict.items())
+
+
 def equiv(ops1, ops2):
-    return set(ops1.fermions().oplist) == \
-            set(ops2.fermions().oplist)
+    return set_rep(ops1) == set_rep(ops2)
 
 class OpSum(list):
     def __init__(self, op_terms):

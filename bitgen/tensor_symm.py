@@ -75,4 +75,17 @@ class Idx2FoldAntisymm(IdxSymmetry): # eg. cccd vector
     def __init__(self):
         symm = [(0,1,2,3)]
         asymm = [(1,0,2,3)]
-        IdxSymmetry.__init__(self, symm, asymm)        
+        IdxSymmetry.__init__(self, symm, asymm)
+
+class Idx2PdmAASymm(IdxSymmetry):
+    def __init__(self):
+        symm = [(0,1,2,3), (2,3,0,1), (1,0,3,2), (3,2,1,0)]
+        asymm = [(2,1,0,3), (0,3,2,1), (3,0,1,2), (1,2,3,0)]
+        IdxSymmetry.__init__(self, symm, asymm)
+
+class Idx2PdmABSymm(IdxSymmetry):
+    def __init__(self):
+        symm = [(0,1,2,3), (1,0,3,2)]
+        asymm = []
+        IdxSymmetry.__init__(self, symm, asymm)
+

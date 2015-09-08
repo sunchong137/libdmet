@@ -4,11 +4,16 @@ import numpy as np
 import itertools as it
 import libdmet.utils.logger as log
 
-__all__ = ["define", "reg", "contract", "sumover", "dump", "registered"]
+__all__ = ["define", "reg", "contract", "sumover", "dump", "registered", "find_term"]
 
 dim = 6
 np.random.seed(123)
 registered = []
+
+def find_term(expr):
+    for reg in registered:
+        if reg.get_expr() == expr:
+            return reg
 
 def randMatrix(nidx, symm, antisymm):
     mat = np.random.rand(*([dim] * nidx)) * 2 - 1
@@ -57,34 +62,30 @@ class Intermediate(basic.NumTensor):
                         self._dup = i
                         return
 
-                found = False
+                found = []
                 for i, r in enumerate(registered):
                     if np.allclose(val, -r.val):
-                        expr = "(-@01)"
-                        ops = [r]
-                        found = True
+                        found.append((r.refcount, "(-@01)", [r]))
                         break
-                if not found:
-                    for i, r in enumerate(registered):
-                        for reorder in it.permutations(range(r.nidx)):
-                            if np.allclose(val, np.transpose(r.val, reorder)):
-                                if reorder == (1,0):
-                                    expr = "@01.T"
-                                else:
-                                    expr = "np.transpose(@01, %s)" % str(reorder)
-                                ops = [r]
-                                found = True
-                                break
-                            elif np.allclose(-val, np.transpose(r.val, reorder)):
-                                if reorder == (1,0):
-                                    expr = "(-@01.T)"
-                                else:
-                                    expr = "(-np.transpose(@01, %s))" % str(reorder)
-                                ops = [r]
-                                found = True
-                                break
-                        if found:
+                for i, r in enumerate(registered):
+                    for reorder in it.permutations(range(r.nidx)):
+                        if np.allclose(val, np.transpose(r.val, reorder)):
+                            if reorder == (1,0):
+                                found.append((r.refcount, "@01.T", [r]))
+                            else:
+                                found.append((r.refcount, "np.transpose(@01, %s)" \
+                                        % str(reorder), [r]))
                             break
+                        elif np.allclose(-val, np.transpose(r.val, reorder)):
+                            if reorder == (1,0):
+                                found.append((r.refcount, "(-@01.T)", [r]))
+                            else:
+                                found.append((r.refcount, "(-np.transpose(@01, %s))" \
+                                        % str(reorder), [r]))
+                            break
+                if len(found) > 0:
+                    _, expr, ops = sorted(found, key = lambda (c, e, _): c * 50 - len(e))[-1]
+
             # now find symmetry
             if symm is None:
                 s = []
@@ -296,6 +297,33 @@ def contract(_Op1, _Op2, **kwargs):
             expr = "(-" + expr + ")"
         idx = [i for i in bidx1 + bidx2 if not i in sumover]
         return define(expr, [Op1, Op2], len(idx), **kwargs), idx
+    elif len(sumover) == 3 and len(idx1) == 4 and len(idx2) == 4:
+        i1 = filter(lambda i: not i in sumover, idx1)[0]
+        i2 = filter(lambda i: not i in sumover, idx2)[0]
+        best1, best2 = None, None
+        bidx1, bidx2 = None, None
+        for ridx1 in Op1.symm.symm(idx1) + Op1.symm.antisymm(idx1):
+            if ridx1 in Op1.symm.symm(idx1):
+                fac1 = 1
+            else:
+                fac1 = -1
+            for ridx2 in Op2.symm.symm(idx2) + Op2.symm.antisymm(idx2):
+                if ridx2 in Op2.symm.symm(idx2):
+                    fac2 = 1
+                else:
+                    fac2 = -1
+                t1, t2 = build_tuple(ridx1, ridx2)
+                if bidx1 is None or bidx1.index(i1) + bidx2.index(i2) > \
+                        ridx1.index(i1) + ridx2.index(i2):
+                    best1, best2 = t1, t2
+                    bidx1, bidx2 = ridx1, ridx2
+                    factor = fac1 * fac2
+        expr = "np.tensordot(@01, @02, axes=(%s, %s))" % \
+                (best1, best2)
+        if factor == -1:
+            expr = "(-" + expr + ")"
+        idx = [i1, i2]
+        return define(expr, [Op1, Op2], len(idx), **kwargs), idx
     else:
         raise Exception
 
@@ -309,9 +337,8 @@ def sumover(toSum):
             sum_dict[key] = val
 
     for (fac, ops) in toSum:
-        if ops.expr == "(-@01)":
-            ops1 = ops.ops[0]
-            ops1.refcount -= 1
+        if ops.expr.startswith("(-") and ops.expr.endswith(")"):
+            ops1 = define(ops.expr[2:-1], ops.ops, ops.nidx)
             add_to_dict(ops1, -fac)
         else:
             add_to_dict(ops, fac)

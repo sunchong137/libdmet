@@ -89,13 +89,14 @@ def transform(v_A, v_B, u_A, u_B, w):
     val038 = np.tensordot(val031, u_A, axes=(2,0))
     val039 = np.tensordot(val033, v_B, axes=(2,0))
     val040 = np.tensordot(val036, u_A, axes=(2,0))
-    val041 = 0.5*np.transpose(val039, (0, 1, 3, 2)) + \
+    val041 = np.transpose(val040, (1, 0, 2, 3))
+    val042 = 0.5*np.transpose(val039, (0, 1, 3, 2)) + \
             0.5*np.transpose(val038, (0, 1, 3, 2)) + \
-            -1.0*np.transpose(val040, (1, 0, 2, 3))
-    val042 = val041 - np.transpose(val041, (1,0,2,3))
-    H2x_H2 = val042 - np.transpose(val042, (0,1,3,2))
+            -1.0*val041
+    val043 = val042 - np.transpose(val042, (1,0,2,3))
+    H2x_H2 = val043 - np.transpose(val043, (0,1,3,2))
     H2wAB_H2 = 1.0*val038 + \
-            -1.0*np.transpose(val040, (1, 0, 3, 2)) + \
+            -1.0*np.transpose(val041, (0, 1, 3, 2)) + \
             1.0*val039 + \
             -1.0*np.tensordot(np.tensordot(val027, v_B, axes=(3,0)), v_B, axes=(2,0)) + \
             -1.0*val040 + \

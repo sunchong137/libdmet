@@ -36,6 +36,32 @@ _reduced[4] = [
     D('B') * D('B') * D('A') * D('A'),
 ]
 
+_reduced[6] = [
+    # cccddd
+    C('A') * C('A') * C('A') * D('A') * D('A') * D('A'),
+    C('A') * C('A') * C('B') * D('B') * D('A') * D('A'),
+    C('A') * C('B') * C('B') * D('B') * D('B') * D('A'),
+    C('B') * C('B') * C('B') * D('B') * D('B') * D('B'),
+    # ccccdd
+    C('A') * C('A') * C('A') * C('B') * D('A') * D('A'),
+    C('A') * C('A') * C('B') * C('B') * D('B') * D('A'),
+    C('B') * C('B') * C('B') * C('A') * D('B') * D('B'),
+    # cccccd
+    C('A') * C('A') * C('A') * C('B') * C('B') * D('A'),
+    C('B') * C('B') * C('B') * C('A') * C('A') * D('B'),
+    # cccccc
+    C('A') * C('A') * C('A') * C('B') * C('B') * C('B'),
+    # ccdddd
+    C('A') * C('A') * D('B') * D('A') * D('A') * D('A'),
+    C('A') * C('B') * D('B') * D('B') * D('A') * D('A'),
+    C('B') * C('B') * D('A') * D('B') * D('B') * D('B'),
+    # cccccd
+    C('A') * D('B') * D('B') * D('A') * D('A') * D('A'),
+    C('B') * D('A') * D('A') * D('B') * D('B') * D('B'),
+    # cccccc
+    D('B') * D('B') * D('B') * D('A') * D('A') * D('A'),
+]
+
 def get_reduced_type(ops):
     ops1 = rm_indices(ops.fermions())
     for r in _reduced[len(ops1)]:

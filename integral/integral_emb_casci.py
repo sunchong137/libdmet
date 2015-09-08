@@ -115,12 +115,13 @@ def transform(v_A, v_B, u_A, u_B, h_0, h_A, h_B, D, w_A, w_B, w_AB):
     val048 = np.tensordot(val034, u_A, axes=(2,0))
     val049 = np.tensordot(val037, v_B, axes=(2,0))
     val050 = np.tensordot(val041, u_A, axes=(2,0))
-    val051 = 0.5*np.transpose(val049, (0, 1, 3, 2)) + \
-            -1.0*np.transpose(val050, (1, 0, 2, 3)) + \
+    val051 = np.transpose(val050, (1, 0, 2, 3))
+    val052 = 0.5*np.transpose(val049, (0, 1, 3, 2)) + \
+            -1.0*val051 + \
             0.5*np.transpose(val048, (0, 1, 3, 2))
-    val052 = val051 - np.transpose(val051, (1,0,2,3))
-    H2x_H2 = val052 - np.transpose(val052, (0,1,3,2))
-    H2wAB_H2 = -1.0*np.transpose(val050, (1, 0, 3, 2)) + \
+    val053 = val052 - np.transpose(val052, (1,0,2,3))
+    H2x_H2 = val053 - np.transpose(val053, (0,1,3,2))
+    H2wAB_H2 = -1.0*np.transpose(val051, (0, 1, 3, 2)) + \
             1.0*val049 + \
             -1.0*np.tensordot(np.tensordot(val044, u_A, axes=(3,0)), u_A, axes=(2,0)) + \
             1.0*np.tensordot(np.tensordot(np.tensordot(u_B, np.tensordot(u_B, w_AB, axes=(0,2)), axes=(0,3)), u_A, axes=(3,0)), u_A, axes=(2,0)) + \
