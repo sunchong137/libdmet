@@ -4,7 +4,7 @@ import numpy as np
 import itertools as it
 import libdmet.utils.logger as log
 
-__all__ = ["define", "reg", "contract", "sumover", "dump", "registered", "find_term"]
+__all__ = ["define", "reg", "contract", "sumover", "dump", "registered", "find_term", "cleanup"]
 
 dim = 6
 np.random.seed(123)
@@ -15,15 +15,18 @@ def find_term(expr):
         if reg.get_expr() == expr:
             return reg
 
-def randMatrix(nidx, symm, antisymm):
-    mat = np.random.rand(*([dim] * nidx)) * 2 - 1
-    mat1 = np.zeros_like(mat)
-    for s in symm:
-        mat1 += np.transpose(mat, s)
-    mat1 /= len(symm)
-    for a in antisymm:
-        mat1 = 0.5 * (mat1 - np.transpose(mat1, a))
-    return mat1
+def randMatrix(nidx, symm):
+    if isinstance(symm, basic.IdxIdentity):
+        return np.eye(dim)
+    else:
+        mat = np.random.rand(*([dim] * nidx)) * 2 - 1
+        mat1 = np.zeros_like(mat)
+        for s in symm._symm:
+            mat1 += np.transpose(mat, s)
+        mat1 /= len(symm._symm)
+        for a in symm._antisymm:
+            mat1 = 0.5 * (mat1 - np.transpose(mat1, a))
+        return mat1
 
 class Intermediate(basic.NumTensor):
     def __init__(self, expr, ops, nidx, symm = None, name = None, \
@@ -41,7 +44,7 @@ class Intermediate(basic.NumTensor):
             if name is None:
                 name = expr
             basic.NumTensor.__init__(self, None, nidx = nidx, symm = symm)
-            self.val = randMatrix(nidx, symm._symm, symm._antisymm)
+            self.val = randMatrix(nidx, symm)
             self.expr = expr
             self.ops = ops
             self.refcount = 0
@@ -400,3 +403,7 @@ def dump():
         if inter.final or inter.name is not None:
             code.append(inter.__str__())
     return "\n".join(code)
+
+def cleanup():
+    while len(registered) != 0:
+        del registered[-1]

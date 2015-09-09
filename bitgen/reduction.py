@@ -62,6 +62,43 @@ _reduced[6] = [
     D('B') * D('B') * D('B') * D('A') * D('A') * D('A'),
 ]
 
+_reduced[8] = [
+    # ccccdddd
+    C('A') * C('A') * C('A') * C('A') * D('A') * D('A') * D('A') * D('A'),
+    C('A') * C('A') * C('A') * C('B') * D('B') * D('A') * D('A') * D('A'),
+    C('A') * C('A') * C('B') * C('B') * D('B') * D('B') * D('A') * D('A'),
+    C('A') * C('B') * C('B') * C('B') * D('B') * D('B') * D('B') * D('A'),
+    C('B') * C('B') * C('B') * C('B') * D('B') * D('B') * D('B') * D('B'),
+    # cccccddd
+    C('A') * C('A') * C('A') * C('A') * C('B') * D('A') * D('A') * D('A'),
+    C('A') * C('A') * C('A') * C('B') * C('B') * D('B') * D('A') * D('A'),
+    C('B') * C('B') * C('B') * C('A') * C('A') * D('A') * D('B') * D('B'),
+    C('B') * C('B') * C('B') * C('B') * C('A') * D('B') * D('B') * D('B'),
+    # ccccccdd
+    C('A') * C('A') * C('A') * C('A') * C('B') * C('B') * D('A') * D('A'),
+    C('A') * C('A') * C('A') * C('B') * C('B') * C('B') * D('B') * D('A'),
+    C('B') * C('B') * C('B') * C('B') * C('A') * C('A') * D('B') * D('B'),
+    # cccccccd
+    C('A') * C('A') * C('A') * C('A') * C('B') * C('B') * C('B') * D('A'),
+    C('B') * C('B') * C('B') * C('B') * C('A') * C('A') * C('A') * D('B'),
+    # cccccccc
+    C('A') * C('A') * C('A') * C('A') * C('B') * C('B') * C('B') * C('B'),
+    # cccddddd
+    C('A') * C('A') * C('A') * D('B') * D('A') * D('A') * D('A') * D('A'),
+    C('A') * C('A') * C('B') * D('B') * D('B') * D('A') * D('A') * D('A'),
+    C('B') * C('B') * C('A') * D('A') * D('A') * D('B') * D('B') * D('B'),
+    C('B') * C('B') * C('B') * D('A') * D('B') * D('B') * D('B') * D('B'),
+    # ccdddddd
+    C('A') * C('A') * D('B') * D('B') * D('A') * D('A') * D('A') * D('A'),
+    C('A') * C('B') * D('B') * D('B') * D('B') * D('A') * D('A') * D('A'),
+    C('B') * C('B') * D('A') * D('A') * D('B') * D('B') * D('B') * D('B'),
+    # cddddddd
+    C('A') * D('B') * D('B') * D('B') * D('A') * D('A') * D('A') * D('A'),
+    C('B') * D('A') * D('A') * D('A') * D('B') * D('B') * D('B') * D('B'),
+    # cccccccc
+    D('B') * D('B') * D('B') * D('B') * D('A') * D('A') * D('A') * D('A'),
+]
+
 def get_reduced_type(ops):
     ops1 = rm_indices(ops.fermions())
     for r in _reduced[len(ops1)]:

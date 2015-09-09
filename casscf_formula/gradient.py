@@ -1,8 +1,8 @@
 import numpy as np
 
 def grad(h_A, h_B, D, w_A, w_B, w_AB, y_A, y_B, x, \
-            rho_A, rho_B, kappa_BA, Gamma_aa, Gamma_bb, Gamma_ab, \
-            Gamma_2a, Gamma_2b, Gamma_4):
+        rho_A, rho_B, kappa_BA, Gamma_aa, Gamma_bb, Gamma_ab, \
+        Gamma_2a, Gamma_2b, Gamma_4):
     val001 = (-np.tensordot(y_A, Gamma_2a, axes=((1, 2, 3), (1, 2, 3))))
     val002 = np.tensordot(Gamma_4, x, axes=((1, 2, 3), (1, 3, 2)))
     val003 = np.tensordot(Gamma_2a, y_A, axes=((0, 1, 2), (0, 1, 2)))

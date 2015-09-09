@@ -91,19 +91,28 @@ def merge(expr, indices = "pqrs"):
     return merged
 
 def eval_delta(merged_expr, indices = ""):
-    for key, val in merged_expr.items():
-        for i, (fac, ops) in enumerate(val):
-            assert(len(ops.fermions()) == 0)
-            while len(ops.deltas()) > 0:
-                # use the knowledge that delta is after num_tensor
-                ridx = sorted(ops[-1].idx)[::-1]
-                if ridx[0] in indices:
-                    assert(not ridx[1] in indices)
-                    ridx = ridx[::-1]
-                assert(len(set(ridx).intersection(key.get_indices())) == 0)
-                ops = basic.OpProduct(ops[:-1]).replace_indices(ridx)
-            val[i] = (fac, ops)
+    for key in merged_expr:
+        merged_expr[key] = eval_delta_expr(merged_expr[key], \
+                indices = indices + "".join(key.get_indices()))
     return merged_expr
+
+def eval_delta_expr(expr, indices = ""):
+    for i, (fac, ops) in enumerate(expr):
+        assert(len(ops.fermions()) == 0)
+        while len(ops.deltas()) > 0:
+            # use the knowledge that delta is after num_tensor
+            ridx = sorted(ops[-1].idx)[::-1]
+            if ridx[0] in indices:
+                if ridx[1] in indices:
+                    ops = basic.OpProduct(ops[:-1] + \
+                            [basic.NumTensor("I", ridx, symm = basic.IdxIdentity())])
+                    continue
+                else:
+                    ridx = ridx[::-1]
+            ops = basic.OpProduct(ops[:-1]).replace_indices(ridx)
+        expr[i] = (fac, ops)
+    return expr
+
 
 if __name__ == "__main__":
     _eval_deltas(basic.OpProduct([basic.Delta("ij"), basic.Delta("jk")]))

@@ -89,3 +89,8 @@ class Idx2PdmABSymm(IdxSymmetry):
         asymm = []
         IdxSymmetry.__init__(self, symm, asymm)
 
+class IdxIdentity(IdxSymmetry):
+    def __init__(self):
+        symm = [(0,1), (1,0)]
+        asymm = []
+        IdxSymmetry.__init__(self, symm, asymm)
