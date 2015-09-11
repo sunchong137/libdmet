@@ -1,6 +1,7 @@
 from libdmet.solver import block, scf, casscf
 from libdmet.solver.afqmc import AFQMC
-from libdmet.solver.dmrgci import DmrgCI, BCSDmrgCI, get_orbs
+from libdmet.solver.dmrgci import DmrgCI, get_orbs
+from libdmet.solver.bcs_dmrgci import BCSDmrgCI
 from libdmet.system import integral
 import libdmet.utils.logger as log
 import numpy as np
