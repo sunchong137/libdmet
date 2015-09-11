@@ -88,6 +88,16 @@ class CASSCF(mc1step_uhf.CASSCF):
         else:
             return mc1step_uhf.CASSCF.approx_cas_integral(self, mo, u, eris)
 
+    def gen_g_hop(self, mo, u, casdm1, casdm2, eris):
+        if not self.exact_integral or u == 1:
+            return mc1step_uhf.CASSCF.gen_g_hop(self, mo, u, casdm1, casdm2, eris)
+        else:
+            mo1 = map(np.dot, mo, u)
+            eris1 = self.ao2mo(mo1)
+            gorb, _, h_op, h_diag = mc1step_uhf.CASSCF.gen_g_hop(self, \
+                    mo1, 1, casdm1, casdm2, eris1)
+            return gorb, lambda *args: gorb, h_op, h_diag
+
 def proj_rho(orbs, rho):
     spin = rho.shape[0]
     proj_orbs = [None, None]

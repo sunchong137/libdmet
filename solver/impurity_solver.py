@@ -70,7 +70,7 @@ class CASSCF(object):
     settings = {
         "max_stepsize": 0.04,
         "max_cycle_macro": 50,
-        "max_cycle_micro": 2, # micro_cycle
+        "max_cycle_micro": 8, # micro_cycle
         "max_cycle_micro_inner": 8,
         "conv_tol": 1e-5, # energy convergence
         "conv_tol_grad": 1e-3, # orb grad convergence
@@ -81,10 +81,12 @@ class CASSCF(object):
         "ah_lindep": 1e-14,
         "ah_start_tol": 0.1,
         "ah_start_cycle": 2,
-        "ah_grad_trust_region": 1.5,
+        "ah_grad_trust_region": 4,
         "ah_guess_space": 0,
         "ah_decay_rate": 0.7, # augmented hessian decay
         "ci_repsonse_space": 3,
+        "keyframe_interval": np.inf, # do not change
+        "keyframe_trust_region": 0,  # do not change
         "dynamic_micro_step": False,
         "exact_integral": True,
     }
