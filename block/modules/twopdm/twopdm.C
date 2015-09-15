@@ -2072,6 +2072,7 @@ void compute_two_pdm_2_2_0_bcs(Wavefunction& wave1, Wavefunction& wave2, const S
       assign_antisymmetric(twopdm, kx, lx, jx, ix, expectations[0]); // kx<->lx because of transpose
 
       // both leftop and dotop must be ab type
+      expectations = {};
       spinExpectation(wave1, wave2, leftop, dotop, rightop, big, expectations, false); // c_i c_j c_k c_l
       assign_antisymmetric_cccc(ccccpdm, ix, jx, kx, lx, expectations[0]);
     }
