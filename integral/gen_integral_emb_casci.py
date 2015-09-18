@@ -19,7 +19,7 @@ log.result("Substitute:\n%s", sub)
 
 H = trans.transform(sub, Ham)
 
-with open("integral_emb_casci.py", "w") as f:
+with open("integral_emb_casci1.py", "w") as f:
     f.write("import numpy as np\n\n")
     f.write("def transform(v_A, v_B, u_A, u_B, h_0, h_A, h_B, D, w_A, w_B, w_AB):\n    ")
     f.write(trans.generate_code(H, indices = "pqrs").replace("\n", "\n    ") + "\n")

@@ -19,7 +19,7 @@ log.result("Substitute:\n%s", sub)
 
 H = trans.transform(sub, Ham)
 
-with open("integral_localize.py", "w") as f:
+with open("integral_localize1.py", "w") as f:
     f.write("import numpy as np\n\n")
     f.write("def transform(v_A, v_B, h_0, h_A, h_B, D, w_A, w_B, w_AB, y_A, y_B, x):\n    ")
     f.write(trans.generate_code(H, indices = "pqrs").replace("\n", "\n    ") + "\n")

@@ -9,12 +9,12 @@ def transform(v_A, v_B, u_A, u_B, w):
     val006 = np.tensordot(val004, w, axes=((0, 1),(0, 2)))
     val007 = np.dot(u_A, v_B.T)
     val008 = np.tensordot(val007, w, axes=((0, 1),(0, 2)))
-    H0_H2 = -0.5*np.trace(np.dot(val003, val001)) + \
-            0.5*np.trace(np.dot(val002, val001)) + \
-            1.0*np.trace(np.dot(val002, val004)) + \
-            1.0*np.trace(np.dot(val008, val007.T)) + \
-            0.5*np.trace(np.dot(val005, val004)) + \
-            -0.5*np.trace(np.dot(val006, val004))
+    H0_H2 = -0.5*np.sum(val003*val001) + \
+            1.0*np.sum(val002*val004) + \
+            0.5*np.sum(val005*val004) + \
+            1.0*np.sum(val008*val007) + \
+            0.5*np.sum(val002*val001) + \
+            -0.5*np.sum(val006*val004)
     val009 = np.dot(v_A.T, val002)
     val010 = np.dot(v_A.T, val003)
     val011 = np.dot(u_B.T, val005)

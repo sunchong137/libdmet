@@ -1,12 +1,12 @@
 import numpy as np
 
 def transform(v_A, v_B, u_A, u_B, h_0, h_A, h_B, D, w_A, w_B, w_AB):
-    H0_H0 = 1.0*h_0
+    H0_H0 = h_0
     val001 = np.dot(u_A.T, h_A)
     val002 = np.dot(u_B.T, h_B)
-    H0_H1 = 1.0*np.trace(np.dot(val001, u_A)) + \
-            2.0*np.trace(np.dot(np.dot(u_A.T, D), v_B)) + \
-            1.0*np.trace(np.dot(val002, u_B))
+    H0_H1 = 1.0*np.sum(val001.T*u_A) + \
+            2.0*np.sum(np.dot(u_A.T, D).T*v_B) + \
+            1.0*np.sum(val002.T*u_B)
     val003 = np.dot(u_A, u_A.T)
     val004 = np.tensordot(val003, w_A, axes=((0, 1),(0, 1)))
     val005 = np.tensordot(val003, w_A, axes=((0, 1),(0, 2)))
@@ -16,12 +16,12 @@ def transform(v_A, v_B, u_A, u_B, h_0, h_A, h_B, D, w_A, w_B, w_AB):
     val009 = np.dot(u_A, v_B.T)
     val010 = np.tensordot(val009, w_AB, axes=((0, 1),(0, 2)))
     val011 = np.tensordot(val003, w_AB, axes=((0, 1),(0, 1)))
-    H0_H2 = 0.5*np.trace(np.dot(val004, val003)) + \
-            1.0*np.trace(np.dot(val011, val006)) + \
-            1.0*np.trace(np.dot(val010, val009.T)) + \
-            0.5*np.trace(np.dot(val007, val006)) + \
-            -0.5*np.trace(np.dot(val005, val003)) + \
-            -0.5*np.trace(np.dot(val008, val006))
+    H0_H2 = 0.5*np.sum(val004*val003) + \
+            1.0*np.sum(val011*val006) + \
+            1.0*np.sum(val010*val009) + \
+            0.5*np.sum(val007*val006) + \
+            -0.5*np.sum(val005*val003) + \
+            -0.5*np.sum(val008*val006)
     val012 = np.dot(v_A.T, h_A)
     val013 = np.dot(v_A.T, D)
     H1D_H1 = 1.0*np.dot(val012, u_A) + \

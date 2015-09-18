@@ -114,8 +114,6 @@ def eval_delta_expr(expr, indices = ""):
                     continue
                 elif ridx[0] in indices:
                     ridx = ridx[::-1]
-                else:
-                    raise Exception
             ops = basic.OpProduct(ops[:-1]).replace_indices(ridx)
         expr[i] = (fac, ops)
     return expr

@@ -383,10 +383,10 @@ def contract(_Op1, _Op2, **kwargs):
                     factor = fac1 * fac2
         expr = "np.tensordot(@01, @02, axes=(%s, %s))" % \
                 (best1, best2)
+        idx = [i1, i2]
         op = define(expr, [Op1, Op2], len(idx), **kwargs)
         if factor == -1:
             op = define("(-@01)", [op], len(idx), **kwargs)
-        idx = [i1, i2]
         return op, idx
     elif len(sumover) == len(idx1) == len(idx2):
         best = None
@@ -410,10 +410,15 @@ def contract(_Op1, _Op2, **kwargs):
         if best == 0:
             expr = "np.sum(@01*@02)"
         elif len(sumover) == 2:
-            expr = "np.sum(@01*@02.T)"
+            if "rightT" in kwargs:
+                expr = "np.sum(@01*@02.T)"
+            else:
+                expr = "np.sum(@01.T*@02)"
         else:
             expr = "np.tensordot(@01, @02, axes = (%s, %s))" % \
                     (tuple(range(len(sumover))), tuple(order))
+        if "rightT" in kwargs:
+            del kwargs["rightT"]
         op = define(expr, [Op1, Op2], 0, **kwargs)
         if factor == -1:
             op = define("(-@01)", [op], 0, **kwargs)

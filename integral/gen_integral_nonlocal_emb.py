@@ -21,7 +21,7 @@ H = trans.transform(sub, Ham)
 
 # now further simplify the terms by classify according to integrals
 
-with open("integral_nonlocal_emb.py", "w") as f:
+with open("integral_nonlocal_emb1.py", "w") as f:
     f.write("import numpy as np\n\n")
     f.write("def transform(v_A, v_B, u_A, u_B, w):\n    ")
     f.write(trans.generate_code(H, indices = "pqrs").replace("\n", "\n    ") + "\n")
