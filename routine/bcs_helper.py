@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as la
 import itertools as it
 import libdmet.utils.logger as log
-from libdmet.utils.misc import mdot, find, counted
+from libdmet.utils.misc import mdot
 from copy import deepcopy
 
 def extractRdm(GRho):
@@ -25,12 +25,18 @@ def extractH1(GFock):
 
 def combineRdm(rhoA, rhoB, kappaAB):
     norbs = rhoA.shape[0]
-    GRho = np.empty((2*norbs, 2*norbs))
-    GRho[:norbs, :norbs] = rhoA
-    GRho[norbs:, norbs:] = np.eye(norbs) - rhoB
-    GRho[norbs:, :norbs] = -kappaAB.T
-    GRho[:norbs, norbs:] = -kappaAB
-    return GRho
+    return np.vstack((
+        np.hstack((      rhoA,             -kappaAB)),
+        np.hstack((-kappaAB.T, np.eye(norbs) - rhoB))
+    ))
+
+def swapSpin(GRho):
+    rhoA, rhoB, kappaBA = extractRdm(GRho)
+    norbs = rhoA.shape[0]
+    return np.vstack((
+        np.hstack((      rhoB,             -kappaBA)),
+        np.hstack((-kappaBA.T, np.eye(norbs) - rhoA))
+    ))
 
 def basisToCanonical(basis):
     assert(basis.shape[0] == 2)
@@ -59,6 +65,7 @@ def mono_fit(fn, y0, x0, thr, increase = True):
     if not increase:
         return mono_fit(lambda x: -fn(x), -y0, x0, thr, True)
 
+    from libdmet.utils.misc import counted
     @counted
     def evaluate(xx):
         yy = fn(xx)
@@ -147,6 +154,7 @@ def contract_trans_inv_sparse(basisL, basisR, lattice, H, thr = 1e-7):
     nbasisL = basisL.shape[2]
     nbasisR = basisR.shape[2]
     res = np.zeros((nbasisL, nbasisR))
+    from libdmet.utils.misc import find
     mask_basisL = find(True, map(lambda a: la.norm(a) > thr, basisL))
     mask_basisR = find(True, map(lambda a: la.norm(a) > thr, basisR))
     mask_H = find(True, map(lambda a: la.norm(a) > thr, H))

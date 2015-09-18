@@ -125,6 +125,9 @@ class Localizer(object):
         # Edmiston-Ruedenberg: maximizing self-energy
         # L = \sum_p (pp||pp)
         # each Jacobian step \theta between -pi/4 to pi/4
+        if self.norbs < 2:
+            log.info("Norb = %d, too few to localize", self.norbs)
+            return
         Iter = 0
         log.info("Edmiston-Ruedenberg localization")
         initL = self.getL()
