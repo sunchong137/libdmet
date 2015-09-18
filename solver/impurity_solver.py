@@ -1,7 +1,7 @@
-from libdmet.solver import block, scf, casscf
+from libdmet.solver import block, scf, casscf, bcs_dmrgscf
 from libdmet.solver.afqmc import AFQMC
 from libdmet.solver.dmrgci import DmrgCI, get_orbs
-from libdmet.solver.bcs_dmrgci import BCSDmrgCI
+from libdmet.solver.bcs_dmrgci import BCSDmrgCI, get_qps
 from libdmet.system import integral
 import libdmet.utils.logger as log
 import numpy as np
@@ -72,7 +72,7 @@ class CASSCF(object):
         "max_stepsize": 0.04,
         "max_cycle_macro": 50,
         "max_cycle_micro": 8, # micro_cycle
-        "max_cycle_micro_inner": 8,
+        "max_cycle_micro_inner": 10,
         "conv_tol": 1e-5, # energy convergence
         "conv_tol_grad": 1e-3, # orb grad convergence
         # for augmented hessian
@@ -86,20 +86,21 @@ class CASSCF(object):
         "ah_guess_space": 0,
         "ah_decay_rate": 0.7, # augmented hessian decay
         "ci_repsonse_space": 3,
-        "keyframe_interval": np.inf, # do not change
+        "keyframe_interval": 1000000, # do not change
         "keyframe_trust_region": 0,  # do not change
         "dynamic_micro_step": False,
         "exact_integral": True,
     }
 
-    def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
-            fcisolver = "FCI", settings = {}):
+    def __init__(self, ncas, nelecas, bogoliubov = False, MP2natorb = False, \
+            spinAverage = False, fcisolver = "FCI", settings = {}):
         log.eassert(ncas * 2 >= nelecas, \
                 "CAS size not compatible with number of electrons")
         self.ncas = ncas
         self.nelecas = nelecas # alpha and beta
         self.MP2natorb = MP2natorb
         self.spinAverage = spinAverage
+        self.bogoliubov = bogoliubov
         self.scfsolver = scf.SCF()
         self.mo_coef = None
 
@@ -107,12 +108,17 @@ class CASSCF(object):
         # mcscf class: casscf.CASSCF or casscf.DMRGSCF
         self.settings = settings
         if fcisolver.upper() == "FCI":
+            log.eassert(not bogoliubov, \
+                    "FCI solver is not available for BCS calculations")
             self.solver_cls = casscf.CASSCF
         elif fcisolver.upper() == "DMRG":
             log.eassert(self.settings.has_key("fcisolver"), \
                     "When using DMRG-CASSCF, must specify "
                     "the key 'fcisolver' with a BLOCK solver instance")
-            self.solver_cls = casscf.DMRGSCF
+            if bogoliubov:
+                self.solver_cls = bcs_dmrgscf.BCS_DMRGSCF
+            else:
+                self.solver_cls = casscf.DMRGSCF
         else:
             log.error("FCI solver %s is not valid.", fcisolver.upper())
         # solver instance, initialized at first run
@@ -124,6 +130,9 @@ class CASSCF(object):
 
     def run(self, Ham, mcscf_args = {}, guess = None, nelec = None, \
             similar = False):
+        if self.bogoliubov:
+            return self._run_bogoliubov(Ham, mcscf_args, guess, similar)
+
         spin = Ham.H1["cd"].shape[0]
         norbs = Ham.H1["cd"].shape[1]
         if nelec is None:
@@ -155,6 +164,33 @@ class CASSCF(object):
         rho = np.asarray(self.solver.make_rdm1s())
 
         return rho, E
+
+    def _run_bogoliubov(self, Ham, mcscf_args = {}, guess = None, similar = False):
+        spin = 2
+        norbs = Ham.H1["cd"].shape[1]
+        if self.mo_coef is None or not similar:
+            # not restart from previous orbitals
+            core, cas, casinfo = get_qps(self, Ham, guess)
+            self.mo_coef = np.empty((2, norbs*2, norbs))
+            self.mo_coef[:, :, :core.shape[2]] = core
+            self.mo_coef[:, :, core.shape[2]:] = cas
+
+        if self.solver is None or 1:
+            print self.settings
+            self.solver = self.solver_cls(self.scfsolver.mf, \
+                    self.ncas, norbs, **self.settings)
+        else:
+            self.solver.refresh(self.scfsolver.mf, self.ncas)
+
+        self.apply_options(self.solver, CASSCF.settings)
+        E, _, _, self.mo_coef = self.solver.mc1step(mo_coeff = self.mo_coef, \
+                **mcscf_args)
+
+        from libdmet.routine.bcs_helper import combineRdm
+        rho, kappa = self.solver.make_rdm1s()
+        GRho = combineRdm(rho[0], rho[1], kappa)
+
+        return GRho, E
 
     def cleanup(self):
         pass

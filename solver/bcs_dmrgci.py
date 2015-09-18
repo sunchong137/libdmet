@@ -99,6 +99,14 @@ def buildCASHamiltonian(Ham, core, cas):
             Ham.H1["cd"][0] + v[0], Ham.H1["cd"][1] + v[1], Ham.H1["cc"][0] + \
             v[2], Ham.H2["ccdd"][0], Ham.H2["ccdd"][1], Ham.H2["ccdd"][2])
     return integral.Integral(cas.shape[2], False, True, H0, {"cd": CD, "cc": CC}, \
+            {"ccdd": CCDD, "cccd": CCCD, "cccc": CCCC}), _H0
+
+def rotateHam(rotmat, Ham):
+    H0, CD, CC, CCDD, CCCD, CCCC = transform_local(rotmat[0], rotmat[1], Ham.H0, \
+            Ham.H1["cd"][0], Ham.H1["cd"][1], Ham.H1["cc"][0], Ham.H2["ccdd"][0], \
+            Ham.H2["ccdd"][1], Ham.H2["ccdd"][2], Ham.H2["cccd"][0], \
+            Ham.H2["cccd"][1], Ham.H2["cccc"][0])
+    return integral.Integral(Ham.norb, False, True, H0, {"cd": CD, "cc": CC}, \
             {"ccdd": CCDD, "cccd": CCCD, "cccc": CCCC})
 
 def split_localize(orbs, info, Ham, basis = None):
@@ -164,12 +172,7 @@ def split_localize(orbs, info, Ham, basis = None):
                 localorbs[1,:,i] *= -1.
                 rotmat[1,:,i] *= -1
 
-    H0, CD, CC, CCDD, CCCD, CCCC = transform_local(rotmat[0], rotmat[1], Ham.H0, \
-            Ham.H1["cd"][0], Ham.H1["cd"][1], Ham.H1["cc"][0], Ham.H2["ccdd"][0], \
-            Ham.H2["ccdd"][1], Ham.H2["ccdd"][2], Ham.H2["cccd"][0], \
-            Ham.H2["cccd"][1], Ham.H2["cccc"][0])
-    HamLocal = integral.Integral(norbs, False, True, H0, {"cd": CD, "cc": CC}, \
-            {"ccdd": CCDD, "cccd": CCCD, "cccc": CCCC})
+    HamLocal = rotateHam(rotmat, Ham)
     return HamLocal, localorbs, rotmat
 
 def reorder(order, Ham, orbs, rot = None):
@@ -225,7 +228,7 @@ class BCSDmrgCI(object):
         # FIXME think about choosing number of electron/hole freely
         core, cas, casinfo = get_qps(self, Ham, guess)
         coreGRho = np.dot(core[0], core[0].T)
-        casHam = buildCASHamiltonian(Ham, core, cas)
+        casHam, _ = buildCASHamiltonian(Ham, core, cas)
 
         if self.splitloc:
             casHam, cas, _ = \

@@ -89,7 +89,7 @@ class CASSCF(mc1step_uhf.CASSCF):
             return mc1step_uhf.CASSCF.approx_cas_integral(self, mo, u, eris)
 
     def gen_g_hop(self, mo, u, casdm1, casdm2, eris):
-        if not self.exact_integral or u == 1:
+        if not self.exact_integral or (isinstance(u, int) and u == 1):
             return mc1step_uhf.CASSCF.gen_g_hop(self, mo, u, casdm1, casdm2, eris)
         else:
             mo1 = map(np.dot, mo, u)
@@ -223,8 +223,7 @@ class DMRGSCF(CASSCF):
                     {"ccdd": incore_transform(H2, (split_rot,)*4)})
             casHam, cas_local, rot = dmrgci.split_localize(split_cas, casinfo, \
                     casHam, basis = self.basis)
-            rot[0] = np.dot(split_rot[0], rot[0])
-            rot[1] = np.dot(split_rot[1], rot[1])
+            rot = np.asarray(map(np.dot, split_rot, rot))
         else:
             casHam = integral.Integral(ncas, False, False, 0., \
                     {"cd": np.asarray(H1)}, {"ccdd": np.asarray(H2)})

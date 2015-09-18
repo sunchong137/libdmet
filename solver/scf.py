@@ -162,17 +162,17 @@ class UHFB(hf.RHF):
 
 def incore_transform(eri_, c):
     eriA = np.tensordot(c[0][0], eri_[0], (0, 0))
-    eriA = np.swapaxes(np.tensordot(c[1][0], eriA, (0, 1)), 0, 1)
-    eriA = np.swapaxes(np.tensordot(eriA, c[2][0], (2, 0)), 2, 3)
+    eriA = np.tensordot(c[1][0], eriA, (0, 1))
     eriA = np.tensordot(eriA, c[3][0], (3, 0))
+    eriA = np.tensordot(eriA, c[2][0], (2, 0))
     eriB = np.tensordot(c[0][1], eri_[1], (0, 0))
-    eriB = np.swapaxes(np.tensordot(c[1][1], eriB, (0, 1)), 0, 1)
-    eriB = np.swapaxes(np.tensordot(eriB, c[2][1], (2, 0)), 2, 3)
+    eriB = np.tensordot(c[1][1], eriB, (0, 1))
     eriB = np.tensordot(eriB, c[3][1], (3, 0))
+    eriB = np.tensordot(eriB, c[2][1], (2, 0))
     eriAB = np.tensordot(c[0][0], eri_[2], (0, 0))
-    eriAB = np.swapaxes(np.tensordot(c[1][0], eriAB, (0, 1)), 0, 1)
-    eriAB = np.swapaxes(np.tensordot(eriAB, c[2][1], (2, 0)), 2, 3)
+    eriAB = np.tensordot(c[1][0], eriAB, (0, 1))
     eriAB = np.tensordot(eriAB, c[3][1], (3, 0))
+    eriAB = np.tensordot(eriAB, c[2][1], (2, 0))
     return np.asarray([eriA, eriB, eriAB])
 
 def kernel(mp, mo_coeff, mo_energy, nocc):
@@ -255,7 +255,6 @@ class UMP2(MP2):
         rdm_b[:nocc[1], :nocc[1]] = np.eye(nocc[1]) + rdm_c_b
         rdm_b[nocc[1]:, nocc[1]:] = rdm_v_b
         return np.asarray([rdm_a, rdm_b])
-
 
 class SCF(object):
     def __init__(self, tmp = "/tmp"):
