@@ -197,7 +197,62 @@ def contract(_Op1, _Op2, **kwargs):
     Op1, idx1 = _Op1
     Op2, idx2 = _Op2
     sumover = set(idx1).intersection(idx2)
-    if len(sumover) == 0:
+    if "diag_idx" in kwargs:
+        assert(set(idx1) == set(idx2))
+        didx = kwargs["diag_idx"]
+        del kwargs["diag_idx"]
+        for i in didx:
+            assert(idx1.count(i) == 1)
+            assert(idx2.count(i) == 1)
+        best = None
+        def v(order):
+            return np.sum(abs(np.asarray(order) - np.arange(len(order))))
+        def better(ridx1, ridx2, ref1, ref2):
+            order = map(lambda i: ridx2.index(i), ridx1)
+            ref_order = map(lambda i: ref2.index(i), ref1)
+            k1 = map(lambda i: ridx1.index(i), didx)
+            k1_ref = map(lambda i: ref1.index(i), didx)
+            if v(k1) < v(k1_ref):
+                return True
+            elif v(k1) == v(k1_ref) and \
+                    v(order) < v(ref_order):
+                return True
+            else:
+                return False
+
+        for ridx1 in Op1.symm.symm(idx1) + Op1.symm.antisymm(idx1):
+            if ridx1 in Op1.symm.symm(idx1):
+                fac1 = 1
+            else:
+                fac1 = -1
+            for ridx2 in Op2.symm.symm(idx2) + Op2.symm.antisymm(idx2):
+                if ridx2 in Op2.symm.symm(idx2):
+                    fac2 = 1
+                else:
+                    fac2 = -1
+                order = map(lambda i: ridx2.index(i), ridx1)
+                if best is None or better(ridx1, ridx2, bidx1, bidx2):
+                    best = order
+                    bidx1, bidx2 = ridx1, ridx2
+                    factor = fac1 * fac2
+        if v(best) == 0:
+            expr = "np.sum(@01*@02, axis=%s)" % \
+                    str(tuple([i for i, x in enumerate(bidx1) \
+                    if not x in didx]))
+        else:
+            expr = "np.sum(@01*np.transpose(@02, %s), axis=%s)" % \
+                    (tuple(best), tuple([i for i, x in enumerate(bidx1) \
+                    if not x in didx]))
+        k = map(lambda i: bidx1.index(i), didx)
+        op = define(expr, [Op1, Op2], len(didx), **kwargs)
+        if k != sorted(k):
+            expr1 = "np.transpose(@01, %s)" % \
+                    str(tuple(map(lambda i: sorted(k).index(i), k)))
+            op = define(expr1, [op], len(didx), **kwargs)
+        if factor == -1:
+            op = define("(-@01)", [op], len(didx), **kwargs)
+        return op, didx
+    elif len(sumover) == 0:
         raise Exception("No common indices")
     elif len(sumover) == 1 and len(idx1) == 2 and len(idx2) == 2:
         # use np.dot
@@ -207,16 +262,6 @@ def contract(_Op1, _Op2, **kwargs):
         expr = "np.dot(@01%s, @02%s)" % (T(transl), T(transr))
         idx = [i for i in idx1 + idx2 if i != idx_sum]
         return define(expr, [Op1, Op2], len(idx), **kwargs), idx
-    elif len(sumover) == 2 and len(idx1) == 2 and len(idx2) == 2:
-        # this is trace
-        trans = (idx1 == idx2) and not ((1,0) in Op1.symm._symm or \
-                (1,0) in Op2.symm._symm)
-        if "rightT" in kwargs:
-            expr = "np.trace(np.dot(@01, @02%s))" % T(trans)
-            del kwargs["rightT"]
-        else:
-            expr = "np.trace(np.dot(@01%s, @02))" % T(trans)
-        return define(expr, [Op1, Op2], 0, **kwargs), ""
     elif len(sumover) == 1 and min(len(idx1), len(idx2)) == 2:
         # use tensordot
         idx_sum = list(sumover)[0]
@@ -243,13 +288,16 @@ def contract(_Op1, _Op2, **kwargs):
                         best1, best2 = pos1, pos2
                         bidx1, bidx2 = ridx1, ridx2
                         factor = fac1 * fac2
+
         expr = "np.tensordot(@01, @02, axes=(%s,%s))" % \
                 (best1, best2)
-        if factor == -1:
-            expr = "(-" + expr + ")"
         idx = [i for i in bidx1 + bidx2 if not i in sumover]
-        return define(expr, [Op1, Op2], len(idx), **kwargs), idx
-    elif len(sumover) == 2 and min(len(idx1), len(idx2)) == 2:
+        op = define(expr, [Op1, Op2], len(idx), **kwargs)
+        if factor == -1:
+            op = define("(-@01)", [op], len(idx), **kwargs)
+        return op, idx
+    elif len(sumover) == 2 and min(len(idx1), len(idx2)) == 2 and \
+            max(len(idx1), len(idx2)) > 2:
         best1, best2 = None, None
         if len(idx1) == 2:
             def compare(_idx1,_idx2):
@@ -308,10 +356,11 @@ def contract(_Op1, _Op2, **kwargs):
                 else:
                     expr = "np.transpose(%s, %s)" % (expr, order)
             del kwargs["indices"]
+        op = define(expr, [Op1, Op2], len(idx), **kwargs)
         if factor == -1:
-            expr = "(-" + expr + ")"
-        return define(expr, [Op1, Op2], len(idx), **kwargs), idx
-    elif len(sumover) == 3 and len(idx1) == 4 and len(idx2) == 4:
+            op = define("(-@01)", [op], len(idx), **kwargs)
+        return op, idx
+    elif len(sumover) >= 2 and len(idx1) == len(idx2) == len(sumover) + 1:
         i1 = filter(lambda i: not i in sumover, idx1)[0]
         i2 = filter(lambda i: not i in sumover, idx2)[0]
         best1, best2 = None, None
@@ -334,10 +383,42 @@ def contract(_Op1, _Op2, **kwargs):
                     factor = fac1 * fac2
         expr = "np.tensordot(@01, @02, axes=(%s, %s))" % \
                 (best1, best2)
+        op = define(expr, [Op1, Op2], len(idx), **kwargs)
         if factor == -1:
-            expr = "(-" + expr + ")"
+            op = define("(-@01)", [op], len(idx), **kwargs)
         idx = [i1, i2]
-        return define(expr, [Op1, Op2], len(idx), **kwargs), idx
+        return op, idx
+    elif len(sumover) == len(idx1) == len(idx2):
+        best = None
+        for ridx1 in Op1.symm.symm(idx1) + Op1.symm.antisymm(idx1):
+            if ridx1 in Op1.symm.symm(idx1):
+                fac1 = 1
+            else:
+                fac1 = -1
+            for ridx2 in Op2.symm.symm(idx2) + Op2.symm.antisymm(idx2):
+                if ridx2 in Op2.symm.symm(idx2):
+                    fac2 = 1
+                else:
+                    fac2 = -1
+                order = map(lambda i: ridx2.index(i), idx1)
+                if np.sum(abs(np.asarray(order) - \
+                        np.arange(len(sumover)))) < best or best is None:
+                    best = np.sum(abs(np.asarray(order) - \
+                        np.arange(len(sumover))))
+                    border = order
+                    factor = fac1 * fac2
+        if best == 0:
+            expr = "np.sum(@01*@02)"
+        elif len(sumover) == 2:
+            expr = "np.sum(@01*@02.T)"
+        else:
+            expr = "np.tensordot(@01, @02, axes = (%s, %s))" % \
+                    (tuple(range(len(sumover))), tuple(order))
+        op = define(expr, [Op1, Op2], 0, **kwargs)
+        if factor == -1:
+            op = define("(-@01)", [op], 0, **kwargs)
+        idx = []
+        return op, idx
     else:
         raise Exception
 

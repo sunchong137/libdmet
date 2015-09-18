@@ -25,7 +25,7 @@ def expectation(ops):
         elif ops1 == D('B') * D('A'):
             return OpProduct(NumTensor("kappa_BA", ops.get_indices(), symm = IdxNoSymm(2)))
         else:
-            assert(0)
+            raise Exception
     elif len(ops) == 4:
         i,j,k,l = ops.get_indices()
         if ops1 == C('A') * C('A') * D('A') * D('A'):
@@ -47,6 +47,11 @@ def expectation(ops):
         elif ops1 == D('B') * D('B') * D('A') * D('A'):
             return OpProduct(NumTensor("Gamma_4", l+k+j+i, symm = Idx4FoldAntisymm()))
         else:
-            assert(0)
+            raise Exception
     else:
-        assert(0)
+        raise Exception
+
+def get_expectations(expr):
+    assert(isinstance(expr, OpSum))
+    return OpSum(map(lambda (fac, ops): (fac, ops.nonfermions() * \
+            expectation(ops.fermions())), expr))

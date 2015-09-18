@@ -161,9 +161,9 @@ class OpSum(list):
 
     def _format(self, term):
         if isinstance(term, BaseTensor):
-            return (1, OpProduct([term]))
+            return (1., OpProduct([term]))
         elif isinstance(term, OpProduct):
-            return (1, term)
+            return (1., term)
         elif len(term) == 2:
             factor, ops = term
             assert(isinstance(factor, (int, float)))

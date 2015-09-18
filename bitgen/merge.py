@@ -34,8 +34,10 @@ def equiv_idx(redtype, indices):
     _eqlist = sorted(map(lambda key: redclass[key], redclass))
     eq_indices = []
     for i in it.product(*map(lambda l: it.permutations(l), _eqlist)):
-        indices1 = "".join([indices[i] for i in it.chain.from_iterable(i)])
-        eq_indices.append((indices1, get_parity(indices, indices1)))
+        indices1 = "".join([indices[s] for s in it.chain.from_iterable(i)])
+        parity = reduce(lambda a,b: a*b, \
+                map(lambda st: get_parity(sorted(st), st), i), 1)
+        eq_indices.append((indices1, parity))
     return eq_indices
 
 def merge_fixed(expr, indices = "pq"):
@@ -102,13 +104,18 @@ def eval_delta_expr(expr, indices = ""):
         while len(ops.deltas()) > 0:
             # use the knowledge that delta is after num_tensor
             ridx = sorted(ops[-1].idx)[::-1]
-            if ridx[0] in indices:
-                if ridx[1] in indices:
+            if ridx[0] == ridx[1]:
+                ops = basic.OpProduct(ops[:-1])
+                continue
+            if ridx[0] in indices or ridx[1] in indices:
+                if ridx[0] in indices and ridx[1] in indices:
                     ops = basic.OpProduct(ops[:-1] + \
                             [basic.NumTensor("I", ridx, symm = basic.IdxIdentity())])
                     continue
-                else:
+                elif ridx[0] in indices:
                     ridx = ridx[::-1]
+                else:
+                    raise Exception
             ops = basic.OpProduct(ops[:-1]).replace_indices(ridx)
         expr[i] = (fac, ops)
     return expr

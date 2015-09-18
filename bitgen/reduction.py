@@ -143,7 +143,7 @@ def get_reduce_permutations(ops):
 def reduced(obj):
     if isinstance(obj, OpSum):
         return reduce(OpSum.__add__, map(lambda (fac, ops): \
-                fac * _reduced_OpProduct(ops), obj), OpSum([]))
+                float(fac) * _reduced_OpProduct(ops), obj), OpSum([]))
     elif isinstance(obj, OpProduct):
         return _reduced_OpProduct(obj)
     else:
