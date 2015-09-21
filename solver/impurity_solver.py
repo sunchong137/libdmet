@@ -176,7 +176,6 @@ class CASSCF(object):
             self.mo_coef[:, :, core.shape[2]:] = cas
 
         if self.solver is None or 1:
-            print self.settings
             self.solver = self.solver_cls(self.scfsolver.mf, \
                     self.ncas, norbs, **self.settings)
         else:

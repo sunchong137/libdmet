@@ -264,7 +264,7 @@ def gaopt(Ham, tmp = "/tmp"):
                     executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
                     "-integral", os.path.join(wd, "Kmat")]), stdout = f, shell = True)
         else:
-            sub.check_call(["mpirun", "-np", "4", \
+            sub.check_call(["mpirun", "-np", "%d" % (block.Block.nproc * block.Block.nnode), \
                     executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
                     "-integral", os.path.join(wd, "Kmat")], stdout = f)
 

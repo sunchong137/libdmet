@@ -71,13 +71,16 @@ def read_integral(dirname, lattice, cutoff = None):
 def buildHamiltonian(dirname, lattice):
     return HamNonInt(lattice, *(read_integral(dirname, lattice)))
 
-def AFInitGuessOrbs(v, lattice, AForbs, PMorbs, shift = 0., polar = 0.5):
+def AFInitGuessOrbs(v, lattice, AForbs, PMorbs, shift = 0., polar = 0.5, bogoliubov = False, rand = 0.):
     names = lattice.supercell.names
     nscsites = lattice.supercell.nsites
     subA = map(names.index, AForbs[0])
     subB = map(names.index, AForbs[1])
     subC = map(names.index, PMorbs)
-    vguess = np.zeros((2, nscsites, nscsites))
+    if bogoliubov:
+        vguess = np.zeros((3, nscsites, nscsites))
+    else:
+        vguess = np.zeros((2, nscsites, nscsites))
     for site in subA:
         vguess[0, site, site] = shift + polar
         vguess[1, site, site] = shift - polar
@@ -86,6 +89,11 @@ def AFInitGuessOrbs(v, lattice, AForbs, PMorbs, shift = 0., polar = 0.5):
         vguess[1, site, site] = shift + polar
     for site in subC:
         vguess[0, site, site] = vguess[1, site, site] = shift
+    if bogoliubov:
+        np.random.seed(32499823)
+        nact = len(subA) + len(subB)
+        vguess[np.ix_([2], subA+subB, subA+subB)] = \
+            (np.random.rand(1, nact, nact) - 0.5) * rand
 
     # FIXME a hack, directly update the parameters
     p = np.zeros(v.length())
@@ -98,6 +106,11 @@ def AFInitGuessOrbs(v, lattice, AForbs, PMorbs, shift = 0., polar = 0.5):
         p[psite(site) + psite(nscsites)] = shift + polar
     for site in subC:
         p[psite(site)] = p[psite(site) + psite(nscsites)] = shift
+    if bogoliubov:
+        for site1 in subA+subB:
+            for site2 in subA+subB:
+                p[psite(nscsites)*2+site1*nscsites+site2] = \
+                        vguess[2, site1, site2]
 
     v.update(p)
     log.eassert(la.norm(v.get() - vguess) < 1e-10, \
