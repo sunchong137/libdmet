@@ -51,7 +51,7 @@ for iter in range(MaxIter):
     Mu += dmu
     vcor = dmet.addDiag(vcor, dmu)
     GRhoImp, EnergyImp, nelecImp = \
-            dmet.transformResults(GRhoEmb, EnergyEmb, basis, ImpHam, H_energy)
+            dmet.transformResults(GRhoEmb, EnergyEmb, Lat, basis, ImpHam, H_energy, dmu)
 
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(GRhoEmb, Lat, basis, vcor, Mu, \

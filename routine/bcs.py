@@ -125,10 +125,6 @@ def __embHam1e(lattice, basis, vcor, mu, **kwargs):
 
     log.debug(1, "transform native H1")
     H1energy["cd"], H1energy["cc"][0], H0energy = transform_imp_env(basis, lattice, latH1)
-    tempCD, tempCC, tempH0 = transform_local(basis, lattice, mu * np.eye(nscsites))
-    H1energy["cd"] -= tempCD
-    H1energy["cc"] -= tempCC
-    H0energy -= tempH0
     return (H1, H0), (H1energy, H0energy)
 
 def __embHam2e(lattice, basis, vcor, local, **kwargs):
@@ -162,10 +158,6 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
     else:
         from libdmet.integral.integral_nonlocal_emb import transform
         VA, VB, UA, UB = separate_basis(basis)
-        #np.save("va.npy", VA)
-        #np.save("vb.npy", VB)
-        #np.save("ua.npy", UA)
-        #np.save("ub.npy", UB)
         H0, cd, cc, ccdd, cccd, cccc = \
                 transform(VA[0], VB[0], UA[0], UB[0], lattice.getH2())
         # FIXME the definition of UA and UB
@@ -291,7 +283,7 @@ def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0)
     log.result("residue (end)   = %20.12f", err_end)
     return vcor_new, err_begin
 
-def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
+def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
     VA, VB, UA, UB = separate_basis(basis)
     nscsites = basis.shape[-2] / 2
     nbasis = basis.shape[-1]
@@ -307,12 +299,15 @@ def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
         # FIXME energy expression is definitely wrong with mu built in the
         # Hamiltonian
         H1energy, H0energy = H_energy
-        CDeff = ImpHam.H1["cd"] - H1energy["cd"]
-        CCeff = ImpHam.H1["cc"] - H1energy["cc"]
-        H0eff = ImpHam.H0 - H0energy
         rhoA, rhoB, kappaBA = extractRdm(GRhoEmb)
-        Efrag = E - np.sum(CDeff[0] * rhoA) - np.sum(CDeff[1] * rhoB) - \
-                2 * np.sum(CCeff.T * kappaBA) - H0eff
+
+        tempCD, tempCC, tempH0 = transform_imp(basis, lattice, dmu * np.eye(nscsites))
+
+        CDeff = ImpHam.H1["cd"] - H1energy["cd"] - tempCD
+        CCeff = ImpHam.H1["cc"] - H1energy["cc"] - tempCC
+        H0eff = ImpHam.H0 - H0energy - tempH0
+        Efrag = E - np.sum(CDeff[0] * rhoA + CDeff[1] * rhoB) - \
+                2 * np.sum(CCeff[0] * kappaBA.T) - H0eff
     else:
         Efrag = None
     return GRhoImp, Efrag, nelec

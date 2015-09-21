@@ -30,9 +30,10 @@ def HartreeFockBogoliubov(Lat, v, filling, mu0, thrnelec = 1e-6):
     # present results
     return rho, mu
 
-def transformResults(GRhoEmb, E, basis, ImpHam, H_energy):
+def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
     nscsites = basis.shape[-2] / 2
-    GRhoImp, Efrag, nelec = bcs.transformResults(GRhoEmb, E, basis, ImpHam, H_energy)
+    GRhoImp, Efrag, nelec = bcs.transformResults(GRhoEmb, E, lattice, \
+            basis, ImpHam, H_energy, dmu)
     log.debug(1, "impurity generalized density matrix:\n%s", GRhoImp)
 
     if Efrag is None:
