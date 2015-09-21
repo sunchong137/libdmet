@@ -51,10 +51,10 @@ Ham = dmet.buildHamiltonian("integrals", Lat)
 Lat.setHam(Ham)
 
 vcor = dmet.VcorLocal(False, False, Lat.supercell.nsites)
-if os.path.exists("vcor.npy") and 0:
+fvcor = "vcor.npy"
+if os.path.exists(fvcor):
     log.result("Read vcor from disk")
-    with open("vcor.npy", "r") as f:
-        vcor.update(np.load(f))
+    vcor.update(np.load(fvcor))
 else:
     log.result("Antiferromagnetic initial guess of vcor")
     dmet.AFInitGuessOrbs(vcor, Lat, AForbs, PMorbs, shift = 0.3, polar = 0.3)
@@ -103,8 +103,7 @@ for iter in range(MaxIter):
         pvcor, _, _ = dc.Apply(vcor_new.param, vcor_new.param - vcor.param, Skip = skipDiis)
         vcor.update(pvcor)
 
-    with open("vcor.npy", "w") as f:
-        np.save(f, vcor_new.param)
+    np.save(fvcor, vcor_new.param)
 
 if conv:
     log.result("DMET converged")
