@@ -9,6 +9,7 @@ from libdmet.solver.scf import pyscflogger, incore_transform
 from libdmet.routine.bcs_helper import extractRdm, combineRdm, \
         basisToCanonical, basisToSpin
 import libdmet.utils.logger as log
+import copy
 
 def g_atomic_to_canonical(g, mo):
     norb = mo.shape[1] / 2
@@ -324,7 +325,7 @@ class BCS_DMRGSCF(mc1step_uhf.CASSCF):
         from libdmet.system import integral
         self.integral = integral.Integral(norb, False, True, H0, H1, H2)
 
-    def refresh(self, mf, ncas, norb, fcisolver, nelecas = None, frozen = []):
+    def refresh(self, mf, ncas, norb, nelecas = None, frozen = []):
         fcisolver = copy.copy(self.fcisolver)
         mc1step_uhf.CASSCF.__init__(self, mf, ncas, norb*2, \
                 (norb-ncas, norb-ncas), frozen)

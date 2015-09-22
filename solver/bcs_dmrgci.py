@@ -217,7 +217,9 @@ def split_localize(orbs, info, Ham, basis = None):
         # localorbs contain v and u parts with respect to embedding quasiparticles
         localbasis = basisToSpin(np.tensordot(basisToCanonical(basis), \
                 basisToCanonical(localorbs), (2, 0)))
-        ovlp = np.tensordot(np.abs(localbasis[0]), np.abs(localbasis[1]), ((0,1), (0,1)))
+        localbasis0 = np.sqrt(localbasis[0,:,:norbs]**2+localbasis[0,:,norbs:]**2)
+        localbasis1 = np.sqrt(localbasis[1,:,:norbs]**2+localbasis[1,:,norbs:]**2)
+        ovlp = np.tensordot(localbasis0, localbasis1, ((0,1), (0,1))) 
         ovlp_sq = ovlp ** 2
         cost_matrix = make_cost_matrix(ovlp_sq, lambda cost: 1. - cost)
         m = Munkres()
@@ -229,7 +231,6 @@ def split_localize(orbs, info, Ham, basis = None):
             log.debug(1, "(%2d, %2d) -> %12.6f", indices[i][0], indices[i][1], vals[i])
         log.info("Match localized quasiparticles: max %5.2f min %5.2f ave %5.2f", \
                 np.max(vals), np.min(vals), np.average(vals))
-
         # update localorbs and rotmat
         orderb = map(lambda idx: idx[1], indices)
         localorbs[1] = localorbs[1][:, orderb]
@@ -245,6 +246,25 @@ def split_localize(orbs, info, Ham, basis = None):
 
     HamLocal = rotateHam(rotmat, Ham)
     return HamLocal, localorbs, rotmat
+
+def momopt(old_basis, new_basis):
+    norb = old_basis.shape[2] / 2
+    old_basis1 = np.sqrt(old_basis[:,:,:norb] ** 2 + old_basis[:,:,norb:] ** 2)
+    new_basis1 = np.sqrt(new_basis[:,:,:norb] ** 2 + new_basis[:,:,norb:] ** 2)
+    # use Hungarian algorithm to match the basis
+    ovlp = 0.5 * np.tensordot(np.abs(old_basis1), np.abs(new_basis1), ((0,1,2), (0,1,2)))
+    ovlp_sq = ovlp ** 2
+    cost_matrix = make_cost_matrix(ovlp_sq, lambda cost: 1. - cost)
+
+    m = Munkres()
+    indices = m.compute(cost_matrix)
+    indices = sorted(indices, key = lambda idx: idx[0])
+    vals = map(lambda idx: ovlp_sq[idx], indices)
+    log.info("MOM reorder quality: max %5.2f min %5.2f ave %5.2f", \
+            np.max(vals), np.min(vals), np.average(vals))
+
+    reorder = [idx[1] for idx in indices]
+    return reorder, np.average(vals)
 
 def reorder(order, Ham, orbs, rot = None):
     # order 4 1 3 2 means 4 to 1, 1 to 2, 3 to 3, 2 to 4

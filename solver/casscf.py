@@ -164,7 +164,6 @@ class DMRGSCF(CASSCF):
                 make_rdm12s(self.fcisolver, self)
 
     def refresh(self, mf, ncas, nelecas, ncore = None, frozen = []):
-        # FIXME fcisolver is replaced when refresh!
         fcisolver = copy.copy(self.fcisolver)
         CASSCF.__init__(self, mf, ncas, nelecas, ncore, frozen)
         self.fcisolver = fcisolver

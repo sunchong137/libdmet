@@ -181,7 +181,8 @@ class CASSCF(object):
                     self.ncas, norbs, nelecas = self.nelecas, \
                     **self.settings)
         else:
-            self.solver.refresh(self.scfsolver.mf, self.ncas)
+            self.solver.refresh(self.scfsolver.mf, self.ncas, \
+                    norbs, nelecas = self.nelecas)
 
         self.apply_options(self.solver, CASSCF.settings)
         E, _, _, self.mo_coef = self.solver.mc1step(mo_coeff = self.mo_coef, \
