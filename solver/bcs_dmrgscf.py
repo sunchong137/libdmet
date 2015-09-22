@@ -324,6 +324,21 @@ class BCS_DMRGSCF(mc1step_uhf.CASSCF):
         from libdmet.system import integral
         self.integral = integral.Integral(norb, False, True, H0, H1, H2)
 
+    def refresh(self, mf, ncas, norb, fcisolver, nelecas = None, frozen = []):
+        fcisolver = copy.copy(self.fcisolver)
+        mc1step_uhf.CASSCF.__init__(self, mf, ncas, norb*2, \
+                (norb-ncas, norb-ncas), frozen)
+        self.fcisolver = fcisolver
+        self.rot = None
+        self.basis = None
+        mo_coefs = mf.mo_coeff
+        self.GRho = mdot(mo_coefs[:, :norb], mo_coefs[:, :norb].T)
+        def no_ao2mo(self, *args):
+            log.warning("ao2mo called")
+            return
+        self.ao2mo = no_ao2mo
+        self.converged = False
+
     def mc1step(self, *args, **kwargs):
         if 'basis' in kwargs.keys():
             self.basis = kwargs["basis"]

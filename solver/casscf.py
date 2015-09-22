@@ -165,9 +165,9 @@ class DMRGSCF(CASSCF):
 
     def refresh(self, mf, ncas, nelecas, ncore = None, frozen = []):
         # FIXME fcisolver is replaced when refresh!
-        self._fcisolver = copy.copy(self.fcisolver)
+        fcisolver = copy.copy(self.fcisolver)
         CASSCF.__init__(self, mf, ncas, nelecas, ncore, frozen)
-        self.fcisolver = self._fcisolver
+        self.fcisolver = fcisolver
         self.rot = None
         self.basis = None
         hf_coefs = mf.mo_coeff
