@@ -49,7 +49,8 @@ def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
 
         return GRhoImp, Efrag/nscsites, nelec/nscsites
 
-Hubbard.transformResults = transformResults
+Hubbard.transformResults = lambda GRhoEmb, E, basis, ImpHam, H_energy: \
+      transformResults(GRhoEmb, E, None, basis, ImpHam, H_energy, 0.)
 
 def ConstructImpHam(Lat, GRho, v, mu, matching = True, local = True, **kwargs):
     log.result("Making embedding basis")
