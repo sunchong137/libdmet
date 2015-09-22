@@ -217,8 +217,9 @@ def split_localize(orbs, info, Ham, basis = None):
         # localorbs contain v and u parts with respect to embedding quasiparticles
         localbasis = basisToSpin(np.tensordot(basisToCanonical(basis), \
                 basisToCanonical(localorbs), (2, 0)))
-        localbasis0 = np.sqrt(localbasis[0,:,:norbs]**2+localbasis[0,:,norbs:]**2)
-        localbasis1 = np.sqrt(localbasis[1,:,:norbs]**2+localbasis[1,:,norbs:]**2)
+        nscsites = basis.shape[2] / 2
+        localbasis0 = np.sqrt(localbasis[0,:,:nscsites]**2+localbasis[0,:,nscsites:]**2)
+        localbasis1 = np.sqrt(localbasis[1,:,:nscsites]**2+localbasis[1,:,nscsites:]**2)
         ovlp = np.tensordot(localbasis0, localbasis1, ((0,1), (0,1))) 
         ovlp_sq = ovlp ** 2
         cost_matrix = make_cost_matrix(ovlp_sq, lambda cost: 1. - cost)
