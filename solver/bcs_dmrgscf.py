@@ -272,8 +272,9 @@ def make_rdm12s(solver, casscf):
     return rdm1s_cas, rdm2s_cas
 
 class BCS_DMRGSCF(mc1step_uhf.CASSCF):
-    def __init__(self, mf, ncas, norb, fcisolver, frozen = [], \
-            splitloc = True, mom_reorder = True, TmpDir = "/tmp"):
+    def __init__(self, mf, ncas, norb, fcisolver, nelecas = None, \
+            frozen = [], splitloc = True, mom_reorder = True, \
+            TmpDir = "/tmp"):
         mc1step_uhf.CASSCF.__init__(self, mf, ncas, norb*2, \
                 (norb-ncas, norb-ncas), frozen)
         if log.Level[log.verbose] >= log.Level["DEBUG1"]:

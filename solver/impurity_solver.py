@@ -92,8 +92,9 @@ class CASSCF(object):
         "exact_integral": True,
     }
 
-    def __init__(self, ncas, nelecas, bogoliubov = False, MP2natorb = False, \
-            spinAverage = False, fcisolver = "FCI", settings = {}):
+    def __init__(self, ncas, nelecas = None, bogoliubov = False, \
+            MP2natorb = False, spinAverage = False, fcisolver = "FCI", \
+            settings = {}):
         log.eassert(ncas * 2 >= nelecas, \
                 "CAS size not compatible with number of electrons")
         self.ncas = ncas
@@ -177,7 +178,8 @@ class CASSCF(object):
 
         if self.solver is None or 1:
             self.solver = self.solver_cls(self.scfsolver.mf, \
-                    self.ncas, norbs, **self.settings)
+                    self.ncas, norbs, nelecas = self.nelecas, \
+                    **self.settings)
         else:
             self.solver.refresh(self.scfsolver.mf, self.ncas)
 

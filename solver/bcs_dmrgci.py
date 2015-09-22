@@ -11,8 +11,79 @@ from libdmet.integral.integral_emb_casci import transform
 from libdmet.integral.integral_localize import transform as transform_local
 from libdmet.solver.dmrgci import gaopt, momopt
 
+def get_qps_nelec(casci, Ham, guess):
+    # get quasiparticles by solving scf
+
+    casci.scfsolver.set_system(None, 0, True, False)
+    casci.scfsolver.set_integral(Ham)
+
+    E_HFB, GRho_HFB = casci.scfsolver.HFB(Mu = 0, tol = 1e-5, \
+            MaxIter = 30, InitGuess = guess)
+    mo = casci.scfsolver.get_mo()
+    mo_energy = casci.scfsolver.get_mo_energy()
+    norb = mo_energy.size / 2
+    nelecas = casci.nelecas / 2
+    ncas = casci.ncas
+    mo_v = map(lambda i: la.norm(mo[:norb,i])**2, range(norb*2))
+    orbtype = []
+    for i in range(norb*2):
+        if mo_energy[i] < 0. and mo_v[i] > 0.5:
+            orbtype.append(("A", "o"))
+        elif mo_energy[i] < 0.:
+            orbtype.append(("B", "v"))
+        elif mo_energy[i] > 0. and mo_v[i] > 0.5:
+            orbtype.append(("A", "v"))
+        elif mo_energy[i] > 0.:
+            orbtype.append(("B", "o"))
+    # ordered so that those close to the fermi surface come first
+    AO = [i for i, x in enumerate(orbtype) if x == ("A", "o")][::-1]
+    BO = [i for i, x in enumerate(orbtype) if x == ("B", "o")]
+    AV = [i for i, x in enumerate(orbtype) if x == ("A", "v")]
+    BV = [i for i, x in enumerate(orbtype) if x == ("B", "v")][::-1]
+    log.check(len(AO) == len(BO), "occupation number of A and B" \
+            "different (%d vs. %d)", len(AO), len(BO))
+    # divide into core and cas
+    casA_idx = AO[:nelecas][::-1] + AV[:ncas - nelecas]
+    casB_idx = BO[:nelecas][::-1] + BV[:ncas - nelecas]
+    coreqpA_idx = AO[nelecas:] + BV[ncas-nelecas:]
+    coreqpB_idx = BO[nelecas:] + AV[ncas-nelecas:]
+    # now seriously classify casA and casB into occ, partial and virt
+    casA_occ, casA_part, casA_virt = [], [], []
+    for idx in casA_idx:
+        if mo_v[idx] > 0.7 and mo_energy[idx] < -1e-4:
+            casA_occ.append(idx)
+        elif mo_v[idx] > 0.7 and mo_energy[idx] > 1e-4:
+            casA_virt.append(idx)
+        else:
+            casA_part.append(idx)
+    casB_occ, casB_part, casB_virt = [], [], []
+    for idx in casB_idx:
+        if mo_v[idx] < 0.3 and mo_energy[idx] > 1e-4:
+            casB_occ.append(idx)
+        elif mo_v[idx] < 0.3 and mo_energy[idx] < -1e-4:
+            casB_virt.append(idx)
+        else:
+            casB_part.append(idx)
+    casA = mo[:, casA_occ+casA_part+casA_virt]
+    casB = np.vstack((
+        mo[norb:, casB_occ+casB_part+casB_virt],
+        mo[:norb, casB_occ+casB_part+casB_virt]))
+    casinfo = (
+        (len(casA_occ), len(casA_part), len(casA_virt)),
+        (len(casB_occ), len(casB_part), len(casB_virt))
+    )
+    coreA = mo[:, coreqpA_idx]
+    coreB = np.vstack((
+        mo[norb:, coreqpB_idx],
+        mo[:norb, coreqpB_idx]))
+    return np.asarray([coreA, coreB]), np.asarray([casA, casB]), \
+            casinfo
+
 def get_qps(casci, Ham, guess):
     # get quasiparticles by solving scf
+    if casci.nelecas is not None:
+        return get_qps_nelec(casci, Ham, guess)
+
     casci.scfsolver.set_system(None, 0, True, False)
     casci.scfsolver.set_integral(Ham)
 
@@ -36,7 +107,7 @@ def get_qps(casci, Ham, guess):
     cas_temp = mo[:, norb - ncas: norb + ncas]
     cas_energy = mo_energy[norb - ncas: norb + ncas]
     cas = [{"o": [], "v": [], "p": []}, {"o": [], "v": [], "p": []}]
-    cas_v = map(lambda i: la.norm(cas_temp[:norb,i]), range(ncas*2))
+    cas_v = map(lambda i: la.norm(cas_temp[:norb,i])**2, range(ncas*2))
     order = np.argsort(cas_v)
     for idx in order[ncas:]: # alpha
         if cas_energy[idx] < -1e-4:
@@ -202,7 +273,7 @@ def reorder(order, Ham, orbs, rot = None):
         return Ham, orbs
 
 class BCSDmrgCI(object):
-    def __init__(self, ncas, splitloc = False, cisolver = None, \
+    def __init__(self, ncas, nelecas = None, splitloc = False, cisolver = None, \
             mom_reorder = True, tmpDir = "/tmp"):
         self.ncas = ncas
         self.splitloc = splitloc
@@ -225,8 +296,7 @@ class BCSDmrgCI(object):
     def run(self, Ham, ci_args = {}, guess = None, basis = None, similar = False):
         # ci_args is a list or dict for ci solver, or None
 
-        # FIXME think about choosing number of electron/hole freely
-        core, cas, casinfo = get_qps(self, Ham, guess)
+        Ca2CuO2Cl2_bcs_dmrg_casscf.pycore, cas, casinfo = get_qps(self, Ham, guess)
         coreGRho = np.dot(core[0], core[0].T)
         casHam, _ = buildCASHamiltonian(Ham, core, cas)
 
