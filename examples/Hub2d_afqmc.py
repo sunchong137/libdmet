@@ -40,12 +40,14 @@ for iter in range(MaxIter):
     rhoEmb, EnergyEmb = solver.run(ImpHam)
     rhoImp, EnergyImp, nelecImp = \
             dmet.transformResults(rhoEmb, EnergyEmb, basis, ImpHam, H1e)
+    nImp = np.product(ImpSize)
+    log.result("Spin Correlation Function (impurity):\n%s", \
+            solver.spin_corr()[:nImp, :nImp])
 
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(rhoEmb, Lat, basis, vcor, np.inf)
     history.update(EnergyImp, err, nelecImp, \
             np.max(abs(vcor.get() - vcor_new.get())), dc)
-
     if np.max(abs(vcor.get() - vcor_new.get())) < 1e-5:
         conv = True
         break

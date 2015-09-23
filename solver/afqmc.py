@@ -127,7 +127,7 @@ class AFQMC(object):
         self.count = 0
 
     def run(self, Ham, onepdm = True, similar = False):
-        norbs = Ham.norb
+        self.norbs = Ham.norb
         settings = copy.copy(AFQMC.settings)
         settings["onepdm"] = onepdm
         # clear the directory
@@ -141,12 +141,26 @@ class AFQMC(object):
         # read energy
         E, eE = self.extractE(grep("energy:", outputfile, A = 3))
         log.result("AFQMC energy uncertainty (1 sigma) = %20.12f", eE)
+        return self.onepdm(), E + Ham.H0
+
+    def onepdm(self):
         # read density matrix
+        norbs = self.norbs
         rho, drho = read1pdm(os.path.join(self.tmpDir, "cicj.dat"))
         rho = rho.reshape((2, norbs, norbs))
         erho = np.max(abs(drho))
         log.result("AFQMC density matrix uncertainty (max) = %20.12f", erho)
-        return rho, E + Ham.H0
+        return rho
+
+    def spin_corr(self):
+        # read spin correlation matrix
+        norbs = self.norbs
+        scorr, dscorr = read1pdm(os.path.join(self.tmpDir, "sisj.dat"))
+        scorr = scorr.reshape((norbs, norbs))
+        escorr = np.max(abs(dscorr))
+        log.result("AFQMC spin correlation matrix uncertainty (max)" \
+                " = %20.12f", escorr)
+        return scorr
 
     def extractE(self, text):
         lines = text.split('\n')
