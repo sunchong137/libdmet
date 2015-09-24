@@ -144,7 +144,7 @@ class CASSCF(object):
         nelecasAB = (self.nelecas/2, self.nelecas/2)
         if self.mo_coef is None or not similar: 
             # not restart from previous orbitals
-            core, cas, virt, casinfo = get_orbs(self, Ham, guess, nelec)
+            core, cas, virt, _ = get_orbs(self, Ham, guess, nelec)
             self.mo_coef = np.empty((2, norbs, norbs))
             self.mo_coef[:, :, :core.shape[2]] = core
             self.mo_coef[:, :, core.shape[2]:core.shape[2]+cas.shape[2]] = cas
@@ -171,7 +171,7 @@ class CASSCF(object):
         norbs = Ham.H1["cd"].shape[1]
         if self.mo_coef is None or not similar:
             # not restart from previous orbitals
-            core, cas, casinfo = get_qps(self, Ham, guess)
+            core, cas, _ = get_qps(self, Ham, guess)
             self.mo_coef = np.empty((2, norbs*2, norbs))
             self.mo_coef[:, :, :core.shape[2]] = core
             self.mo_coef[:, :, core.shape[2]:] = cas

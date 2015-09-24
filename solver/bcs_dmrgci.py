@@ -297,6 +297,7 @@ class BCSDmrgCI(object):
     def __init__(self, ncas, nelecas = None, splitloc = False, cisolver = None, \
             mom_reorder = True, tmpDir = "/tmp"):
         self.ncas = ncas
+        self.nelecas = nelecas
         self.splitloc = splitloc
         log.eassert(cisolver is not None, "No default ci solver is available" \
                 " with CASCI, you have to use Block")
@@ -317,7 +318,7 @@ class BCSDmrgCI(object):
     def run(self, Ham, ci_args = {}, guess = None, basis = None, similar = False):
         # ci_args is a list or dict for ci solver, or None
 
-        Ca2CuO2Cl2_bcs_dmrg_casscf.pycore, cas, casinfo = get_qps(self, Ham, guess)
+        core, cas, casinfo = get_qps(self, Ham, guess)
         coreGRho = np.dot(core[0], core[0].T)
         casHam, _ = buildCASHamiltonian(Ham, core, cas)
 
