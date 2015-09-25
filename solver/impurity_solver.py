@@ -142,13 +142,21 @@ class CASSCF(object):
                 "spin-restricted CASSCF solver is not implemented")
 
         nelecasAB = (self.nelecas/2, self.nelecas/2)
+
         if self.mo_coef is None or not similar: 
             # not restart from previous orbitals
+            log.debug(0, "Generate new orbitals using Hartree-Fock")
             core, cas, virt, _ = get_orbs(self, Ham, guess, nelec)
             self.mo_coef = np.empty((2, norbs, norbs))
             self.mo_coef[:, :, :core.shape[2]] = core
             self.mo_coef[:, :, core.shape[2]:core.shape[2]+cas.shape[2]] = cas
             self.mo_coef[:, :, core.shape[2]+cas.shape[2]:] = virt
+        else:
+            log.debug(0, "Reusing previous orbitals")
+            spin = Ham.H1["cd"].shape[0]
+            self.scfsolver.set_system(nelec, 0, False, spin == 1)
+            self.scfsolver.set_integral(Ham)
+            self.scfsolver.HF(tol = 1e-5, MaxIter = 30, InitGuess = guess)
 
         if self.solver is None:
             self.solver = self.solver_cls(self.scfsolver.mf, \
@@ -169,20 +177,28 @@ class CASSCF(object):
     def _run_bogoliubov(self, Ham, mcscf_args = {}, guess = None, similar = False):
         spin = 2
         norbs = Ham.H1["cd"].shape[1]
+
         if self.mo_coef is None or not similar:
             # not restart from previous orbitals
+            log.debug(0, "Generate new quasiparticles using HFB")
             core, cas, _ = get_qps(self, Ham, guess)
             self.mo_coef = np.empty((2, norbs*2, norbs))
             self.mo_coef[:, :, :core.shape[2]] = core
             self.mo_coef[:, :, core.shape[2]:] = cas
+        else:
+            log.debug(0, "Reusing previous quasiparticles")
+            self.scfsolver.set_system(None, 0, True, False)
+            self.scfsolver.set_integral(Ham)
+            self.scfsolver.HFB(Mu = 0, tol = 1e-5, MaxIter = 30, \
+                    InitGuess = guess)
 
         if self.solver is None:
             self.solver = self.solver_cls(self.scfsolver.mf, \
-                    self.ncas, norbs, nelecas = self.nelecas, \
+                    self.ncas, norbs, Ham, nelecas = self.nelecas, \
                     **self.settings)
         else:
             self.solver.refresh(self.scfsolver.mf, self.ncas, \
-                    norbs, nelecas = self.nelecas)
+                    norbs, Ham, nelecas = self.nelecas)
 
         self.apply_options(self.solver, CASSCF.settings)
         E, _, _, self.mo_coef = self.solver.mc1step(mo_coeff = self.mo_coef, \

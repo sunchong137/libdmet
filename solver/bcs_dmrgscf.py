@@ -273,7 +273,7 @@ def make_rdm12s(solver, casscf):
     return rdm1s_cas, rdm2s_cas
 
 class BCS_DMRGSCF(mc1step_uhf.CASSCF):
-    def __init__(self, mf, ncas, norb, fcisolver, nelecas = None, \
+    def __init__(self, mf, ncas, norb, Ham, fcisolver, nelecas = None, \
             frozen = [], splitloc = True, mom_reorder = True, \
             TmpDir = "/tmp"):
         mc1step_uhf.CASSCF.__init__(self, mf, ncas, norb*2, \
@@ -315,17 +315,9 @@ class BCS_DMRGSCF(mc1step_uhf.CASSCF):
         self.fcisolver.make_rdm12s = lambda *args: \
                 make_rdm12s(self.fcisolver, self)
 
-        # restore Hamiltonian
-        H0 = mf.mol.energy_nuc()
-        H1 = {
-            "cd": np.asarray([mf.h1e[:norb, :norb], -mf.h1e[norb:, norb:]]),
-            "cc": mf.h1e[:norb, norb:][np.newaxis]
-        }
-        H2 = mf._eri
-        from libdmet.system import integral
-        self.integral = integral.Integral(norb, False, True, H0, H1, H2)
+        self.integral = Ham
 
-    def refresh(self, mf, ncas, norb, nelecas = None, frozen = []):
+    def refresh(self, mf, ncas, norb, Ham, nelecas = None, frozen = []):
         fcisolver = copy.copy(self.fcisolver)
         mc1step_uhf.CASSCF.__init__(self, mf, ncas, norb*2, \
                 (norb-ncas, norb-ncas), frozen)
@@ -334,10 +326,12 @@ class BCS_DMRGSCF(mc1step_uhf.CASSCF):
         self.basis = None
         mo_coefs = mf.mo_coeff
         self.GRho = mdot(mo_coefs[:, :norb], mo_coefs[:, :norb].T)
+
         def no_ao2mo(self, *args):
             log.warning("ao2mo called")
             return
         self.ao2mo = no_ao2mo
+        self.integral = Ham
         self.converged = False
 
     def mc1step(self, *args, **kwargs):
