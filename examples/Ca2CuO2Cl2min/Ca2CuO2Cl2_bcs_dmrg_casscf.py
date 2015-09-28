@@ -98,6 +98,17 @@ for iter in range(MaxIter):
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(GRhoEmb, Lat, basis, vcor, Mu, MaxIter1 = 200, MaxIter2 = 0)
 
+    if iter >= TraceStart:
+        # to avoid spiral increase of vcor and mu
+        log.result("Keep trace of vcor unchanged")
+        ddiagV = np.average(np.diagonal(\
+                (vcor_new.get()-vcor.get())[:2], 0, 1, 2))
+        vcor_new = dmet.addDiag(vcor_new, -ddiagV)
+
+    log.section("\nfitting chemical potential\n")
+    _, Mu_new = dmet.HartreeFockBogoliubov(Lat, vcor_new, Filling, Mu)
+    log.result("dMu = %20.12f", Mu_new - Mu)
+
     history.update(EnergyImp, err, nelecImp, np.max(abs(vcor.get() - vcor_new.get())), dc)    
     if np.max(abs(vcor.get() - vcor_new.get())) < 1e-5:
         conv = True
@@ -105,8 +116,12 @@ for iter in range(MaxIter):
 
     if not conv:
         skipDiis = (iter < DiisStart) and (la.norm(vcor_new.param - vcor.param) > 0.01)
-        pvcor, _, _ = dc.Apply(vcor_new.param, vcor_new.param - vcor.param, Skip = skipDiis)
-        vcor.update(pvcor)
+        pvcor, dpvcor, _ = dc.Apply( \
+                np.hstack((vcor_new.param, Mu_new)), \
+                np.hstack((vcor_new.param - vcor.param, Mu_new - Mu)), \
+                Skip = skipDiis)
+        vcor.update(pvcor[:-1])
+        Mu = pvcor[-1]
 
     with open("vcor.npy", "w") as f:
         np.save(f, vcor_new.param)
