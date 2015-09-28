@@ -160,49 +160,90 @@ public:
   }
   void operator()(const std::vector<boost::shared_ptr<SparseMatrix> >& opvec) const
   {
-    if ((mpigetrank() == 0 || distributed))// && op.get_deltaQuantum().particleNumber != 0)
-    {
-      for (int opind=0; opind<opvec.size(); opind++) {
-	SparseMatrix& op = *opvec[opind];
+    if ((mpigetrank() == 0 || distributed)) {
+    for (int opind=0; opind<opvec.size(); opind++) {
+	    SparseMatrix& op = *opvec[opind];
 #ifndef SERIAL
-	boost::mpi::communicator world;
-	if (op.get_orbs().size() == 1 && op.get_orbs()[0]%world.size() != mpigetrank())
-	  continue;
-#endif	  
-	vector<SpinQuantum> wQ = wavefunction.get_deltaQuantum();
-	vector<SpinQuantum> oQ = op.get_deltaQuantum();
-	vector<IrrepSpace> vec = wQ[0].get_symm() + oQ[0].get_symm();
-	vector<SpinSpace> spinvec = wQ[0].get_s()+oQ[0].get_s();
-    for (int k=0; k<wQ.size(); ++k)
-    for (int l=0; l<oQ.size(); ++l)
-	for (int j=0; j<vec.size(); j++)
-	for (int i=0; i<spinvec.size(); i++)
-	{
-	  SpinQuantum q = SpinQuantum(wQ[k].get_n()+oQ[l].get_n(), spinvec[i], vec[j]);
-	  const boost::shared_ptr<SparseMatrix> fullop = op.getworkingrepresentation(big.get_leftBlock());      
-      if (dmrginp.hamiltonian() != BCS || q.get_n() <= dmrginp.effective_molecule_quantum().get_n()) {
+	    boost::mpi::communicator world;
+	    if (op.get_orbs().size() == 1 && op.get_orbs()[0]%world.size() != mpigetrank())
+	      continue;
+#endif
+	    vector<SpinQuantum> wQ = wavefunction.get_deltaQuantum();
+	    vector<SpinQuantum> oQ = op.get_deltaQuantum();
+	    vector<IrrepSpace> vec = wQ[0].get_symm() + oQ[0].get_symm();
+	    vector<SpinSpace> spinvec = wQ[0].get_s()+oQ[0].get_s();
+      if (dmrginp.hamiltonian() == BCS) {
+	      const boost::shared_ptr<SparseMatrix> fullop = op.getworkingrepresentation(big.get_leftBlock());
+        for (int n = 0; n <= dmrginp.effective_molecule_quantum().get_n(); ++n) {
+          bool valid_cre = false, valid_des = false;
+          for (int k = 0; k < wQ.size(); ++k) {
+            for (int l = 0; l < oQ.size(); ++l) {
+              if (wQ[k].get_n()+oQ[l].get_n() == n) {
+                valid_cre = true;
+              }
+              if (wQ[k].get_n()-oQ[l].get_n() == n) {
+                valid_des = true;
+              }
+            }
+          }
+          if (!valid_cre && !valid_des) {
+            continue;
+          }
+	        for (int j=0; j<vec.size(); j++)
+	        for (int i=0; i<spinvec.size(); i++) {
+            if (valid_cre) {
+	            SpinQuantum q = SpinQuantum(n, spinvec[i], vec[j]);
+              Wavefunction opxwave = Wavefunction(q, &big, wavefunction.get_onedot());
+              opxwave.Clear();
+	            TensorMultiply(big.get_leftBlock(), *fullop, &big, const_cast<Wavefunction&> (wavefunction), opxwave, dmrginp.molecule_quantum(), 1.0);
+	            double norm = DotProduct(opxwave, opxwave);
+	            if (abs(norm) > NUMERICAL_ZERO) {
+	              Scale(1./sqrt(norm), opxwave);
+	              MultiplyProduct(opxwave, Transpose(opxwave), dm[omp_get_thread_num()], scale);
+              }
+            }
+            if (valid_des) {
+	            SpinQuantum q = SpinQuantum(n, spinvec[i], vec[j]);
+              Wavefunction opxwave2 = Wavefunction(q, &big, wavefunction.get_onedot());
+              opxwave2.Clear();
+	            TensorMultiply(big.get_leftBlock(),Transpose(*fullop),&big, const_cast<Wavefunction&> (wavefunction), opxwave2, dmrginp.molecule_quantum(), 1.0);
+	            double norm = DotProduct(opxwave2, opxwave2);
+              if (abs(norm) >NUMERICAL_ZERO) {
+	              Scale(1./sqrt(norm), opxwave2);
+	              MultiplyProduct(opxwave2, Transpose(opxwave2), dm[omp_get_thread_num()], scale);
+	            }
+            }
+          }
+        }
+      }
+      else {
+      for (int k=0; k<wQ.size(); ++k)
+      for (int l=0; l<oQ.size(); ++l)
+	    for (int j=0; j<vec.size(); j++)
+	    for (int i=0; i<spinvec.size(); i++)
+	    {
+	      SpinQuantum q = SpinQuantum(wQ[k].get_n()+oQ[l].get_n(), spinvec[i], vec[j]);
+	      const boost::shared_ptr<SparseMatrix> fullop = op.getworkingrepresentation(big.get_leftBlock());      
         Wavefunction opxwave = Wavefunction(q, &big, wavefunction.get_onedot());
         opxwave.Clear();
-	    TensorMultiply(big.get_leftBlock(), *fullop, &big, const_cast<Wavefunction&> (wavefunction), opxwave, dmrginp.molecule_quantum(), 1.0);
-	    double norm = DotProduct(opxwave, opxwave);
-	    if (abs(norm) > NUMERICAL_ZERO) {
-	      Scale(1./sqrt(norm), opxwave);
-	      MultiplyProduct(opxwave, Transpose(opxwave), dm[omp_get_thread_num()], scale);
+	      TensorMultiply(big.get_leftBlock(), *fullop, &big, const_cast<Wavefunction&> (wavefunction), opxwave, dmrginp.molecule_quantum(), 1.0);
+	      double norm = DotProduct(opxwave, opxwave);
+	      if (abs(norm) > NUMERICAL_ZERO) {
+	        Scale(1./sqrt(norm), opxwave);
+	        MultiplyProduct(opxwave, Transpose(opxwave), dm[omp_get_thread_num()], scale);
+	      }
+	      q = SpinQuantum(wQ[k].get_n()-oQ[l].get_n(), spinvec[i], vec[j]);
+	      Wavefunction opxwave2 = Wavefunction(q, &big, wavefunction.get_onedot());
+	      opxwave2.Clear();
+	      TensorMultiply(big.get_leftBlock(),Transpose(*fullop),&big, const_cast<Wavefunction&> (wavefunction), opxwave2, dmrginp.molecule_quantum(), 1.0);
+	      norm = DotProduct(opxwave2, opxwave2);
+	      if (abs(norm) >NUMERICAL_ZERO) {
+	        Scale(1./sqrt(norm), opxwave2);
+	        MultiplyProduct(opxwave2, Transpose(opxwave2), dm[omp_get_thread_num()], scale);
+	      }
 	    }
       }
-	  q = SpinQuantum(wQ[k].get_n()-oQ[l].get_n(), spinvec[i], vec[j]);
-      if (dmrginp.hamiltonian() != BCS || q.get_n() >= 0) {
-	    Wavefunction opxwave2 = Wavefunction(q, &big, wavefunction.get_onedot());
-	    opxwave2.Clear();
-	    TensorMultiply(big.get_leftBlock(),Transpose(*fullop),&big, const_cast<Wavefunction&> (wavefunction), opxwave2, dmrginp.molecule_quantum(), 1.0);
-	    double norm = DotProduct(opxwave2, opxwave2);
-	    if (abs(norm) >NUMERICAL_ZERO) {
-	      Scale(1./sqrt(norm), opxwave2);
-	      MultiplyProduct(opxwave2, Transpose(opxwave2), dm[omp_get_thread_num()], scale);
-	    }
-      }
-	}
-      }
+    }
     }
   }
 
@@ -258,12 +299,11 @@ void DensityMatrix::add_onedot_noise(const std::vector<Wavefunction>& wave_solut
 #endif
 
     onedot_noise_f onedot_noise(dmnoise, *wvptr, big, 1., MAX_THRD);
-
     if (leftBlock->has(CRE)) {
       onedot_noise.set_opType(CRE);
       for_all_multithread(leftBlock->get_op_array(CRE), onedot_noise);
     }
-    
+    // FIXME most time consuming
     if (dmrginp.hamiltonian() != HUBBARD) {
 
       if (leftBlock->has(CRE_CRE)) {
@@ -281,7 +321,6 @@ void DensityMatrix::add_onedot_noise(const std::vector<Wavefunction>& wave_solut
 
       }
     }
-
     onedot_noise.syncaccumulate();
     norm = 0.0;
     for(int lQ=0;lQ<dmnoise[0].nrows();++lQ)
@@ -291,7 +330,6 @@ void DensityMatrix::add_onedot_noise(const std::vector<Wavefunction>& wave_solut
     if (norm > 1.0)
       ScaleAdd(noise/norm/nroots, dmnoise[0], *this);
   }
-
   norm = 0.0;
   for(int lQ=0;lQ<nrows();++lQ)
       if(this->allowed(lQ,lQ))
