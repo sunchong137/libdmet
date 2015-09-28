@@ -59,7 +59,7 @@ def SolveImpHam_with_dmu(lattice, ImpHam, basis, dmu, solver, solver_args = {}):
     return result
 
 def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, solver, \
-        solver_args = {}, delta = 0.02, thrnelec = 1e-4, step = 0.05):
+        solver_args = {}, delta = 0.02, thrnelec = 1e-5, step = 0.05):
     solve_with_mu = lambda mu: SolveImpHam_with_dmu(lattice, ImpHam, basis, \
             mu, solver, solver_args)
     rhoEmb, EnergyEmb = solve_with_mu(0.)
