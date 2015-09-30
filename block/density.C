@@ -173,7 +173,7 @@ public:
 	    vector<IrrepSpace> vec = wQ[0].get_symm() + oQ[0].get_symm();
 	    vector<SpinSpace> spinvec = wQ[0].get_s()+oQ[0].get_s();
       if (dmrginp.hamiltonian() == BCS) {
-	      const boost::shared_ptr<SparseMatrix> fullop = op.getworkingrepresentation(big.get_leftBlock());
+	    boost::shared_ptr<SparseMatrix> fullop;
         for (int n = 0; n <= dmrginp.effective_molecule_quantum().get_n(); ++n) {
           bool valid_cre = false, valid_des = false;
           for (int k = 0; k < wQ.size(); ++k) {
@@ -189,7 +189,10 @@ public:
           if (!valid_cre && !valid_des) {
             continue;
           }
-	        for (int j=0; j<vec.size(); j++)
+          if (!fullop) {
+	        fullop = op.getworkingrepresentation(big.get_leftBlock());
+          }
+	      for (int j=0; j<vec.size(); j++)
 	        for (int i=0; i<spinvec.size(); i++) {
             if (valid_cre) {
 	            SpinQuantum q = SpinQuantum(n, spinvec[i], vec[j]);
