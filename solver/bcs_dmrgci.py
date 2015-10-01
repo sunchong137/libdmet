@@ -40,8 +40,17 @@ def get_qps_nelec(casci, Ham, guess):
     BO = [i for i, x in enumerate(orbtype) if x == ("B", "o")]
     AV = [i for i, x in enumerate(orbtype) if x == ("A", "v")]
     BV = [i for i, x in enumerate(orbtype) if x == ("B", "v")][::-1]
-    log.check(len(AO) == len(BO), "occupation number of A and B" \
-            "different (%d vs. %d)", len(AO), len(BO))
+    if len(AO) != len(BO):
+      log.warning("occupation numbers of A and B " \
+            "are different (%d vs. %d)", len(AO), len(BO))
+      if len(AO) > len(BO):
+          p = len(AO) - len(BO)
+          log.warning("label %d occupied alpha orbitals as virtual", p)
+          AO, AV = AO[p:], AO[:p][::-1] + AV
+      else:
+          p = len(BO) - len(AO)
+          log.warning("label %d occupied beta orbitals as virtual", p)
+          BO, BV = BO[p:], BO[:p][::-1] + BV
     # divide into core and cas
     casA_idx = AO[:nelecas][::-1] + AV[:ncas - nelecas]
     casB_idx = BO[:nelecas][::-1] + BV[:ncas - nelecas]
