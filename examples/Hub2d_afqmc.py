@@ -35,7 +35,8 @@ for iter in range(MaxIter):
     rho, mu = dmet.HartreeFock(Lat, vcor, U)
 
     log.section("\nconstructing impurity problem\n")
-    ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor)
+    ImpHam, H1e, basis = dmet.ConstructImpHam(Lat, rho, vcor, onebodyOnly = True)
+    ImpHam.H2["ccdd"] = {"U": U, "nsites": np.product(ImpSize)}
     log.section("\nsolving impurity problem\n")
     rhoEmb, EnergyEmb = solver.run(ImpHam)
     rhoImp, EnergyImp, nelecImp = \
