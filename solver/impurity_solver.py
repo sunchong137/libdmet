@@ -74,7 +74,7 @@ class CASSCF(object):
         "max_cycle_micro": 8, # micro_cycle
         "max_cycle_micro_inner": 10,
         "conv_tol": 1e-5, # energy convergence
-        "conv_tol_grad": 1e-3, # orb grad convergence
+        "conv_tol_grad": None, # orb grad convergence
         # for augmented hessian
         "ah_level_shift": 1e-4,
         "ah_conv_tol": 1e-12, # augmented hessian accuracy
