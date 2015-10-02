@@ -132,12 +132,16 @@ def __embBasis_phsymm(lattice, rho, **kwargs):
 def embHam(lattice, basis, vcor, local = True, **kwargs):
     log.info("One-body part")
     Int1e, Int1e_energy = __embHam1e(lattice, basis, vcor, **kwargs)
+    if "oneBodyOnly" in kwargs and kwargs["oneBodyOnly"]:
+        return integral.Integral(nbasis, spin == 1, False, 0,
+                {"cd": Int1e}, {"ccdd": None}), {"cd": Int1e_energy}
     log.info("Two-body part")
     Int2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
 
     spin = basis.shape[0]
     nbasis = basis.shape[-1]
-    return integral.Integral(nbasis, spin == 1, False, 0, {"cd": Int1e}, {"ccdd": Int2e}), {"cd": Int1e_energy}
+    return integral.Integral(nbasis, spin == 1, False, 0,
+            {"cd": Int1e}, {"ccdd": Int2e}), {"cd": Int1e_energy}
 
 def __embHam1e(lattice, basis, vcor, **kwargs):
     log.eassert(vcor.islocal(), "nonlocal correlation potential cannot be treated in this routine")
