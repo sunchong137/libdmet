@@ -127,7 +127,7 @@ def kernel(casscf, mo_coeff, tol=1e-7, conv_tol_grad=None, macro=50, micro=3,
 
     if conv_tol_grad is None:
         conv_tol_grad = np.sqrt(tol*.1)
-        logger.info(casscf, 'Set conv_tol_grad to %g', conv_tol_grad)
+        pyscflogger.info(casscf, 'Set conv_tol_grad to %g', conv_tol_grad)
     conv_tol_ddm = conv_tol_grad * 3
     max_cycle_micro = micro
     conv = False
@@ -407,8 +407,6 @@ class BCS_DMRGSCF(mc1step_uhf.CASSCF):
                       macro=macro, micro=micro,
                       ci0=ci0, callback=callback, verbose=self.verbose)
         pyscflogger.note(self, 'CASSCF energy = %.15g', self.e_tot)
-        #if self.verbose >= logger.INFO:
-        #    self.analyze(mo_coeff, self.ci, verbose=self.verbose)
         return self.e_tot, e_cas, self.ci, self.mo_coeff
 
     def casci(self, mo_coeff, ci0 = None, eris = None):
