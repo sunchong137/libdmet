@@ -24,33 +24,16 @@ def get_qps_nelec(casci, Ham, guess):
     norb = mo_energy.size / 2
     nelecas = casci.nelecas / 2
     ncas = casci.ncas
-    mo_v = map(lambda i: la.norm(mo[:norb,i])**2, range(norb*2))
-    orbtype = []
-    for i in range(norb*2):
-        if mo_energy[i] < 0. and mo_v[i] > 0.5:
-            orbtype.append(("A", "o"))
-        elif mo_energy[i] < 0.:
-            orbtype.append(("B", "v"))
-        elif mo_energy[i] > 0. and mo_v[i] > 0.5:
-            orbtype.append(("A", "v"))
-        elif mo_energy[i] > 0.:
-            orbtype.append(("B", "o"))
-    # ordered so that those close to the fermi surface come first
-    AO = [i for i, x in enumerate(orbtype) if x == ("A", "o")][::-1]
-    BO = [i for i, x in enumerate(orbtype) if x == ("B", "o")]
-    AV = [i for i, x in enumerate(orbtype) if x == ("A", "v")]
-    BV = [i for i, x in enumerate(orbtype) if x == ("B", "v")][::-1]
-    if len(AO) != len(BO):
-      log.warning("occupation numbers of A and B " \
-            "are different (%d vs. %d)", len(AO), len(BO))
-      if len(AO) > len(BO):
-          p = len(AO) - len(BO)
-          log.warning("label %d occupied alpha orbitals as virtual", p)
-          AO, AV = AO[p:], AO[:p][::-1] + AV
-      else:
-          p = len(BO) - len(AO)
-          log.warning("label %d occupied beta orbitals as virtual", p)
-          BO, BV = BO[p:], BO[:p][::-1] + BV
+    mo_v = map(lambda i: np.sum(mo[:norb,i]**2), range(norb*2))
+    mo_v_ord = np.argsort(mo_v)
+    mo_a, mo_b = mo_v_ord[norb:], mo_v_ord[:norb]
+
+    # ordered so that those close to the fermi surface come first 
+    AO = sorted(filter(lambda i: i < norb, mo_a))[::-1]
+    AV = sorted(filter(lambda i: i >= norb, mo_a))
+    BO = sorted(filter(lambda i: i >= norb, mo_b))
+    BV = sorted(filter(lambda i: i < norb, mo_b))[::-1]
+
     # divide into core and cas
     casA_idx = AO[:nelecas][::-1] + AV[:ncas - nelecas]
     casB_idx = BO[:nelecas][::-1] + BV[:ncas - nelecas]
