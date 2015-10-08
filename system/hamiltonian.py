@@ -44,8 +44,8 @@ def HubbardHamiltonian(lattice, U, tlist = [1.]):
     for order, t in enumerate(tlist):
         if abs(t) < 1e-7:
             continue
-        log.eassert(order < len(lattice.neighborDist),
-            "%dth near neighbor distance unspecified in Lattice object", order+1)
+        log.eassert(order < len(lattice.neighborDist), \
+                "%dth near neighbor distance unspecified in Lattice object", order+1)
         dis = lattice.neighborDist[order]
         log.warning("Searching neighbor within only one supercell")
         pairs = lattice.neighbor(dis = dis, sitesA = range(nscsites))
@@ -56,4 +56,28 @@ def HubbardHamiltonian(lattice, U, tlist = [1.]):
     for s in range(nscsites):
         H2[s,s,s,s] = U
 
+    return HamNonInt(lattice, H1, H2)
+
+def Hubbard3band(lattice, Ud, Up, ed, tpd, tpp):
+    ncells = lattice.ncells
+    nscsites = lattice.supercell.nsites
+    H1 = np.zeros((ncells, nscsites, nscsites))
+    H2 = np.zeros((nscsites,) * 4)
+    d_pd = lattice.neighborDist[0]
+    d_pp = lattice.neighborDist[1]
+    log.warning("Searching neighbor within only one supercell")
+    pd_pairs = lattice.neighbor(dis = d_pd, sitesA = range(nscsites))
+    for i, j in pd_pairs:
+        H1[j / nscsites, i, j % nscsites] = tpd
+    pp_pairs = lattice.neighbor(dis = d_pp, sitesA = range(nscsites))
+    for i, j in pp_pairs:
+        H1[j / nscsites, i, j % nscsites] = tpp
+    for i, orb in enumerate(lattice.supercell.names):
+        if orb == "Cu":
+            H1[0,i,i] = ed
+            H2[i,i,i,i] = Ud
+        elif orb == "O":
+            H2[i,i,i,i] = Up
+        else:
+            log.error("wrong orbital name %s in 3-band Hubbard model", orb)
     return HamNonInt(lattice, H1, H2)

@@ -51,7 +51,7 @@ Ham = dmet.buildHamiltonian("integrals", Lat)
 Lat.setHam(Ham)
 
 vcor = dmet.VcorLocal(False, False, Lat.supercell.nsites)
-if os.path.exists("vcor.npy") and 0:
+if os.path.exists("vcor.npy"):
     log.result("Read vcor from disk")
     with open("vcor.npy", "r") as f:
         vcor.update(np.load(f))

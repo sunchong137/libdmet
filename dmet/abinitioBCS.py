@@ -1,6 +1,6 @@
 from HubbardBCS import *
 from abinitio import buildUnitCell, buildLattice, read_integral, \
-        buildHamiltonian, AFInitGuessOrbs
+        buildHamiltonian, AFInitGuessIdx, AFInitGuessOrbs
 from abinitio import reportOccupation as report
 
 def reportOccupation(lattice, GRho, names = None):

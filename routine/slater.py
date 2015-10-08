@@ -15,6 +15,8 @@ TmpDir = "/tmp"
 def MatSqrt(M):
     log.eassert(la.norm(M - M.T.conj()) < 1e-10, "matrix must be symmetric")
     ew, ev = la.eigh(M)
+    if ew[0] < 0:
+        ew += 1e-12
     log.eassert((ew >= 0).all(), "matrix must be positive definite")
     log.check(ew[0] > 1e-10, "small eigenvalue for rho_imp,"
         "cut-off is recommended\nthe first 5 eigenvalues are %s", ew[:5])

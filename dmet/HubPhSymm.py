@@ -1,5 +1,6 @@
-from libdmet.system.lattice import ChainLattice, SquareLattice, CubicLattice, HoneycombLattice, BipartiteSquare
+from libdmet.system.lattice import ChainLattice, SquareLattice, Square3Band, CubicLattice, HoneycombLattice, BipartiteSquare
 from libdmet.system.hamiltonian import HubbardHamiltonian as Ham
+from libdmet.system.hamiltonian import Hubbard3band
 from libdmet.routine import vcor, slater
 from libdmet.routine.mfd import HF
 from libdmet.routine.diis import FDiisContext

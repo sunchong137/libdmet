@@ -19,18 +19,33 @@ def Real2Frac(cellsize, coord):
     return np.dot(coord, la.inv(cellsize))
 
 def ChainLattice(length, scsites):
-    log.eassert(length % scsites == 0, "incompatible lattice size and supercell size")
+    log.eassert(length % scsites == 0, \
+            "incompatible lattice and supercell sizes")
     uc = UnitCell(np.eye(1), [(np.array([0]), "X")])
-    sc = SuperCell(uc, np.array([scsites]))
-    lat = Lattice(sc, np.array([length / scsites]))
+    sc = SuperCell(uc, np.asarray([scsites]))
+    lat = Lattice(sc, np.asarray([length / scsites]))
     lat.neighborDist = [1.,2.,3.]
     return lat
 
 def SquareLattice(lx, ly, scx, scy):
-    log.eassert(lx % scx == 0 and ly % scy == 0, "incompatible lattice size and supercell size")
+    log.eassert(lx % scx == 0 and ly % scy == 0, \
+            "incompatible lattice and supercell sizes")
     uc = UnitCell(np.eye(2), [(np.array([0, 0]), "X")])
-    sc = SuperCell(uc, np.array([scx, scy]))
-    lat = Lattice(sc, np.array([lx / scx, ly / scy]))
+    sc = SuperCell(uc, np.asarray([scx, scy]))
+    lat = Lattice(sc, np.asarray([lx / scx, ly / scy]))
+    lat.neighborDist = [1., 2.**0.5, 2.]
+    return lat
+
+def Square3Band(lx, ly, scx, scy):
+    log.eassert(lx % scx == 0 and ly % scy == 0, \
+            "incompatible latticeand supercell sizes")
+    uc = UnitCell(np.eye(2)*2, [
+        (np.array([0,0]), "Cu"),
+        (np.array([1,0]), "O"),
+        (np.array([0,1]), "O"),
+    ])
+    sc = SuperCell(uc, np.asarray([scx, scy]))
+    lat = Lattice(sc, np.asarray([lx/scx, ly/scy]))
     lat.neighborDist = [1., 2.**0.5, 2.]
     return lat
 
@@ -38,10 +53,11 @@ def HoneycombLattice(lx, ly, scx, scy):
     log.error("honeycomb lattice not implemented yet")
 
 def CubicLattice(lx, ly, lz, scx, scy, scz):
-    log.eassert(lx % scx == 0 and ly % scy == 0 and lz % scz == 0, "incompatible lattice size and supercell size")
+    log.eassert(lx % scx == 0 and ly % scy == 0 and lz % scz == 0, \
+            "incompatible lattice and supercell size")
     uc = UnitCell(np.eye(3), [(np.array([0, 0, 0]), "X")])
-    sc = SuperCell(uc, np.array([scx, scy, scz]))
-    lat = Lattice(sc, np.array([lx / scx, ly / scy, lz / scz]))
+    sc = SuperCell(uc, np.asarray([scx, scy, scz]))
+    lat = Lattice(sc, np.asarray([lx / scx, ly / scy, lz / scz]))
     lat.neighborDist = [1., 2.**0.5, 3.**0.5]
     return lat
 
