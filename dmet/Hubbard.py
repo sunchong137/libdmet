@@ -109,15 +109,6 @@ def AFInitGuess(ImpSize, U, Filling, polar = None, bogoliubov = False, rand = 0.
         v.assign(np.asarray([init_v+init_p, init_v-init_p]))
     return v
 
-def addDiag(v, scalar):
-    rep = v.get()
-    spin = rep.shape[0]
-    nscsize = rep.shape[1]
-    for s in range(spin):
-        rep[s] += np.eye(nscsize) * scalar 
-    v.assign(rep)
-    return v
-
 def VcorLocal(restricted, bogoliubov, nscsites):
     if restricted:
         nV = nscsites * (nscsites + 1) / 2
@@ -214,5 +205,7 @@ def VcorLocal(restricted, bogoliubov, nscsites):
     v.gradient = types.MethodType(gradient, v)
     v.length = types.MethodType(lambda self: nV+nD, v)
     return v
+
+addDiag = slater.addDiag
 
 FitVcor = slater.FitVcorTwoStep

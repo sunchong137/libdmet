@@ -155,14 +155,18 @@ def contract_trans_inv_sparse(basisL, basisR, lattice, H, thr = 1e-7):
     nbasisR = basisR.shape[2]
     res = np.zeros((nbasisL, nbasisR))
     from libdmet.utils.misc import find
-    mask_basisL = find(True, map(lambda a: la.norm(a) > thr, basisL))
-    mask_basisR = find(True, map(lambda a: la.norm(a) > thr, basisR))
-    mask_H = find(True, map(lambda a: la.norm(a) > thr, H))
+    mask_basisL = set(find(True, map(lambda a: la.norm(a) > thr, basisL)))
+    mask_basisR = set(find(True, map(lambda a: la.norm(a) > thr, basisR)))
+    mask_H = set(find(True, map(lambda a: la.norm(a) > thr, H)))
 
-    for i, j in it.product(mask_basisL, mask_basisR):
-        Hidx = lattice.subtract(j, i)
-        if Hidx in mask_H:
-            res += mdot(basisL[i].T, H[Hidx], basisR[j])
+    for i, k in it.product(mask_basisL, mask_H):
+        j = lattice.add(i, k)
+        if j in mask_basisR:
+            res += mdot(basisL[i].T, H[k], basisR[j])
+    #for i, j in it.product(mask_basisL, mask_basisR):
+    #    Hidx = lattice.subtract(j, i)
+    #    if Hidx in mask_H:
+    #        res += mdot(basisL[i].T, H[Hidx], basisR[j])
     return res
 
 def transform_trans_inv_sparse(basis, lattice, H, thr = 1e-7):
