@@ -82,13 +82,7 @@ Hubbard.apply_dmu = apply_dmu
 def AFInitGuess(ImpSize, U, Filling, polar = None, rand = 0.01):
     return Hubbard.AFInitGuess(ImpSize, U, Filling, polar, True, rand)
 
-def addDiag(v, scalar):
-    rep = v.get()
-    nscsites = rep.shape[1]
-    rep[0] += np.eye(nscsites) * scalar
-    rep[1] += np.eye(nscsites) * scalar
-    v.assign(rep)
-    return v
+addDiag = bcs.addDiag
 
 FitVcor = bcs.FitVcorTwoStep
 

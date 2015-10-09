@@ -216,6 +216,15 @@ def foldRho(rho, Lat, basis):
     return np.asarray(map(lambda s: transform_trans_inv_sparse(basis[s], \
             Lat, rho[s]), range(spin)))
 
+def addDiag(v, scalar):
+    rep = v.get()
+    spin = rep.shape[0]
+    nscsize = rep.shape[1]
+    for s in range(spin):
+        rep[s] += np.eye(nscsize) * scalar
+    v.assign(rep)
+    return v
+
 def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
     spin = basis.shape[0]
     nbasis = basis.shape[-1]

@@ -163,8 +163,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         # FIXME the definition of UA and UB
     return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, {"cd": cd, "cc": cc}, H0
 
-def foldRho(GRho, Lat, basis):
-    thr = 1e-7
+def foldRho(GRho, Lat, basis, thr = 1e-7):
     ncells = Lat.ncells
     nscsites = Lat.supercell.nsites
     nbasis = basis.shape[-1]
@@ -173,14 +172,28 @@ def foldRho(GRho, Lat, basis):
     basisCanonical[:,:nscsites,nbasis:] = basis[1, :, nscsites:] # UA
     basisCanonical[:,nscsites:,nbasis:] = basis[1, :, :nscsites] # VB
     res = np.zeros((nbasis*2, nbasis*2))
-    mask_basis = find(True, map(lambda a: la.norm(a) > thr, basisCanonical))
-    mask_GRho = find(True, map(lambda a: la.norm(a) > thr, GRho))
-
-    for i, j in it.product(mask_basis, repeat = 2):
-        Hidx = Lat.subtract(j, i)
-        if Hidx in mask_GRho:
-            res += mdot(basisCanonical[i].T, GRho[Hidx], basisCanonical[j])
+    mask_basis = set(find(True, map(lambda a: la.norm(a) > thr, basisCanonical)))
+    mask_GRho = set(find(True, map(lambda a: la.norm(a) > thr, GRho)))
+    if len(mask_GRho) < len(mask_basis):
+        for i, Hidx in enumerate(mask_GRho):
+            for i in mask_basis:
+                j = Lat.add(i, Hidx)
+                if j in mask_basis:
+                    res += mdot(basisCanonical[i].T, GRho[Hidx], basisCanonical[j])
+    else:
+        for i, j in it.product(mask_basis, repeat = 2):
+            Hidx = Lat.subtract(j, i)
+            if Hidx in mask_GRho:
+                res += mdot(basisCanonical[i].T, GRho[Hidx], basisCanonical[j])
     return res
+
+def addDiag(v, scalar):
+    rep = v.get()
+    nscsites = rep.shape[1]
+    rep[0] += np.eye(nscsites) * scalar
+    rep[1] += np.eye(nscsites) * scalar
+    v.assign(rep)
+    return v
 
 def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
     nscsites = lattice.supercell.nsites
@@ -188,21 +201,11 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
     (embHA, embHB), embD, _ = transform_trans_inv_sparse(basis, lattice, \
             lattice.getFock(kspace = False))
 
-    embHeff = np.empty((nbasis*2, nbasis*2))
-    def errfunc(param):
-        vcor.update(param)
-        v = deepcopy(vcor.get())
-        v[0] -= mu * np.eye(nscsites)
-        v[1] -= mu * np.eye(nscsites)
-        (VA, VB), VD, _ = transform_local(basis, lattice, v)
-        embHeff[:nbasis, :nbasis] = embHA + VA
-        embHeff[nbasis:, nbasis:] = -(embHB + VB)
-        embHeff[:nbasis, nbasis:] = embD + VD
-        embHeff[nbasis:, :nbasis] = (embD + VD).T
-        ew, ev = la.eigh(embHeff)
-        ewocc = 1 * (ew < 0.)
-        GRho1 = mdot(ev, np.diag(ewocc), ev.T)
-        return la.norm(GRho - GRho1) / sqrt(2.)
+    embH = np.empty((nbasis*2, nbasis*2))
+    embH[:nbasis, :nbasis] = embHA
+    embH[nbasis:, nbasis:] = -embHB
+    embH[:nbasis, nbasis:] = embD
+    embH[nbasis:, :nbasis] = embD.T
 
     # now compute dV/dparam (will be used in gradient)
     dV_dparam = np.empty((vcor.length(), nbasis*2, nbasis*2))
@@ -214,16 +217,33 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
         dV_dparam[ip, :nbasis, nbasis:] = dD_dV
         dV_dparam[ip, nbasis:, :nbasis] = dD_dV.T
 
+    vcor_zero = deepcopy(vcor)
+    vcor_zero.update(np.zeros(vcor_zero.length()))
+    v0 = vcor_zero.get()
+    v0[0] -= mu * np.eye(nscsites)
+    v0[1] -= mu * np.eye(nscsites)
+    (A0, B0), D0, _ = \
+            transform_local(basis, lattice, v0)
+
+    def Vemb_param(param):
+        V = np.tensordot(param, dV_dparam, axes = (0, 0))
+        V[:nbasis, :nbasis] += A0
+        V[nbasis:, nbasis:] -= B0
+        V[:nbasis, nbasis:] += D0
+        V[nbasis:, :nbasis] += D0.T
+        return V
+
+    def errfunc(param):
+        vcor.update(param)
+        embHeff = embH + Vemb_param(param)
+        ew, ev = la.eigh(embHeff)
+        ewocc = 1 * (ew < 0.)
+        GRho1 = mdot(ev, np.diag(ewocc), ev.T)
+        return la.norm(GRho - GRho1) / sqrt(2.)
+
     def gradfunc(param):
         vcor.update(param)
-        v = deepcopy(vcor.get())
-        v[0] -= mu * np.eye(nscsites)
-        v[1] -= mu * np.eye(nscsites)
-        (VA, VB), VD, _ = transform_local(basis, lattice, v)
-        embHeff[:nbasis, :nbasis] = embHA + VA
-        embHeff[nbasis:, nbasis:] = -embHB - VB
-        embHeff[:nbasis, nbasis:] = embD + VD
-        embHeff[nbasis:, :nbasis] = (embD + VD).T
+        embHeff = embH + Vemb_param(param)
         ew, ev = la.eigh(embHeff)
         ewocc = 1 * (ew < 0.)
         GRho1 = mdot(ev, np.diag(ewocc), ev.T)
