@@ -196,11 +196,11 @@ def split_localize(orbs, info, Ham, basis = None):
             localorbs[s, :, -virt:] = np.dot(orbs[s,:,-virt:], virt_coefs)
             rotmat[s, -virt:, -virt:] = virt_coefs
         if part > 0:
-            localizer = Localizer(Han.H2["ccdd"][s, occ:norbs-virt, \
-                occ:norbs-virt, occ:norbs-virt, occ:nobrs-virt])
+            localizer = Localizer(Ham.H2["ccdd"][s, occ:norbs-virt, \
+                occ:norbs-virt, occ:norbs-virt, occ:norbs-virt])
             log.info("Localization: Spin %d, partially occupied:", s)
             localizer.optimize()
-            part_coefs = localizer.ceofs.T
+            part_coefs = localizer.coefs.T
             localorbs[s, :, occ:norbs-virt] = \
                     np.dot(orbs[s,:,occ:norbs-virt], part_coefs)
             rotmat[s, occ:norbs-virt, occ:norbs-virt] = part_coefs
