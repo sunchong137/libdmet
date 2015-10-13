@@ -104,8 +104,9 @@ def InitGuess(ImpSize, U, polar = None):
     nscsites = len(subA) + len(subB)
     if polar is None:
         polar = U/2
-    init_v = np.diag(map(lambda s: polar if s in subA else -polar, range(nscsites)))
-    v.assign(np.asarray([init_v, -init_v]))
+    init_v = np.eye(nscsites) * U/2
+    init_p = np.diag(map(lambda s: polar if s in subA else -polar, range(nscsites)))
+    v.assign(np.asarray([init_v + init_p, init_v - init_p]))
     return v
 
 def VcorLocalPhSymm(U, bogoliubov, subA, subB):

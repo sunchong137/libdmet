@@ -4,6 +4,7 @@
 
 import itertools as it
 import numpy as np
+import numpy.linalg as la
 import libdmet.utils.logger as log
 from scipy.optimize import minimize
 
@@ -38,15 +39,26 @@ class Vcor(object):
     def assign(self, v0):
         log.eassert(self.islocal(), "This routine is for local vcor only")
         log.eassert(v0.shape == self.gradient().shape[1:], \
-            "The initial guess should have shape %s, rather than %s",
+            "The correlation potential should have shape %s, rather than %s",
             self.gradient().shape[1:], v0.shape)
 
-        def fn(x):
-            self.update(x)
-            return np.sum((self.get() - v0) ** 2)
+        # v_empty
+        self.update(np.zeros(self.length()))
+        v_empty = self.get()
+        v0prime = v0 - v_empty
+        param = np.empty(self.length())
+        g = self.gradient()
+        for i in range(self.length()):
+            param[i] = np.sum(g[i] * v0prime) / np.sum(g[i] * g[i])
+        self.update(param)
+        log.check(la.norm(v0-self.get()) < 1e-7, \
+                "symmetrization imposed on initial guess")
+        #def fn(x):
+        #    self.update(x)
+        #    return np.sum((self.get() - v0) ** 2)
 
-        res = minimize(fn, np.zeros(self.length()), tol = 1e-10)
-        log.check(fn(res.x) < 1e-6, "symmetrization imposed on initial guess")
+        #res = minimize(fn, np.zeros(self.length()), tol = 1e-10)
+        #log.check(fn(res.x) < 1e-6, "symmetrization imposed on initial guess")
 
     def __str__(self):
         return self.evaluate().__str__()
