@@ -23,7 +23,7 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.Block(nproc = 4, nnode = 1, MaxM = 400, tol = 1e-6)
+solver = dmet.impurity_solver.Block(nproc = 4, nnode = 1, maxM = 400, tol = 1e-6)
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)

@@ -247,10 +247,10 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
     v0 = vcor_zero.get()
     v0emb = np.empty((spin, nbasis, nbasis))
     for s in range(spin):
-        V0emb[s] = transform_local(basis[s], lattice, v0[s])
+        v0emb[s] = transform_local(basis[s], lattice, v0[s])
 
     def Vemb_param(param):
-        return np.tensordot(param, dV_dparam, axes = (0, 0)) + V0emb
+        return np.tensordot(param, dV_dparam, axes = (0, 0)) + v0emb
 
     ew = np.empty((spin, nbasis))
     ev = np.empty((spin, nbasis, nbasis))
