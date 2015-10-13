@@ -233,16 +233,35 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
 
     embH1 = np.empty((spin, nbasis, nbasis))
     for s in range(spin):
-        embH1[s] = transform_trans_inv_sparse(basis[s], lattice, lattice.getFock(kspace = False))
+        embH1[s] = transform_trans_inv_sparse(basis[s], lattice, \
+                lattice.getFock(kspace = False))
+
+    dV_dparam = np.empty((vcor.length(), spin, nbasis, nbasis))
+    for s in range(spin):
+        for ip in range(vcor.length()):
+            dV_dparam[ip, s] = transform_local_sparseH(basis[s], \
+                    lattice, vcor.gradient()[ip,s])
+
+    vcor_zero = deepcopy(vcor)
+    vcor_zero.update(np.zeros(vcor_zero.length()))
+    v0 = vcor_zero.get()
+    v0emb = np.empty((spin, nbasis, nbasis))
+    for s in range(spin):
+        V0emb[s] = transform_local(basis[s], lattice, v0[s])
+
+    def Vemb_param(param):
+        return np.tensordot(param, dV_dparam, axes = (0, 0)) + V0emb
 
     ew = np.empty((spin, nbasis))
     ev = np.empty((spin, nbasis, nbasis))
 
     def errfunc(param):
         vcor.update(param)
+        embHeff = embH1 + Vemb_param(param)
         for s in range(spin):
-            embHeff = embH1[s] + transform_local(basis[s], lattice, vcor.get()[s])
-            ew[s], ev[s] = la.eigh(embHeff)
+            ew[s], ev[s] = la.eigh(embHeff[s])
+            #embHeff = embH1[s] + transform_local(basis[s], lattice, vcor.get()[s])
+            #ew[s], ev[s] = la.eigh(embHeff)
         ewocc, _, _ = assignocc(ew, nelec, beta, 0.)
         rho1 = np.empty_like(rho)
         for s in range(spin):
@@ -250,18 +269,15 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
 
         return la.norm(rho - rho1) / sqrt(spin)
 
-    dV_dparam = np.empty((vcor.length(), spin, nbasis, nbasis))
-    for s in range(spin):
-        for ip in range(vcor.length()):
-            dV_dparam[ip, s] = transform_local_sparseH(basis[s], lattice, vcor.gradient()[ip,s])
-
     def gradfunc(param):
         # analytic gradient for beta = np.inf and local basis
         vcor.update(param)
         # we need the original spectra
+        embHeff = embH1 + Vemb_param(param)
         for s in range(spin):
-            embHeff = embH1[s] + transform_local(basis[s], lattice, vcor.get()[s])
-            ew[s], ev[s] = la.eigh(embHeff)
+            ew[s], ev[s] = la.eigh(embHeff[s])
+            #embHeff = embH1[s] + transform_local(basis[s], lattice, vcor.get()[s])
+            #ew[s], ev[s] = la.eigh(embHeff)
         ewocc, _, _ = assignocc(ew, nelec, beta, 0.)
         rho1 = np.empty_like(rho)
         for s in range(spin):
