@@ -85,12 +85,14 @@ void SpinBlock::store (bool forward, const vector<int>& sites, SpinBlock& b, int
   
   if (mpigetrank()==0) {
     StateInfo::store(forward, sites, b.braStateInfo, lstate);
-    StateInfo::store(forward, sites, b.ketStateInfo, rstate);
+    if (rstate != lstate) {
+      StateInfo::store(forward, sites, b.ketStateInfo, rstate);
+    }
   }
 
   b.Save (ofs);
   ofs.close();
-  //pout << "\t\t\t block save disk time " << disktimer.elapsedwalltime() << " " << disktimer.elapsedcputime() << endl;
+  pout << "\t\t\t block save disk time " << disktimer.elapsedwalltime() << " " << disktimer.elapsedcputime() << endl;
 }
 
 void SpinBlock::Save (std::ofstream &ofs)

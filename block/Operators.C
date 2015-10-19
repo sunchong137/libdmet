@@ -573,10 +573,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::CreDes::getworkingrepr
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new CreDes);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return  boost::shared_ptr<CreDes>(this, boostutils::null_deleter());
+      //boost::shared_ptr<SparseMatrix> rep(new CreDes);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -677,10 +679,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::DesCre::getworkingrepr
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new DesCre);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<DesCre>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
+      //boost::shared_ptr<SparseMatrix> rep(new DesCre);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -781,10 +785,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::CreCre::getworkingrepr
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new CreCre);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<CreCre>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
+      //boost::shared_ptr<SparseMatrix> rep(new CreCre);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -886,10 +892,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::DesDes::getworkingrepr
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new DesDes);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<DesDes>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
+      //boost::shared_ptr<SparseMatrix> rep(new DesDes);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -1100,11 +1108,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::CreDesComp::getworking
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new CreDesComp);
-      *rep = *this;
-
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<CreDesComp>(this, boostutils::null_deleter());
+      //boost::shared_ptr<SparseMatrix> rep(new CreDesComp);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -1245,11 +1254,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::DesCreComp::getworking
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new DesCreComp);
-      *rep = *this;
-
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<DesCreComp>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
+      //boost::shared_ptr<SparseMatrix> rep(new DesCreComp);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -1464,10 +1474,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::DesDesComp::getworking
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new DesDesComp);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<DesDesComp>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
+      //boost::shared_ptr<SparseMatrix> rep(new DesDesComp);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -1605,10 +1617,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::CreCreComp::getworking
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new CreCreComp);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<CreCreComp>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
+      //boost::shared_ptr<SparseMatrix> rep(new CreCreComp);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -1825,10 +1839,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::CreCreDesComp::getwork
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new CreCreDesComp);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<CreCreDesComp>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
+      //boost::shared_ptr<SparseMatrix> rep(new CreCreDesComp);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -1982,10 +1998,12 @@ boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::CreDesDesComp::getwork
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new CreDesDesComp);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return  boost::shared_ptr<CreDesDesComp>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
+      //boost::shared_ptr<SparseMatrix> rep(new CreDesDesComp);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
@@ -2251,17 +2269,18 @@ double SpinAdapted::Ham::redMatrixElement(Csf c1, vector<Csf>& ladder, const Spi
 
 boost::shared_ptr<SpinAdapted::SparseMatrix> SpinAdapted::Ham::getworkingrepresentation(const SpinBlock* block)
 {
-  //assert(this->get_initialised());
   if (this->get_built())
     {
       return boost::shared_ptr<Ham>(this, boostutils::null_deleter()); // boost::shared_ptr does not own op
     }
   else
     {
-      boost::shared_ptr<SparseMatrix> rep(new Ham);
-      *rep = *this;
-      rep->build(*block);
-      return rep;
+      build(*block);
+      return boost::shared_ptr<Ham>(this, boostutils::null_deleter());
+      //boost::shared_ptr<SparseMatrix> rep(new Ham);
+      //*rep = *this;
+      //rep->build(*block);
+      //return rep;
     }
 
 }
