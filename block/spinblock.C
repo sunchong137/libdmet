@@ -49,18 +49,20 @@ void SpinBlock::printOperatorSummary()
          cout <<numops[proc]<<"  ";
       }
       cout << endl;
-      /*
       if(it->second->is_core()) { 
         for (int i = 0; i < it->second->size(); ++i) {
            std::vector<boost::shared_ptr<SparseMatrix> > global_element = it->second->get_global_element(i);
            cout << "Element " << i  << " has " << global_element.size() << " operators" << endl;
            for (int j = 0; j < global_element.size(); ++j) {
-             cout << "Operator " << j << endl; 
-             cout << *(global_element[j]) << endl;
+             cout << "Operator " << j << endl;
+             std::vector<int> orbs = global_element[j]->get_orbs();
+             for (int i = 0; i < orbs.size(); ++i) {
+               cout << orbs[i] << " ";
+             }
+             cout << endl;
            }
         }
       }
-      */
     }
   }
 #else

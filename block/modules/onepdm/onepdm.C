@@ -297,7 +297,6 @@ void compute_pair_1_1_0(Wavefunction& wave1, Wavefunction& wave2, const SpinBloc
 
 void compute_one_pdm_0_2(Wavefunction& wave1, Wavefunction& wave2, const SpinBlock& big, Matrix& onepdm)
 {
-  if(mpigetrank() == 0) {
   SpinBlock* leftBlock = big.get_leftBlock();
   SpinBlock* rightBlock = big.get_rightBlock();
 
@@ -306,7 +305,6 @@ void compute_one_pdm_0_2(Wavefunction& wave1, Wavefunction& wave2, const SpinBlo
     boost::shared_ptr<SparseMatrix> op = rightBlock->get_op_array(CRE_DES).get_local_element(ij)[0]->getworkingrepresentation(rightBlock);
     int ix = op->get_orbs(0);
     int jx = op->get_orbs(1);
-
     Wavefunction opw2;
     vector<SpinQuantum> dQ = wave1.get_deltaQuantum();
     opw2.initialise(dQ, &big, true);
@@ -326,12 +324,10 @@ void compute_one_pdm_0_2(Wavefunction& wave1, Wavefunction& wave2, const SpinBlo
       onepdm(jx+1, ix+1) = sum/sqrt(2.0);
     }
   }      
-  }
 }
 
 void compute_pair_0_2(Wavefunction& wave1, Wavefunction& wave2, const SpinBlock& big, Matrix& onepdm)
 {
-  if(mpigetrank() == 0) {
   SpinBlock* leftBlock = big.get_leftBlock();
   SpinBlock* rightBlock = big.get_rightBlock();
 
@@ -354,7 +350,6 @@ void compute_pair_0_2(Wavefunction& wave1, Wavefunction& wave2, const SpinBlock&
       onepdm(ix+1, jx+1) = -sum/sqrt(2.0);
       onepdm(jx+1, ix+1) = sum/sqrt(2.0);
     }
-  }      
   }
 }
 

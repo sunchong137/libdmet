@@ -90,33 +90,58 @@ void SweepOnepdm::BlockAndDecimate (SweepParams &sweepParams, SpinBlock& system,
   Matrix pairmat;
   if (dmrginp.hamiltonian() == BCS)
     load_pairmat_binary(pairmat, state ,state);
-
-  if (sweepParams.get_block_iter() == 0) {
-    //this is inface a combination of  2_0_0, 1_1_0 and 0_2_0
-    pout << "compute 2_0_0"<<endl;
-    compute_one_pdm_2_0_0(solution[0], solution[0], big, onepdm);
-    if (dmrginp.hamiltonian() == BCS)
+  
+  if (dmrginp.hamiltonian() == BCS && dmrginp.exactpdm()) {
+    if (sweepParams.get_block_iter() == sweepParams.get_n_iters() / 2) {
+      pout << "compute 2_0_0" << endl;
+      compute_one_pdm_2_0_0(solution[0], solution[0], big, onepdm);
+      pout << "compute 0_2_0" << endl;
+      compute_one_pdm_0_2_0(solution[0], solution[0], big, onepdm);
+      pout << "compute 0_2"<<endl;
+      compute_one_pdm_0_2(solution[0], solution[0], big, onepdm);
+      pout << "compute 1_1_0"<<endl;
+      compute_one_pdm_1_1_0(solution[0], solution[0], big, onepdm);
+      pout << "compute 1_1"<<endl;
+      compute_one_pdm_1_1(solution[0], solution[0], big, onepdm);
+      pout << "compute 2_0_0" << endl;
       compute_pair_2_0_0(solution[0], solution[0], big, pairmat);
-    pout << "compute 1_1_0"<<endl;
-    compute_one_pdm_1_1_0(solution[0], solution[0], big, onepdm);
-    if (dmrginp.hamiltonian() == BCS)    
+      pout << "compute 0_2_0" << endl;
+      compute_pair_0_2_0(solution[0], solution[0], big, pairmat);
+      pout << "compute 0_2"<<endl;
+      compute_pair_0_2(solution[0], solution[0], big, pairmat);
+      pout << "compute 1_1_0"<<endl;
       compute_pair_1_1_0(solution[0], solution[0], big, pairmat);
-  }
+      pout << "compute 1_1"<<endl;
+      compute_pair_1_1(solution[0], solution[0], big, pairmat);
+    }
+  } else {
+    if (sweepParams.get_block_iter() == 0) {
+      //this is inface a combination of  2_0_0, 1_1_0 and 0_2_0
+      pout << "compute 2_0_0"<<endl;
+      compute_one_pdm_2_0_0(solution[0], solution[0], big, onepdm);
+      if (dmrginp.hamiltonian() == BCS)
+        compute_pair_2_0_0(solution[0], solution[0], big, pairmat);
+      pout << "compute 1_1_0"<<endl;
+      compute_one_pdm_1_1_0(solution[0], solution[0], big, onepdm);
+      if (dmrginp.hamiltonian() == BCS)    
+        compute_pair_1_1_0(solution[0], solution[0], big, pairmat);
+    }
 
-  pout << "compute 0_2_0"<<endl;
-  compute_one_pdm_0_2_0(solution[0], solution[0], big, onepdm);
-  if (dmrginp.hamiltonian() == BCS)  
-    compute_pair_0_2_0(solution[0], solution[0], big, pairmat);  
-  pout << "compute 1_1"<<endl;
-  compute_one_pdm_1_1(solution[0], solution[0], big, onepdm);
-  if (dmrginp.hamiltonian() == BCS)  
-    compute_pair_1_1(solution[0], solution[0], big, pairmat);
+    pout << "compute 0_2_0"<<endl;
+    compute_one_pdm_0_2_0(solution[0], solution[0], big, onepdm);
+    if (dmrginp.hamiltonian() == BCS)  
+      compute_pair_0_2_0(solution[0], solution[0], big, pairmat);  
+    pout << "compute 1_1"<<endl;
+    compute_one_pdm_1_1(solution[0], solution[0], big, onepdm);
+    if (dmrginp.hamiltonian() == BCS)  
+      compute_pair_1_1(solution[0], solution[0], big, pairmat);
 
-  if (sweepParams.get_block_iter()  == sweepParams.get_n_iters() - 1) {
-    pout << "compute 0_2"<<endl;
-    compute_one_pdm_0_2(solution[0], solution[0], big, onepdm);
-    if (dmrginp.hamiltonian() == BCS)    
-      compute_pair_0_2(solution[0], solution[0], big, pairmat);    
+    if (sweepParams.get_block_iter()  == sweepParams.get_n_iters() - 1) {
+      pout << "compute 0_2"<<endl;
+      compute_one_pdm_0_2(solution[0], solution[0], big, onepdm);
+      if (dmrginp.hamiltonian() == BCS)    
+        compute_pair_0_2(solution[0], solution[0], big, pairmat);
+    }
   }
 
   accumulate_onepdm(onepdm);
