@@ -39,7 +39,7 @@ enum orbitalFormat{MOLPROFORM, DMRGFORM};
 enum reorderType{FIEDLER, GAOPT, MANUAL, NOREORDER};
 enum keywords{ORBS, LASTM, STARTM, MAXM,  REORDER, HF_OCC, SCHEDULE, SYM, NELECS, SPIN, IRREP,
 	      MAXJ, PREFIX, NROOTS, DOCD, DEFLATION_MAX_SIZE, MAXITER,
-	      SCREEN_TOL, ODOT, SWEEP_TOL, OUTPUTLEVEL, NONSPINADAPTED, BOGOLIUBOV, TWODOT_NOISE, WARMUP, NUMKEYWORDS};
+	      SCREEN_TOL, ODOT, SWEEP_TOL, OUTPUTLEVEL, NONSPINADAPTED, BOGOLIUBOV, EXACTPDM, TWODOT_NOISE, WARMUP, NUMKEYWORDS};
 
 class Input {
 
@@ -93,6 +93,7 @@ class Input {
   bool m_do_npdm_ops;
   bool m_do_npdm_in_core;
   bool m_new_npdm_code;
+  bool m_exactpdm;
   bool m_set_Sz;
   int m_maxiter;
   double m_oneindex_screen_tol;
@@ -159,7 +160,7 @@ class Input {
     ar & m_deflation_min_size & m_deflation_max_size & m_outputlevel & m_reorderfile;
     ar & m_algorithm_type & m_twodot_to_onedot_iter & m_orbformat ;
     ar & m_nquanta & m_sys_add & m_env_add & m_do_fci & m_no_transform ;
-    ar & m_do_npdm_ops & m_do_npdm_in_core & m_new_npdm_code;
+    ar & m_do_npdm_ops & m_do_npdm_in_core & m_new_npdm_code & m_exactpdm;
     ar & m_maxj & m_ninej & m_maxiter & m_do_deriv & m_oneindex_screen_tol & m_twoindex_screen_tol & m_quantaToKeep & m_noise_type;
     ar & m_sweep_tol & m_restart & m_backward & m_fullrestart & m_restart_warm & m_reset_iterations & m_calc_type & m_ham_type & m_warmup;
     ar & m_do_diis & m_diis_error & m_start_diis_iter & m_diis_keep_states & m_diis_error_tol & m_num_spatial_orbs;
@@ -368,6 +369,8 @@ class Input {
   bool &do_npdm_in_core() {return m_do_npdm_in_core;}
   const bool &new_npdm_code() const {return m_new_npdm_code;}
   bool &new_npdm_code() {return m_new_npdm_code;}
+  const bool &exactpdm() const {return m_exactpdm;}
+  bool &exactpdm() {return m_exactpdm;}
   int slater_size() const {return m_norbs;}
   const std::vector<int> &reorder_vector() {return m_reorder;}
   bool spinAdapted() {return m_spinAdapted;}
