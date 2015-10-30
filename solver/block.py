@@ -20,13 +20,13 @@ class Schedule(object):
             minM, maxM, self.maxiter)
 
         self.arrayM = [minM] + [M for M in defaultM if M > minM and M < maxM] + [maxM]
-        self.arraySweep = range(0, 6 * len(self.arrayM), 6)
+        self.arraySweep = range(0, 5 * len(self.arrayM), 5)
         self.arrayTol = [min(1e-4, self.sweeptol * 0.1 * 10.**i) for i in \
                 range(len(self.arrayM))][::-1]
         self.arrayNoise = deepcopy(self.arrayTol)
 
         self.arrayM.append(maxM)
-        self.arraySweep.append(self.arraySweep[-1] + 4)
+        self.arraySweep.append(self.arraySweep[-1] + 3)
         self.arrayTol.append(self.arrayTol[-1])
         self.arrayNoise.append(0)
 
@@ -35,22 +35,22 @@ class Schedule(object):
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
 
-        self.twodot_to_onedot = self.arraySweep[-1] + 4
+        self.twodot_to_onedot = self.arraySweep[-1] + 3
 
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
 
-        if self.twodot_to_onedot + 4 > self.maxiter:
+        if self.twodot_to_onedot + 3 > self.maxiter:
             log.warning("only %d onedot iterations\nmodify maxiter to %d", \
-                self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 4)
-            self.maxiter = self.twodot_to_onedot + 4
+                self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 3)
+            self.maxiter = self.twodot_to_onedot + 3
         self.initialized = True
 
     def gen_restart(self, M):
         log.debug(1, "Generate default schedule with restart calculation M = %d, " \
                 "maxiter = %d", M, self.maxiter)
         self.arrayM = [M, M]
-        self.arraySweep = [0, 4]
+        self.arraySweep = [0, 3]
         self.arrayTol = [self.sweeptol * 0.1] * 2
         self.arrayNoise = [self.sweeptol * 0.1, 0]
 
@@ -59,15 +59,15 @@ class Schedule(object):
         log.debug(2, "Davidson tols   " + " %.0e" * len(self.arrayTol), *self.arrayTol)
         log.debug(2, "add noise       " + " %.0e" * len(self.arrayNoise), *self.arrayNoise)
 
-        self.twodot_to_onedot = self.arraySweep[-1] + 4
+        self.twodot_to_onedot = self.arraySweep[-1] + 3
 
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
 
-        if self.twodot_to_onedot + 4 > self.maxiter:
+        if self.twodot_to_onedot + 3 > self.maxiter:
             log.warning("only %d onedot iterations\nmodify maxiter to %d", \
-                self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 4)
-            self.maxiter = self.twodot_to_onedot + 4
+                self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 3)
+            self.maxiter = self.twodot_to_onedot + 3
         self.initialized = True
 
     def gen_extrapolate(self, M):
