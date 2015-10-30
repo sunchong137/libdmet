@@ -1,7 +1,7 @@
 from libdmet.solver import block, scf, casscf, bcs_dmrgscf
 from libdmet.solver.afqmc import AFQMC
 from libdmet.solver.dmrgci import DmrgCI, get_orbs
-from libdmet.solver.bcs_dmrgci import BCSDmrgCI, get_qps
+from libdmet.solver.bcs_dmrgci import BCSDmrgCI, get_qps, get_BCS_mo
 from libdmet.system import integral
 import libdmet.utils.logger as log
 import numpy as np
@@ -178,10 +178,17 @@ class CASSCF(object):
         spin = 2
         norbs = Ham.H1["cd"].shape[1]
 
+        if self.nelecas is None:
+            fget_qps = get_qps(self.ncas, algo = "energy")
+        else:
+            fget_qps = get_qps(self.ncas, self.nelecas, algo = "nelec")
+        # I don't use local algo here
+
         if self.mo_coef is None or not similar:
             # not restart from previous orbitals
             log.debug(0, "Generate new quasiparticles using HFB")
-            core, cas, _ = get_qps(self, Ham, guess)
+            mo, mo_energy = get_BCS_mo(self.scfsolver, Ham, guess)
+            core, cas, _ = fget_qps(mo, mo_energy)
             self.mo_coef = np.empty((2, norbs*2, norbs))
             self.mo_coef[:, :, :core.shape[2]] = core
             self.mo_coef[:, :, core.shape[2]:] = cas

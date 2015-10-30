@@ -29,7 +29,8 @@ history = dmet.IterHistory()
 block = dmet.impurity_solver.Block(nproc = 4, nnode = 1, \
         bcs = True, tol = 1e-7, maxM = 400)
 
-solver = dmet.impurity_solver.BCSDmrgCI(ncas = 8, cisolver = block, splitloc = True)
+solver = dmet.impurity_solver.BCSDmrgCI(ncas = 8, \
+        cisolver = block, splitloc = True, algo = "energy")
 
 log.section("\nfitting chemical potential\n")
 _, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu)
