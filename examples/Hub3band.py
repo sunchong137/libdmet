@@ -46,7 +46,7 @@ block = dmet.impurity_solver.Block(nproc = 4, nnode = 1, maxM = 400, \
         reorder = True, tol = 1e-7)
 
 solver = dmet.impurity_solver.BCSDmrgCI(ncas = 24, \
-        cisolver = block, splitloc = True)
+        cisolver = block, splitloc = True, algo = "energy")
 
 log.section("\nfitting chemical potential\n")
 _, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu)
