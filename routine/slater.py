@@ -289,17 +289,25 @@ def FitVcorEmb(rho, lattice, basis, vcor, beta, MaxIter = 300, **kwargs):
         evocc, evvirt = ev[:, :, :occ], ev[:, :, occ:]
 
         # drho_ij/dV_ij
-        drho_dV = np.empty((spin, nbasis, nbasis, nbasis, nbasis))
+        #drho_dV = np.empty((spin, nbasis, nbasis, nbasis, nbasis))
+        #dnorm_dV = np.empty((spin, nbasis, nbasis))
+        #for s in range(spin):
+        #    c_jln = np.einsum("jn,ln->jln", evocc[s], evocc[s])
+        #    c_ikm = np.einsum("im,km->ikm", evvirt[s], evvirt[s])
+        #    e_mn = 1. / (-ewvirt[s].reshape((-1,1)) + ewocc[s])
+        #    drho_dV[s] = np.swapaxes(np.tensordot(np.tensordot(c_ikm, e_mn, axes = (2,0)), \
+        #        c_jln, axes = (2,2)), 1, 2) #ikm,mn->ikn;ikn,jln->ikjl;ikjl->ijkl
+        #    drho_dV[s] += np.swapaxes(np.swapaxes(drho_dV[s], 0, 1), 2, 3)
+        #    dnorm_dV[s] = np.tensordot(rho1[s]-rho[s], drho_dV[s], axes = ((0,1),(0,1))) \
+        #        / val / sqrt(spin)
+
+        # low scaling algorithm
         dnorm_dV = np.empty((spin, nbasis, nbasis))
         for s in range(spin):
-            c_jln = np.einsum("jn,ln->jln", evocc[s], evocc[s])
-            c_ikm = np.einsum("im,km->ikm", evvirt[s], evvirt[s])
             e_mn = 1. / (-ewvirt[s].reshape((-1,1)) + ewocc[s])
-            drho_dV[s] = np.swapaxes(np.tensordot(np.tensordot(c_ikm, e_mn, axes = (2,0)), \
-                c_jln, axes = (2,2)), 1, 2) #ikm,mn->ikn;ikn,jln->ikjl;ikjl->ijkl
-            drho_dV[s] += np.swapaxes(np.swapaxes(drho_dV[s], 0, 1), 2, 3)
-            dnorm_dV[s] = np.tensordot(rho1[s]-rho[s], drho_dV[s], axes = ((0,1),(0,1))) \
-                / val / sqrt(spin)
+            temp_mn = mdot(evvirt[s].T, rho1[s] - rho[s], evocc[s]) * e_mn / val / sqrt(spin)
+            dnorm_dV[s] = mdot(evvirt[s], temp_mn, evocc[s].T)
+            dnorm_dV[s] += dnorm_dV[s].T
         # now only indices kl
         return np.tensordot(dV_dparam, dnorm_dV, axes = ((1,2,3), (0,1,2)))
     
