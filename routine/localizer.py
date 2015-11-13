@@ -158,9 +158,9 @@ if __name__ == "__main__":
     np.random.seed(9)
     norbs = 10
     s = np.random.rand(norbs,norbs,norbs,norbs)
-    s += np.swapaxes(s, 0, 1)
-    s += np.swapaxes(s, 2, 3)
-    s += np.swapaxes(np.swapaxes(s, 0, 2), 1, 3)
+    s = s + np.swapaxes(s, 0, 1)
+    s = s + np.swapaxes(s, 2, 3)
+    s = s + np.transpose(s, (2, 3, 0, 1))
     loc = Localizer(s)
     loc.optimize()
     R = loc.coefs

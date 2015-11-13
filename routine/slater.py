@@ -101,8 +101,7 @@ def __embBasis_proj(lattice, rho, **kwargs):
     basis = np.zeros((spin, ncells, nscsites, nscsites * 2))
     for s in range(spin):
         A = MatSqrt(rho[s,0])
-        B = np.swapaxes(np.tensordot(la.inv(A), rho[s, 1:], axes = (1,1)), 0, 1)
-        B = np.swapaxes(B, 1, 2)
+        B = np.rollaxis(np.tensordot(la.inv(A), rho[s, 1:], axes = (1,1)), 0, 3)
         B = orthonormalizeBasis(B)
         basis[s, 0, :, :nscsites] = np.eye(nscsites)
         basis[s, 1:, :, nscsites:] = B
@@ -116,15 +115,13 @@ def __embBasis_phsymm(lattice, rho, **kwargs):
     for s in range(spin):
         # particle
         A1 = MatSqrt(rho[s,0])
-        AB1 = np.swapaxes(np.tensordot(la.inv(A1), rho[s], axes = (1,1)), 0, 1)
-        AB1 = np.swapaxes(AB1, 1, 2)
+        AB1 = np.rollaxis(np.tensordot(la.inv(A1), rho[s], axes = (1,1)), 0, 3)
         AB1 = orthonormalizeBasis(AB1)
         # hole
         rho_h = -rho[s]
         rho_h[0] += np.eye(nscsites)
         A2 = MatSqrt(rho_h[0])
-        AB2 = np.swapaxes(np.tensordot(la.inv(A2), rho_h, axes = (1,1)), 0, 1)
-        AB2 = np.swapaxes(AB2, 1, 2)
+        AB2 = np.rollaxis(np.tensordot(la.inv(A2), rho_h, axes = (1,1)), 0, 3)
         AB2 = orthonormalizeBasis(AB2)
         basis[s,:,:,:nscsites] = AB1
         basis[s,:,:,nscsites:] = AB2
