@@ -139,6 +139,7 @@ def embHam(lattice, basis, vcor, local = True, **kwargs):
     if "oneBodyOnly" in kwargs and kwargs["oneBodyOnly"]:
         return integral.Integral(nbasis, spin == 1, False, 0,
                 {"cd": Int1e}, {"ccdd": None}), {"cd": Int1e_energy}
+    
     log.info("Two-body part")
     Int2e = __embHam2e(lattice, basis, vcor, local, **kwargs)
 
