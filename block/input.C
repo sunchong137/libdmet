@@ -107,6 +107,7 @@ void SpinAdapted::Input::initialize_defaults()
   m_do_npdm_ops = false;
   m_do_npdm_in_core = false;
   m_new_npdm_code = false;
+  m_exactpdm = false;
   m_maxiter = 10;
   m_oneindex_screen_tol = NUMERICAL_ZERO;
   m_twoindex_screen_tol = NUMERICAL_ZERO;
@@ -240,6 +241,16 @@ SpinAdapted::Input::Input(const string& config_name) {
 	}
     m_Bogoliubov = true;
     m_ham_type = BCS;
+      }
+      else if (boost::iequals(keyword, "exactpdm")) {
+        if (usedkey[EXACTPDM] == 0) usedkey_error(keyword, msg);
+        usedkey[EXACTPDM] = 0;
+        if (tok.size() != 1) {
+          pout << "keyword exactpdm is a stand alone keyword" << endl;
+          pout << msg << endl;
+          abort();
+        }
+        m_exactpdm = true;
       }
       else if (boost::iequals(keyword, "warmup")) {
         if (usedkey[WARMUP] == 0)

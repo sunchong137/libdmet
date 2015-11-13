@@ -26,7 +26,7 @@ history = dmet.IterHistory()
 
 block = dmet.impurity_solver.Block(nproc = 8, nnode = 1, \
         reorder = True, tol = 1e-7)
-solver = dmet.impurity_solver.CASCI(ncas = 32, nelecas = 32, \
+solver = dmet.impurity_solver.DrmgCI(ncas = 32, nelecas = 32, \
         splitloc = True, cisolver = block)
 
 for iter in range(MaxIter):
