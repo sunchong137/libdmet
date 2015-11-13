@@ -237,32 +237,33 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
         vcor.update(param)
         embHeff = embH + Vemb_param(param)
         ew, ev = la.eigh(embHeff)
-        ewocc = 1 * (ew < 0.)
-        GRho1 = mdot(ev, np.diag(ewocc), ev.T)
+        occ = 1 * (ew < 0.)
+        GRho1 = mdot(ev, np.diag(occ), ev.T)
         return la.norm(GRho - GRho1) / sqrt(2.)
 
     def gradfunc(param):
         vcor.update(param)
         embHeff = embH + Vemb_param(param)
         ew, ev = la.eigh(embHeff)
-        ewocc = 1 * (ew < 0.)
-        GRho1 = mdot(ev, np.diag(ewocc), ev.T)
+        nocc = 1 * (ew < 0.)
+        GRho1 = mdot(ev, np.diag(nocc), ev.T)
         val = la.norm(GRho - GRho1)
-
         ewocc, ewvirt = ew[:nbasis], ew[nbasis:]
         evocc, evvirt = ev[:, :nbasis], ev[:, nbasis:]
         # dGRho_ij / dV_ij, where V corresponds to terms in the
         # embedding generalized density matrix
-        dGRho_dV = np.empty((nbasis*2, nbasis*2, nbasis*2, nbasis*2))
-        dnorm_dV = np.empty((nbasis*2, nbasis*2))
-        c_jln = np.einsum("jn,ln->jln", evocc, evocc)
-        c_ikm = np.einsum("im,km->ikm", evvirt, evvirt)
+        #c_jln = np.einsum("jn,ln->jln", evocc, evocc)
+        #c_ikm = np.einsum("im,km->ikm", evvirt, evvirt)
+        #e_mn = 1. / (-ewvirt.reshape((-1,1)) + ewocc)
+        #dGRho_dV = np.swapaxes(np.tensordot(np.tensordot(c_ikm, e_mn, \
+        #        axes = (2,0)), c_jln, axes = (2,2)), 1, 2)
+        #dGRho_dV += np.swapaxes(np.swapaxes(dGRho_dV, 0, 1), 2, 3)
+        #dnorm_dV = np.tensordot(GRho1 - GRho, dGRho_dV, \
+        #        axes = ((0,1), (0,1))) / val / sqrt(2.)
         e_mn = 1. / (-ewvirt.reshape((-1,1)) + ewocc)
-        dGRho_dV = np.swapaxes(np.tensordot(np.tensordot(c_ikm, e_mn, \
-                axes = (2,0)), c_jln, axes = (2,2)), 1, 2)
-        dGRho_dV += np.swapaxes(np.swapaxes(dGRho_dV, 0, 1), 2, 3)
-        dnorm_dV = np.tensordot(GRho1 - GRho, dGRho_dV, \
-                axes = ((0,1), (0,1))) / val / sqrt(2.)
+        temp_mn = mdot(evvirt.T, GRho1 - GRho, evocc) * e_mn / val / sqrt(2.)
+        dnorm_dV = mdot(evvirt, temp_mn, evocc.T)
+        dnorm_dV += dnorm_dV.T
         return np.tensordot(dV_dparam, dnorm_dV, axes = ((1,2), (0,1)))
 
     err_begin = errfunc(vcor.param)
