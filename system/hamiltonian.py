@@ -4,17 +4,23 @@ import itertools as it
 import libdmet.utils.logger as log
 
 class HamNonInt(object):
-    def __init__(self, lattice, H1, H2, Fock = None, ImpJK = None):
+    def __init__(self, lattice, H1, H2, Fock = None, ImpJK = None, kspace_input = False):
         ncells = lattice.ncells
         nscsites = lattice.supercell.nsites
         log.eassert(H1.shape == (ncells, nscsites, nscsites), \
             "H1 shape not compatible with lattice")
-        self.H1 = H1
+        if kspace_input:
+            self.H1 = lattice.FFTtoT(H1)
+        else:
+            self.H1 = H1
         if Fock is None:
             self.Fock = H1
         else:
             log.eassert(Fock.shape == H1.shape, "Fock shape not compatible with lattice")
-            self.Fock = Fock
+            if kspace_input:
+                self.Fock = lattice.FFTtoT(Fock)
+            else:
+                self.Fock = Fock
         if ImpJK is None:
             self.ImpJK = None
         else:
