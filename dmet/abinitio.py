@@ -68,8 +68,8 @@ def read_integral(dirname, lattice, cutoff = None):
         Fock, H1 = FockFull, H1Full
     return [H1, H2, Fock, ImpJK]
 
-def buildHamiltonian(dirname, lattice):
-    return HamNonInt(lattice, *(read_integral(dirname, lattice)))
+def buildHamiltonian(dirname, lattice, kspace_input = False):
+    return HamNonInt(lattice, *(read_integral(dirname, lattice)), kspace_input = kspace_input)
 
 def AFInitGuessIdx(v, nscsites, AFidx, PMidx, shift = 0., polar = 0.5, \
         bogoliubov = False, rand = 0.):
@@ -90,8 +90,9 @@ def AFInitGuessIdx(v, nscsites, AFidx, PMidx, shift = 0., polar = 0.5, \
     if bogoliubov:
         np.random.seed(32499823)
         nact = len(subA) + len(subB)
-        vguess[np.ix_([2], subA+subB, subA+subB)] = \
-            (np.random.rand(1, nact, nact) - 0.5) * rand
+        s = np.random.rand(1, nact, nact) - 0.5
+        s[0] += s[0].T
+        vguess[np.ix_([2], subA+subB, subA+subB)] = s * rand
 
     # FIXME a hack, directly update the parameters
     p = np.zeros(v.length())

@@ -7,7 +7,7 @@ import libdmet.utils.logger as log
 import numpy as np
 import numpy.linalg as la
 
-__all__ = ["AFQMC", "Block", "DmrgCI", "CASSCF", "BCSDmrgCI"]
+__all__ = ["AFQMC", "Block", "StackBlock", "DmrgCI", "CASSCF", "BCSDmrgCI"]
 
 class Block(object):
     def __init__(self, nproc, nnode = 1, TmpDir = "/tmp", SharedDir = None, \
@@ -64,6 +64,23 @@ class Block(object):
     def cleanup(self):
         # FIXME first copy and save restart files
         self.cisolver.cleanup()
+
+class StackBlock(Block):
+    def __init__(self, nproc, nthread = 1, nnode = 1, TmpDir = "/tmp", SharedDir = None, \
+            reorder = False, minM = 100, maxM = None, tol = 1e-6, spinAdapted = False, \
+            bcs = False):
+        log.eassert(nnode == 1 or SharedDir is not None, \
+                "Running on multiple nodes (nnod = %d), must specify shared directory", \
+                nnode)
+        self.cisolver = block.StackBlock()
+        block.StackBlock.set_nproc(nproc, nthread, nnode)
+        self.cisolver.createTmp(tmp = TmpDir, shared = SharedDir)
+        block.StackBlock.reorder = reorder
+        self.schedule = block.Schedule(sweeptol = tol)
+        self.minM = minM
+        self.maxM = maxM
+        self.spinAdapted = spinAdapted
+        self.bcs = bcs
 
 
 class CASSCF(object):
