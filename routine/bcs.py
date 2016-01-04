@@ -146,7 +146,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
 
     log.info("H2 memory allocated size = %d MB", ccdd.size * 2 * 8. / 1024 / 1024)
     
-    if local and 0:
+    if local:
         for s in range(2):
             log.eassert(la.norm(basis[s,0,:nscsites,:nscsites] - np.eye(nscsites)) \
                     < 1e-10, "the embedding basis is not local")

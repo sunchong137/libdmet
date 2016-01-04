@@ -8,7 +8,7 @@ from copy import deepcopy
 import subprocess as sub
 
 class Schedule(object):
-    def __init__(self, maxiter = 30, sweeptol = 1e-7):
+    def __init__(self, maxiter = 28, sweeptol = 1e-7):
         self.initialized = False
         self.twodot_to_onedot = None
         self.maxiter = maxiter
@@ -50,7 +50,7 @@ class Schedule(object):
         log.debug(1, "Generate default schedule with restart calculation M = %d, " \
                 "maxiter = %d", M, self.maxiter)
         self.arrayM = [M, M]
-        self.arraySweep = [0, 3]
+        self.arraySweep = [0, 2]
         self.arrayTol = [self.sweeptol * 0.1] * 2
         self.arrayNoise = [self.sweeptol * 0.1, 0]
 
@@ -64,10 +64,10 @@ class Schedule(object):
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
 
-        if self.twodot_to_onedot + 3 > self.maxiter:
+        if self.twodot_to_onedot + 2 > self.maxiter:
             log.warning("only %d onedot iterations\nmodify maxiter to %d", \
-                self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 3)
-            self.maxiter = self.twodot_to_onedot + 3
+                self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 2)
+            self.maxiter = self.twodot_to_onedot + 2
         self.initialized = True
 
     def gen_extrapolate(self, M):
