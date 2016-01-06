@@ -146,7 +146,7 @@ def VcorLocalPhSymm(U, bogoliubov, ImpSize, subA, subB, r = None):
         if (i in subA) == (j in subA):
             return 1
         else:
-            return 0
+            return -1
 
     if bogoliubov:
         nD = nV
