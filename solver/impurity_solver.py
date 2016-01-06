@@ -41,7 +41,7 @@ class Block(object):
         if schedule is None:
             schedule = self.schedule
             if self.cisolver.optimized and restart:
-                schedule.maxiter = 16
+                schedule.maxiter = 12
                 schedule.gen_restart(M)
             else:
                 self.cisolver.optimized = False
