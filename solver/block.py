@@ -51,8 +51,8 @@ class Schedule(object):
                 "maxiter = %d", M, self.maxiter)
         self.arrayM = [M, M]
         self.arraySweep = [0, 2]
-        self.arrayTol = [self.sweeptol * 0.1] * 2
-        self.arrayNoise = [self.sweeptol * 0.1, 0]
+        self.arrayTol = [self.sweeptol, self.sweeptol * 0.1]
+        self.arrayNoise = [self.sweeptol, 0]
 
         log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)
         log.debug(2, "at sweeps       " + " %d" * len(self.arraySweep), *self.arraySweep)
