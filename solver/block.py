@@ -49,10 +49,10 @@ class Schedule(object):
     def gen_restart(self, M):
         log.debug(1, "Generate default schedule with restart calculation M = %d, " \
                 "maxiter = %d", M, self.maxiter)
-        self.arrayM = [M, M]
-        self.arraySweep = [0, 2]
-        self.arrayTol = [self.sweeptol, self.sweeptol * 0.1]
-        self.arrayNoise = [self.sweeptol, 0]
+        self.arrayM = [M, M, M]
+        self.arraySweep = [0, 1, 2]
+        self.arrayTol = [self.sweeptol * 5., self.sweeptol, self.sweeptol * 0.1]
+        self.arrayNoise = [self.sweeptol * 5., self.sweeptol, 0]
 
         log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)
         log.debug(2, "at sweeps       " + " %d" * len(self.arraySweep), *self.arraySweep)
