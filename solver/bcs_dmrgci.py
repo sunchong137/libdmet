@@ -6,8 +6,10 @@ import libdmet.utils.logger as log
 from libdmet.utils.misc import mdot
 from libdmet.routine.localizer import Localizer
 from libdmet.utils.munkres import Munkres, make_cost_matrix
+from libdmet.routine.bcs import save_mem
 from libdmet.routine.bcs_helper import extractRdm, basisToCanonical, basisToSpin
 from libdmet.integral.integral_emb_casci import transform
+from libdmet.integral.integral_emb_casci_save_mem import transform as transform_save_mem
 from libdmet.integral.integral_localize import transform as transform_local
 from libdmet.integral.integral_localize_qp import transform as transform_local_qp
 from libdmet.solver.dmrgci import gaopt, momopt
@@ -83,10 +85,15 @@ def get_qps_local(ncas, vindices, mo, mo_energy, nImp, ImpHam):
     # transform 2eInt (ccdd part only) to occupied basis
     assert(ImpHam.H2["cccd"] is None or la.norm(ImpHam.H2["cccd"]) < 1e-10)
     assert(ImpHam.H2["cccc"] is None or la.norm(ImpHam.H2["cccc"]) < 1e-10)
-    assert(la.norm(ImpHam.H2["ccdd"][0] - ImpHam.H2["ccdd"][2]) < 1e-10)
-    assert(la.norm(ImpHam.H2["ccdd"][0] - ImpHam.H2["ccdd"][2]) < 1e-10)
-    w = transform_local_qp(cAO[:norb], cBO[:norb], \
-            cAO[norb:], cBO[norb:], ImpHam.H2["ccdd"][2])
+    if save_mem:
+        nImp = ImpHam.H2["ccdd"][0].shape[0]
+        w = transform_local_qp(cAO[:nImp], cBO[:nImp], \
+                cAO[norb:norb+nImp], cBO[norb:norb+nImp], ImpHam.H2["ccdd"][0])
+    else:
+        assert(la.norm(ImpHam.H2["ccdd"][0] - ImpHam.H2["ccdd"][2]) < 1e-10)
+        assert(la.norm(ImpHam.H2["ccdd"][1] - ImpHam.H2["ccdd"][2]) < 1e-10)
+        w = transform_local_qp(cAO[:norb], cBO[:norb], \
+                cAO[norb:], cBO[norb:], ImpHam.H2["ccdd"][2])
     # now localize the occupied space
     locA, locB = Localizer(w[0]), Localizer(w[1])
     locA.optimize(thr = 1e-4)
@@ -258,22 +265,28 @@ def buildCASHamiltonian(Ham, core, cas):
     # core-fock
     assert(Ham.H2["cccd"] is None or la.norm(Ham.H2["cccd"]) == 0)
     assert(Ham.H2["cccc"] is None or la.norm(Ham.H2["cccc"]) == 0)
-    _eriA, _eriB, _eriAB = Ham.H2["ccdd"]
 
-    vj00 = np.tensordot(cRhoA, _eriA, ((0,1), (0,1)))
-    vj11 = np.tensordot(cRhoB, _eriB, ((0,1), (0,1)))
-    vj10 = np.tensordot(cRhoA, _eriAB, ((0,1), (0,1)))
-    vj01 = np.tensordot(_eriAB, cRhoB, ((2,3), (0,1)))
-    vk00 = np.tensordot(cRhoA, _eriA, ((0,1), (0,3)))
-    vk11 = np.tensordot(cRhoB, _eriB, ((0,1), (0,3)))
-    vl10 = np.tensordot(cKappaBA, _eriAB, ((1,0), (0,2))) # wrt kappa_ba.T
-    v = np.asarray([vj00+vj01-vk00, vj11+vj10-vk11, vl10])
+    if save_mem:
+        _v = np.asarray(scf._get_veff_bcs_save_mem(cRhoA, cRhoB, cKappaBA, \
+                Ham.H2["ccdd"]))
+        nv = _v.shape[1]
+        v = np.zeros((3, norb, norb))
+        v[:, :nv, :nv] = _v
+    else:
+        v = np.asarray(scf._get_veff_bcs(cRhoA, cRhoB, cKappaBA, Ham.H2["ccdd"]))
+
     # core-core two-body
     _H0 += 0.5 * np.sum(cRhoA * v[0] + cRhoB * v[1] + 2 * cKappaBA.T * v[2])
     VA, VB, UA, UB = cas[0,:norb], cas[1,:norb], cas[1,norb:], cas[0,norb:]
-    H0, CD, CC, CCDD, CCCD, CCCC = transform(VA, VB, UA, UB, _H0, \
-            Ham.H1["cd"][0] + v[0], Ham.H1["cd"][1] + v[1], Ham.H1["cc"][0] + \
-            v[2], Ham.H2["ccdd"][0], Ham.H2["ccdd"][1], Ham.H2["ccdd"][2])
+
+    if save_mem:
+            H0, CD, CC, CCDD, CCCD, CCCC = transform_save_mem(VA, VB, UA, \
+                    UB, _H0, Ham.H1["cd"][0] + v[0], Ham.H1["cd"][1] + v[1], \
+                    Ham.H1["cc"][0] + v[2], Ham.H2["ccdd"][0])
+    else:
+            H0, CD, CC, CCDD, CCCD, CCCC = transform(VA, VB, UA, UB, _H0, \
+                Ham.H1["cd"][0] + v[0], Ham.H1["cd"][1] + v[1], Ham.H1["cc"][0] + \
+                v[2], Ham.H2["ccdd"][0], Ham.H2["ccdd"][1], Ham.H2["ccdd"][2])
     return integral.Integral(cas.shape[2], False, True, H0, {"cd": CD, "cc": CC}, \
             {"ccdd": CCDD, "cccd": CCCD, "cccc": CCCC}), _H0
 

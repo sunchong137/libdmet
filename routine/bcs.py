@@ -11,6 +11,8 @@ from mfd import assignocc, HFB
 from fit import minimize
 from libdmet.utils.misc import mdot, find
 
+save_mem = True
+
 def embBasis(lattice, GRho, local = True, **kwargs):
     if local:
         return __embBasis_proj(lattice, GRho, **kwargs)
@@ -70,12 +72,13 @@ def embHam(lattice, basis, vcor, mu, local = True, **kwargs):
     Int2e, Int1e_from2e, H0_from2e = \
             __embHam2e(lattice, basis, vcor, local, **kwargs)
     nbasis = basis.shape[-1]
-    Int1e["cd"] += Int1e_from2e["cd"]
-    Int1e["cc"] += Int1e_from2e["cc"]
     H0 = H0_from1e + H0_from2e
-    Int1e_energy["cd"] += Int1e_from2e["cd"]
-    Int1e_energy["cc"] += Int1e_from2e["cc"]
     H0_energy = H0_energy_from1e + H0_from2e
+    if Int1e_from2e is not None:
+        Int1e["cd"] += Int1e_from2e["cd"]
+        Int1e["cc"] += Int1e_from2e["cc"]
+        Int1e_energy["cd"] += Int1e_from2e["cd"]
+        Int1e_energy["cc"] += Int1e_from2e["cc"]
     return integral.Integral(nbasis, False, True, H0, Int1e, Int2e), \
             (Int1e_energy, H0_energy)
 
@@ -131,6 +134,13 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
     nscsites = lattice.supercell.nsites
     nbasis = basis.shape[-1]
 
+    if save_mem:
+        if local:
+            return {"ccdd": lattice.getH2()[np.newaxis,:], "cccd": None, "cccc": None}, \
+                    None, 0.
+        else:
+            log.warning("Basis nonlocal, ignoring memory saving option")
+
     if "mmap" in kwargs.keys() and kwargs["mmap"]:
         log.debug(0, "Use memory map for 2-electron integral")
         ccdd = np.memmap(NamedTemporaryFile(dir = TmpDir), dtype = float, \
@@ -146,22 +156,20 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
 
     log.info("H2 memory allocated size = %d MB", ccdd.size * 2 * 8. / 1024 / 1024)
     
-    if local and 0:
+    if local:
         for s in range(2):
             log.eassert(la.norm(basis[s,0,:nscsites,:nscsites] - np.eye(nscsites)) \
                     < 1e-10, "the embedding basis is not local")
         for i in range(ccdd.shape[0]):
             ccdd[i, :nscsites, :nscsites, :nscsites, :nscsites] = lattice.getH2()
-        cd = np.zeros((2, nbasis, nbasis))
-        cc = np.zeros((1, nbasis, nbasis))
-        H0 = 0.
+        return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, None, 0.
     else:
         from libdmet.integral.integral_nonlocal_emb import transform
         VA, VB, UA, UB = separate_basis(basis)
-        H0, cd, cc, ccdd, cccd, cccc = \
+        H01, cd1, cc1, ccdd1, cccd1, cccc1 = \
                 transform(VA[0], VB[0], UA[0], UB[0], lattice.getH2())
         # FIXME the definition of UA and UB
-    return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, {"cd": cd, "cc": cc}, H0
+        return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, {"cd": cd, "cc": cc}, H0
 
 def foldRho(GRho, Lat, basis, thr = 1e-7):
     ncells = Lat.ncells
