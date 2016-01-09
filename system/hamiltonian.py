@@ -64,6 +64,50 @@ def HubbardHamiltonian(lattice, U, tlist = [1.]):
 
     return HamNonInt(lattice, H1, H2)
 
+def HubbardDCA(lattice, U, tlist = [1.]):
+    assert(len(tlist) < 3)
+    from libdmet.utils import dca_transform
+
+    cells = tuple(lattice.csize)
+    scsites = tuple(lattice.supercell.csize)
+    dim = lattice.dim
+    H = []
+    def vec1(d, v1, v2):
+        idx = [0] * dim * 2
+        idx[d] = v1
+        idx[d+dim] = v2
+        return tuple(idx)
+
+    for d in range(dim):
+        H.append((vec1(d, 0, 1), -tlist[0]))
+        H.append((vec1(d, cells[d]-1, scsites[d]-1), -tlist[0]))
+
+    if len(tlist) == 2:
+        assert(dim == 2)
+        H.append(((0, 0, 1, 1), tlist[1]))
+        H.append(((0, cells[1]-1, 1, scsites[1]-1), tlist[1]))
+        H.append(((cells[0]-1, 0, scsites[0]-1, 1), tlist[1]))
+        H.append(((cells[0]-1, cells[1]-1, scsites[0]-1, scsites[1]-1), tlist[1]))
+
+    H_DCA = dca_transform.transformHam(cells, scsites, H)
+
+    ncells = lattice.ncells
+    nscsites = lattice.supercell.nsites
+    H1 = np.zeros((ncells, nscsites, nscsites))
+
+    for pos, val in H_DCA:
+        cidx = lattice.cell_pos2idx(pos[:dim])
+        spos = np.asarray(pos[dim:])
+        for s in range(nscsites):
+            s1 = lattice.supercell.sitedict[tuple((lattice.supercell.sites[s]+spos) % scsites)]
+            H1[cidx, s, s1] = val
+
+    H2 = np.zeros((nscsites,) * 4)
+    for s in range(nscsites):
+        H2[s,s,s,s] = U
+
+    return HamNonInt(lattice, H1, H2)
+
 def Hubbard3band(lattice, Ud, Up, ed, tpd, tpp):
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites

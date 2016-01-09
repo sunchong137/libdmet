@@ -127,6 +127,13 @@ class AFQMC(object):
         self.count = 0
 
     def run(self, Ham, onepdm = True, similar = False):
+        log.info("run AFQMC")
+        log.info("parameters:")
+        log.info("dt        = %9.4f", AFQMC.settings["dt"])
+        log.info("beta      = %9.2f", AFQMC.settings["beta"])
+        log.info("meas_int  = %9.4f", AFQMC.settings["meas_interval"])
+        log.info("meas_skip = %9d", AFQMC.settings["meas_skip"])
+        log.info("sweeps    = %3d, %4d", AFQMC.settings["therm_sweep"], AFQMC.settings["meas_sweep"])
         self.norbs = Ham.norb
         settings = copy.copy(AFQMC.settings)
         settings["onepdm"] = onepdm
