@@ -97,7 +97,7 @@ class Localizer(object):
         C = self.Int2e[i,i,j,j] + self.Int2e[i,j,i,j] + self.Int2e[i,j,j,i] + self.Int2e[j,i,i,j] \
                 + self.Int2e[j,i,j,i] + self.Int2e[j,j,i,i]
 
-        def dL(theta):
+        def get_dL(theta):
             return 0.25 * ((cos(4*theta)-1) * (A-C) + sin(4*theta) * B)
         
         def get_theta():
@@ -110,7 +110,7 @@ class Localizer(object):
                 theta = [alpha*0.25, (alpha-pi)*0.25]
             else:
                 theta = [alpha*0.25, (alpha+pi)*0.25]
-            vals = map(dL, theta)
+            vals = map(get_dL, theta)
             if vals[0] > vals[1]:
                 return theta[0], vals[0]
             else:

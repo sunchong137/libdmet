@@ -9,8 +9,8 @@ import pyscf.lib.logger as pyscflogger
 import libdmet.utils.logger as log
 from libdmet.system import integral
 from libdmet.utils.misc import mdot
-from libdmet.routine.bcs import save_mem
 from libdmet.routine.bcs_helper import extractRdm, extractH1
+from libdmet import save_mem
 
 class flush(object):
     def __init__(self, keywords):
