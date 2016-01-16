@@ -590,7 +590,7 @@ class StackBlock(Block):
     def write_conf(self, f):
         Block.write_conf(self, f)
         f.write("num_thrds %d\n" % type(self).nthread)
-        f.write("prebuild")
+        f.write("prebuild\n")
 
     def callBlock(self):
         sub.check_call(" ".join(
