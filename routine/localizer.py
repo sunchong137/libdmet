@@ -121,7 +121,7 @@ class Localizer(object):
     def getL(self):
         return np.sum(map(lambda i: self.Int2e[i,i,i,i], range(self.norbs)))
 
-    def optimize(self, thr = 1e-3):
+    def optimize(self, thr = 1e-3, MaxIter = 2000):
         # Edmiston-Ruedenberg: maximizing self-energy
         # L = \sum_p (pp||pp)
         # each Jacobian step \theta between -pi/4 to pi/4
@@ -139,7 +139,7 @@ class Localizer(object):
         i, j, theta, dL = sweep[-1]
         log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", \
                 Iter, self.getL(), dL, i, j, theta/pi)
-        while dL > thr:
+        while dL > thr and Iter < MaxIter:
             self.transformInt(i,j,theta)
             self.transformCoef(i,j,theta)
             Iter += 1

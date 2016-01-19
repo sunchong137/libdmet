@@ -147,7 +147,7 @@ def readFCIDUMP(filename, norb, restricted, bogoliubov):
         log.eassert(norb == int(head.split(',')[0].split('=')[1]), "orbital number is not consistent")
         IUHF = False
         line = f.readline()
-        while not "&END" in line:
+        while not "&END" in line and not "/" in line:
           IUHF = IUHF or "IUHF" in line
           line = f.readline()
         log.eassert(restricted != IUHF, "spin restriction is not consistent")
