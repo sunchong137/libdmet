@@ -20,7 +20,6 @@ def get_BCS_mo(scfsolver, Ham, guess):
 
     E_HFB, GRho_HFB = scfsolver.HFB(Mu = 0, tol = 1e-7, \
             MaxIter = 50, InitGuess = guess)
-
     return scfsolver.get_mo(), scfsolver.get_mo_energy()
 
 def get_qps(ncas, algo = "nelec", **kwargs):
@@ -456,6 +455,14 @@ class BCSDmrgCI(object):
         # ci_args is a list or dict for ci solver, or None
 
         mo, mo_energy = get_BCS_mo(self.scfsolver, Ham, guess)
+        if basis is not None:
+            nmodes = np.sum(mo_energy < 0)
+            GRhoHFB = np.dot(mo[:, :nmodes], mo[:, :nmodes].T)
+            nImp = basis.shape[-2] / 2
+            nbasis = basis.shape[-1]
+            nA_HFB, nB_HFB = np.sum(np.diag(GRhoHFB)[:nImp]), np.sum(1. - np.diag(GRhoHFB)[nbasis:nbasis+nImp])
+            log.info("nelec (HFB) = %20.12f" % (nA_HFB + nB_HFB))
+
         core, cas, casinfo = self.get_qps(mo, mo_energy, basis.shape[-2], Ham)
         coreGRho = np.dot(core[0], core[0].T)
         casHam, _ = buildCASHamiltonian(Ham, core, cas)
