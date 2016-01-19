@@ -9,9 +9,10 @@ import pyscf.lib.logger as pyscflogger
 import libdmet.utils.logger as log
 from libdmet.system import integral
 from libdmet.utils.misc import mdot
-from libdmet.routine.bcs import save_mem
 from libdmet.routine.bcs_helper import extractRdm, extractH1
+from libdmet import settings
 
+# logger wrapper for pyscf
 class flush(object):
     def __init__(self, keywords):
         self.keywords = set(keywords)
@@ -36,6 +37,24 @@ class flush(object):
 pyscflogger.flush = flush([])
 pyscflogger.QUIET = 10
 
+# simple 2e integral transformation
+
+def incore_transform(eri_, c):
+    eriA = np.tensordot(c[0][0], eri_[0], (0, 0))
+    eriA = np.tensordot(c[1][0], eriA, (0, 1))
+    eriA = np.tensordot(eriA, c[3][0], (3, 0))
+    eriA = np.tensordot(eriA, c[2][0], (2, 0))
+    eriB = np.tensordot(c[0][1], eri_[1], (0, 0))
+    eriB = np.tensordot(c[1][1], eriB, (0, 1))
+    eriB = np.tensordot(eriB, c[3][1], (3, 0))
+    eriB = np.tensordot(eriB, c[2][1], (2, 0))
+    eriAB = np.tensordot(c[0][0], eri_[2], (0, 0))
+    eriAB = np.tensordot(c[1][0], eriAB, (0, 1))
+    eriAB = np.tensordot(eriAB, c[3][1], (3, 0))
+    eriAB = np.tensordot(eriAB, c[2][1], (2, 0))
+    return np.asarray([eriA, eriB, eriAB])
+
+# unrestricted (integral) hartree-fock routine
 class UIHF(UHF):
     """
     a routine for unrestricted HF with integrals different for two spin species
@@ -53,7 +72,7 @@ class UIHF(UHF):
         if isinstance(dm, np.ndarray) and dm.ndim == 2:
             dm = np.array([dm*0.5, dm*0.5])
         if self._eri is not None:
-            if save_mem:
+            if settings.save_mem:
                 eri = self._eri[0]
                 norb = dm[0].shape[0]
                 nImp = eri.shape[0]
@@ -93,6 +112,8 @@ class UIHF(UHF):
 
     def get_ovlp(self, *args):
         return self.ovlp
+
+# unrestricted Hartree-Fock Bogoliubov
 
 def _UHFB_get_grad(mo_coeff, mo_occ, fock_ao):
     '''RHF Gradients'''
@@ -153,7 +174,7 @@ class UHFB(hf.RHF):
 
         rhoA, rhoB, kappaBA = extractRdm(dm)
 
-        if save_mem:
+        if settings.save_mem:
             va, vb, vd = _get_veff_bcs_save_mem(rhoA, rhoB, kappaBA, \
                     self._eri["ccdd"])
         else:
@@ -206,26 +227,58 @@ class UHFB(hf.RHF):
         return self.get_fock_(h1e, s1e, vhf, dm*2., cycle, adiis, \
                 diis_start_cycle, level_shift_factor, damp_factor)
 
-'''
-Newton Raphson method for unrestricted Hartre-Fock Bogoliubov
-'''
 
-# helper function to generate gradient and hessian operator
-#def gen_g_hop_uhfb(mf, mo_coeff, mo_occ, fock_ao = None):
+# Newton Raphson method for unrestricted Hartre-Fock Bogoliubov
 
+def gen_g_hop_uhfb(mf, mo_coeff, mo_occ, fock_ao = None):
+    mol = mf.mol
+    occidx = np.where(mo_occ == 1)[0]
+    viridx = np.where(mo_occ == 0)[0]
+    nocc, nvir = len(occidx), len(viridx)
+
+    if fock_ao is None:
+        # GRho
+        dm1 = mf.make_rdm1(mo_coeff, mo_occ)
+        fock_ao = mf.get_hcore() + mf.get_veff(mol, dm1)
+    fock = mdot(mo_coeff.T, fock_ao, mo_coeff)
+
+    g = fock[viridx[:, None], occidx] * 2
+
+    foo = fock[occidx[:, None], occidx]
+    fvv = fock[viridx[:, None], viridx]
+
+    # approximated by the non-interacting part
+    h_diag = (fvv.diagonal().reshape(-1,1) - foo.diagonal()) * 2
+
+    def h_op(x):
+        x = x.reshape(nvir, nocc)
+        x2 = (np.dot(fvv, x) - np.dot(x, foo)) * 2
+
+        d1 = mdot(mo_coeff[:, viridx], x, mo_coeff[:, occidx].T)
+        grho = d1 + d1.T
+        nmo = mo_occ.shape[0] / 2
+        grho[nmo:, nmo:] += np.eye(nmo)
+        dvhf = mf.get_veff(mol, grho)
+
+        x2 += 0.5 * mdot(mo_coeff[:, viridx].T, dvhf, mo_coeff[:, occidx]) * 4
+
+        return x2.reshape(-1)
+
+    return g.reshape(-1), h_op, h_diag.reshape(-1)
 
 def newton(mf):
     assert(isinstance(mf, UHFB))
     class newtonUHFB(UHFB):
         def __init__(self):
             self._scf = mf
-            self.max_cycle_inner = 10
             self.max_stepsize = 0.05
 
             self.ah_start_tol = 5.
-            # the following two are the most useful options
-            self.ah_start_cycle = 1
-            self.ah_level_shift = 0
+            # the following three are the most useful options
+            # seems 6 / 0. / 15 gives good results
+            self.ah_start_cycle = 6
+            self.ah_level_shift = 0.
+            self.max_cycle_inner = 15
 
             self.ah_conv_tol = 1e-12
             self.ah_lindep = 1e-14
@@ -240,29 +293,29 @@ def newton(mf):
             self._keys = self_keys.union(mf._keys)
 
         def dump_flags(self):
-            pyscflogger.info('\n')
-            pyscflogger.info('******** SCF Newton Raphson flags ********')
-            pyscflogger.info('SCF tol = %g', self.conv_tol)
-            pyscflogger.info('conv_tol_grad = %s',    self.conv_tol_grad)
-            pyscflogger.info('max. SCF cycles = %d', self.max_cycle)
-            pyscflogger.info('direct_scf = %s', self._scf.direct_scf)
+            pyscflogger.info(self, '\n')
+            pyscflogger.info(self, '******** SCF Newton Raphson flags ********')
+            pyscflogger.info(self, 'SCF tol = %g', self.conv_tol)
+            pyscflogger.info(self, 'conv_tol_grad = %s',    self.conv_tol_grad)
+            pyscflogger.info(self, 'max. SCF cycles = %d', self.max_cycle)
+            pyscflogger.info(self, 'direct_scf = %s', self._scf.direct_scf)
             if self._scf.direct_scf:
-                pyscflogger.info('direct_scf_tol = %g', self._scf.direct_scf_tol)
+                pyscflogger.info(self, 'direct_scf_tol = %g', self._scf.direct_scf_tol)
             if self.chkfile:
-                pyscflogger.info('chkfile to save SCF result = %s', self.chkfile)
-            pyscflogger.info('max_cycle_inner = %d',  self.max_cycle_inner)
-            pyscflogger.info('max_stepsize = %g', self.max_stepsize)
-            pyscflogger.info('ah_start_tol = %g',     self.ah_start_tol)
-            pyscflogger.info('ah_level_shift = %g',   self.ah_level_shift)
-            pyscflogger.info('ah_conv_tol = %g',      self.ah_conv_tol)
-            pyscflogger.info('ah_lindep = %g',        self.ah_lindep)
-            pyscflogger.info('ah_start_cycle = %d',   self.ah_start_cycle)
-            pyscflogger.info('ah_max_cycle = %d',     self.ah_max_cycle)
-            pyscflogger.info('ah_grad_trust_region = %g', self.ah_grad_trust_region)
-            pyscflogger.info('keyframe_interval = %d', self.keyframe_interval)
-            pyscflogger.info('keyframe_interval_rate = %g', self.keyframe_interval_rate)
-            pyscflogger.info('augmented hessian decay rate = %g', self.ah_decay_rate)
-            pyscflogger.info('max_memory %d MB (current use %d MB)',
+                pyscflogger.info(self, 'chkfile to save SCF result = %s', self.chkfile)
+            pyscflogger.info(self, 'max_cycle_inner = %d',  self.max_cycle_inner)
+            pyscflogger.info(self, 'max_stepsize = %g', self.max_stepsize)
+            pyscflogger.info(self, 'ah_start_tol = %g',     self.ah_start_tol)
+            pyscflogger.info(self, 'ah_level_shift = %g',   self.ah_level_shift)
+            pyscflogger.info(self, 'ah_conv_tol = %g',      self.ah_conv_tol)
+            pyscflogger.info(self, 'ah_lindep = %g',        self.ah_lindep)
+            pyscflogger.info(self, 'ah_start_cycle = %d',   self.ah_start_cycle)
+            pyscflogger.info(self, 'ah_max_cycle = %d',     self.ah_max_cycle)
+            pyscflogger.info(self, 'ah_grad_trust_region = %g', self.ah_grad_trust_region)
+            pyscflogger.info(self, 'keyframe_interval = %d', self.keyframe_interval)
+            pyscflogger.info(self, 'keyframe_interval_rate = %g', self.keyframe_interval_rate)
+            pyscflogger.info(self, 'augmented hessian decay rate = %g', self.ah_decay_rate)
+            pyscflogger.info(self, 'max_memory %d MB (current use %d MB)',
                      self.max_memory, pyscf.lib.current_memory()[0])
 
         def get_fock_(self, h1e, s1e, vhf, dm, cycle=-1, adiis=None,
@@ -282,8 +335,7 @@ def newton(mf):
             return mo_coeff, mo_occ
 
         def gen_g_hop(self, mo_coeff, mo_occ, fock_ao = None, h1e = None):
-            from pyscf.scf.newton_ah import gen_g_hop_rhf
-            return gen_g_hop_rhf(self, mo_coeff, mo_occ, fock_ao)
+            return gen_g_hop_uhfb(self, mo_coeff, mo_occ, fock_ao)
 
         def update_rotate_matrix(self, dx, mo_occ, u0 = 1):
             import scipy
@@ -303,20 +355,7 @@ def newton(mf):
 
     return newtonUHFB()
 
-def incore_transform(eri_, c):
-    eriA = np.tensordot(c[0][0], eri_[0], (0, 0))
-    eriA = np.tensordot(c[1][0], eriA, (0, 1))
-    eriA = np.tensordot(eriA, c[3][0], (3, 0))
-    eriA = np.tensordot(eriA, c[2][0], (2, 0))
-    eriB = np.tensordot(c[0][1], eri_[1], (0, 0))
-    eriB = np.tensordot(c[1][1], eriB, (0, 1))
-    eriB = np.tensordot(eriB, c[3][1], (3, 0))
-    eriB = np.tensordot(eriB, c[2][1], (2, 0))
-    eriAB = np.tensordot(c[0][0], eri_[2], (0, 0))
-    eriAB = np.tensordot(c[1][0], eriAB, (0, 1))
-    eriAB = np.tensordot(eriAB, c[3][1], (3, 0))
-    eriAB = np.tensordot(eriAB, c[2][1], (2, 0))
-    return np.asarray([eriA, eriB, eriAB])
+# unrestricted MP2
 
 def UMP2_kernel(mp, mo_coeff, mo_energy, nocc):
     log.debug(0, "transforming integral for MP2")
@@ -399,16 +438,27 @@ class UMP2(MP2):
         rdm_b[nocc[1]:, nocc[1]:] = rdm_v_b
         return np.asarray([rdm_a, rdm_b])
 
+# main class for uihf, uhfb and ump2
+
 class SCF(object):
-    def __init__(self, tmp = "/tmp"):
+    def __init__(self, tmp = "/tmp", newton_ah = True):
         self.sys_initialized = False
         self.integral_initialized = False
         self.doneHF = False
+        self.newton_ah = newton_ah
         log.debug(0, "Using pyscf version %s", pyscf.__version__)
-        if log.Level[log.verbose] <= log.Level["INFO"]:
-            pyscflogger.flush.addkey("cycle=")
+        if self.newton_ah:
+            if log.Level[log.verbose] <= log.Level["RESULT"]:
+                pyscflogger.flush.addkey("macro X")
+            elif log.Level[log.verbose] <= log.Level["INFO"]:
+                pyscflogger.flush.addkey("macro")
+            else:
+                pyscflogger.flush = flush([""])
         else:
-            pyscflogger.flush = flush([""])
+            if log.Level[log.verbose] <= log.Level["INFO"]:
+                pyscflogger.flush.addkey("cycle=")
+            else:
+                pyscflogger.flush = flush([""])
 
     def set_system(self, nelec, spin, bogoliubov, spinRestricted):
         log.eassert(not spinRestricted, "Only spin-unrestricted version is implemented")
@@ -460,20 +510,46 @@ class SCF(object):
             self.mf.ovlp = np.eye(self.integral.norb)
             self.mf._eri = self.integral.H2["ccdd"] #vaa, vbb, vab
             self.mf.conv_tol = tol
-            if InitGuess is not None:
-                #E = self.mf.scf(InitGuess)
-                self.mf.max_cycle = 0
-                self.mf.scf(InitGuess)
+
+            if self.newton_ah:
                 from pyscf.scf.newton_ah import kernel, newton
-                E = kernel(newton(self.mf), self.mf.mo_coeff, self.mf.mo_occ, \
-                        max_cycle=50, verbose=6)[1]
+
+                if InitGuess is not None:
+
+                    mo_occ = [None, None]
+                    mo_coeff = [None, None]
+                    mo_occ[0], mo_coeff[0] = la.eigh(InitGuess[0])
+                    mo_occ[1], mo_coeff[1] = la.eigh(InitGuess[1])
+
+                    newtonUIHF = newton(self.mf)
+                    newtonUIHF.max_cycle_inner = 15
+                    newtonUIHF.ah_start_cycle = 6
+                    newtonUIHF.dump_flags()
+                    conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUIHF, \
+                            tuple(mo_coeff), tuple(mo_occ), \
+                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
+                else:
+                    self.mf.max_cycle = 0
+                    self.mf.scf(np.zeros((2, self.integral.norb, self.integral.norb)))
+
+                    newtonUIHF = newton(self.mf)
+                    newtonUIHF.max_cycle_inner = 15
+                    newtonUIHF.ah_start_cycle = 6
+                    newtonUIHF.dump_flags()
+                    conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUIHF, \
+                            self.mf.mo_coeff, self.mf.mo_occ, \
+                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
+
+                self.mf.mo_energy = mo_energy
+                self.mf.mo_coeff = mo_coeff
+                self.mf.mo_occ = mo_occ
+                self.mf.converged = conv
+
             else:
-                #E = self.mf.scf(np.zeros((2, self.integral.norb, self.integral.norb)))                
-                self.mf.max_cycle = 0
-                E = self.mf.scf(np.zeros((2, self.integral.norb, self.integral.norb)))
-                from pyscf.scf.newton_ah import kernel, newton
-                E = kernel(newton(self.mf), self.mf.mo_coeff, self.mf.mo_occ, \
-                        max_cycle=300, verbose=6)[1]
+                if InitGuess is not None:
+                    E = self.mf.scf(InitGuess)
+                else:
+                    E = self.mf.scf(np.zeros((2, self.integral.norb, self.integral.norb)))
  
             coefs = self.mf.mo_coeff
             occs = self.mf.mo_occ
@@ -508,24 +584,47 @@ class SCF(object):
             self.mf.ovlp = np.eye(norb*2)
             self.mf._eri = self.integral.H2 # we can have cccd and cccc terms
             self.mf.conv_tol = tol
-            if InitGuess is not None:
-                #E = self.mf.scf(InitGuess)
-                self.mf.max_cycle = 0
-                mo_occ, mo_coeff = la.eigh(InitGuess)
-                nmo = mo_occ.shape[0]/2
-                mo_occ[:nmo] = 0
-                mo_occ[nmo:] = 1
-                from pyscf.scf.newton_ah import kernel, newton
-                _, E, _, mo_coeff, mo_occ = kernel(newton(self.mf), mo_coeff, mo_occ, \
-                        max_cycle=50, verbose=5)
+
+            if self.newton_ah:
+                from pyscf.scf.newton_ah import kernel
+
+                if InitGuess is not None:
+                    # use traditional HF: uncomment this
+                    # E = self.mf.scf(InitGuess)
+
+                    # get orbitals for initial guess, and round out fractions in occupation number
+                    mo_occ, mo_coeff = la.eigh(InitGuess)
+                    nmo = mo_occ.shape[0]/2
+                    mo_occ[:nmo], mo_occ[nmo:] = 0, 1
+
+                    newtonUHFB = newton(self.mf)
+                    newtonUHFB.dump_flags()
+
+                    conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUHFB, mo_coeff, mo_occ, \
+                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
+                else:
+                    # do an initial traditional HF to generate orbitals
+                    self.mf.max_cycle = 1
+                    self.mf.scf(np.zeros((norb*2, norb*2)))
+
+                    newtonUHFB = newton(self.mf)
+                    newtonUHFB.dump_flags()
+
+                    conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUHFB, \
+                            self.mf.mo_coeff, self.mf.mo_occ, \
+                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
+
+                self.mf.mo_energy = mo_energy
                 self.mf.mo_coeff = mo_coeff
                 self.mf.mo_occ = mo_occ
-                #dm = mdot(mo_coeff, np.diag(mo_occ), mo_coeff.T)
-                #self.mf.max_cycle = 50
-                #E = self.mf.scf(dm)
+                self.mf.converged = conv
+
             else:
-                E = self.mf.scf(np.zeros((norb*2, norb*2)))
-                # FIXME implement interface to newton method properly
+                if InitGuess is not None:
+                    E = self.mf.scf(InitGuess)
+                else:
+                    E = self.mf.scf(np.zeros((norb*2, norb*2)))
+
             coefs = self.mf.mo_coeff
             occs = self.mf.mo_occ
             GRho = mdot(coefs, np.diag(occs), coefs.T)

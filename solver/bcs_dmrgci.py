@@ -6,13 +6,13 @@ import libdmet.utils.logger as log
 from libdmet.utils.misc import mdot
 from libdmet.routine.localizer import Localizer
 from libdmet.utils.munkres import Munkres, make_cost_matrix
-from libdmet.routine.bcs import save_mem
 from libdmet.routine.bcs_helper import extractRdm, basisToCanonical, basisToSpin
 from libdmet.integral.integral_emb_casci import transform
 from libdmet.integral.integral_emb_casci_save_mem import transform as transform_save_mem
 from libdmet.integral.integral_localize import transform as transform_local
 from libdmet.integral.integral_localize_qp import transform as transform_local_qp
 from libdmet.solver.dmrgci import gaopt, momopt
+from libdmet import settings
 
 def get_BCS_mo(scfsolver, Ham, guess):
     scfsolver.set_system(None, 0, True, False)
@@ -32,12 +32,17 @@ def get_qps(ncas, algo = "nelec", **kwargs):
     elif algo == "energy":
         return lambda mo, mo_e, *args: get_qps_energy(ncas, mo, mo_e)
     elif algo == "local":
-        log.eassert("vindices" in kwargs, \
-            "number of electrons has to be specified")
+        log.eassert("nocc" in kwargs, \
+                "number of core orbitals must be specified")
+        log.eassert("PAOidx" in kwargs, \
+                "candidate PAO indices must be specified")
+        nPAO = ncas - kwargs["nocc"]
+        log.eassert(len(kwargs["PAOidx"]) >= nPAO, \
+                "number of PAO cannot be larger than all PAO candidates")
         return lambda mo, mo_e, nImp, Ham: get_qps_local(ncas, \
-                kwargs["vindices"], mo, mo_e, nImp, Ham)
+                nPAO, kwargs["PAOidx"], mo, mo_e, nImp, Ham)
 
-def proj_virtual(mo, idx):
+def proj_virtual(mo, idx, n):
     # nao: selected AO's to be projected
     # nmo: number of mo's used in the projection
     nao = len(idx)
@@ -51,18 +56,28 @@ def proj_virtual(mo, idx):
         p[:, i] = mo[orbidx].T
     # svd: u defines a rotation of molecular orbitals,
     u, s, _ = la.svd(p)
-    log.info("projection singular values:\n%s" % s)
+    log.debug(1, "projection singular values:\n%s" % s)
+    if n < nao:
+        log.warning("using incompleted projected virtual space is an experimental feature," \
+                " use with caution")
+        log.debug(0, "current projected virtual space cut-off = %10.4f", s[n])
+    else:
+        log.debug(0, "no cut-off in projected virtual space")
+        if s[nao - 1] < 1e-8:
+            log.warning("projected virtual space is likely to be linear dependent, with"
+                    "smallest singular value = %10.4f\ncut-off is suggested", s[nao-1])
+
     # apply rotation
     mo1 = np.dot(mo, u)
     # return core and active
-    return mo1[:, nao:], mo1[:, :nao]
+    return mo1[:, n:], mo1[:, :n]
 
-def get_qps_local(ncas, vindices, mo, mo_energy, nImp, ImpHam):
+def get_qps_local(ncas, nPAO, PAOidx, mo, mo_energy, nImp, ImpHam):
     norb = mo_energy.size / 2
 
     log.info("ncore = %d ncas = %d", norb-ncas, ncas)
     # number of electrons per spin
-    nelecas = ncas - len(vindices)
+    nelecas = ncas - nPAO
     mo_v = map(lambda i: np.sum(mo[:norb,i]**2), range(norb*2))
     mo_v_ord = np.argsort(mo_v)
     mo_a, mo_b = mo_v_ord[norb:], mo_v_ord[:norb]
@@ -85,7 +100,7 @@ def get_qps_local(ncas, vindices, mo, mo_energy, nImp, ImpHam):
     # transform 2eInt (ccdd part only) to occupied basis
     assert(ImpHam.H2["cccd"] is None or la.norm(ImpHam.H2["cccd"]) < 1e-10)
     assert(ImpHam.H2["cccc"] is None or la.norm(ImpHam.H2["cccc"]) < 1e-10)
-    if save_mem:
+    if settings.save_mem:
         nImp = ImpHam.H2["ccdd"][0].shape[0]
         w = transform_local_qp(cAO[:nImp], cBO[:nImp], \
                 cAO[norb:norb+nImp], cBO[norb:norb+nImp], ImpHam.H2["ccdd"][0])
@@ -96,30 +111,28 @@ def get_qps_local(ncas, vindices, mo, mo_energy, nImp, ImpHam):
                 cAO[norb:], cBO[norb:], ImpHam.H2["ccdd"][2])
     # now localize the occupied space
     locA, locB = Localizer(w[0]), Localizer(w[1])
-    locA.optimize(thr = 1e-4)
-    locB.optimize(thr = 1e-4)
+    locA.optimize()
+    locB.optimize()
     # rotate
     cAOloc, cBOloc = np.dot(cAO, locA.coefs.T), np.dot(cBO, locB.coefs.T)
     # compute the indicators
     # self coulomb repulsion
-    fA = np.asarray([locA.Int2e[i,i,i,i] for i in range(len(AO))], \
-            dtype = int)
-    fB = np.asarray([locB.Int2e[i,i,i,i] for i in range(len(BO))], \
-            dtype = int)
+    fA = np.asarray([locA.Int2e[i,i,i,i] for i in range(len(AO))])
+    fB = np.asarray([locB.Int2e[i,i,i,i] for i in range(len(BO))])
     # weight on impurity
     wA = np.sum(cAOloc[:nImp]**2, 0) + np.sum(cAOloc[norb:norb+nImp]**2, 0)
     wB = np.sum(cBOloc[:nImp]**2, 0) + np.sum(cBOloc[norb:norb+nImp]**2, 0)
     ordA, ordB = np.argsort(wA), np.argsort(wB)
-    log.debug(1, "Spin A:\nCoulomb repulsion: %s\nImpurity weight: %s", \
+    log.debug(1, "Spin A:\nCoulomb repulsion: \n%s\nImpurity weight: \n%s", \
             fA[ordA], wA[ordA])
-    log.debug(1, "Spin B:\nCoulomb repulsion: %s\nImpurity weight: %s", \
+    log.debug(1, "Spin B:\nCoulomb repulsion: \n%s\nImpurity weight: \n%s", \
             fB[ordB], wB[ordB])
     # take out core and cas from occupied set
     coreOA, casOA = cAOloc[:, ordA[:-nelecas]], cAOloc[:, ordA[-nelecas:]]
     coreOB, casOB = cBOloc[:, ordB[:-nelecas]], cBOloc[:, ordB[-nelecas:]]
     # handle virtual orbitals
-    coreVA, casVA = proj_virtual(cAV, vindices)
-    coreVB, casVB = proj_virtual(cBV, vindices)
+    coreVA, casVA = proj_virtual(cAV, PAOidx, nPAO)
+    coreVB, casVB = proj_virtual(cBV, PAOidx, nPAO)
     core = np.asarray([
         np.hstack((coreOA, np.vstack((coreVB[norb:], coreVB[:norb])))), \
         np.hstack((coreOB, np.vstack((coreVA[norb:], coreVA[:norb]))))
@@ -129,8 +142,8 @@ def get_qps_local(ncas, vindices, mo, mo_energy, nImp, ImpHam):
         np.hstack((casOB, casVB)),
     ])
     casinfo = (
-        (nelecas, 0, len(vindices)),
-        (nelecas, 0, len(vindices))
+        (nelecas, 0, nPAO),
+        (nelecas, 0, nPAO)
     )
     return core, cas, casinfo
 
@@ -266,7 +279,7 @@ def buildCASHamiltonian(Ham, core, cas):
     assert(Ham.H2["cccd"] is None or la.norm(Ham.H2["cccd"]) == 0)
     assert(Ham.H2["cccc"] is None or la.norm(Ham.H2["cccc"]) == 0)
 
-    if save_mem:
+    if settings.save_mem:
         _v = np.asarray(scf._get_veff_bcs_save_mem(cRhoA, cRhoB, cKappaBA, \
                 Ham.H2["ccdd"]))
         nv = _v.shape[1]
@@ -279,7 +292,7 @@ def buildCASHamiltonian(Ham, core, cas):
     _H0 += 0.5 * np.sum(cRhoA * v[0] + cRhoB * v[1] + 2 * cKappaBA.T * v[2])
     VA, VB, UA, UB = cas[0,:norb], cas[1,:norb], cas[1,norb:], cas[0,norb:]
 
-    if save_mem:
+    if settings.save_mem:
             H0, CD, CC, CCDD, CCCD, CCCC = transform_save_mem(VA, VB, UA, \
                     UB, _H0, Ham.H1["cd"][0] + v[0], Ham.H1["cd"][1] + v[1], \
                     Ham.H1["cc"][0] + v[2], Ham.H2["ccdd"][0])
@@ -414,14 +427,19 @@ def reorder(order, Ham, orbs, rot = None):
 class BCSDmrgCI(object):
     def __init__(self, ncas, splitloc = False, cisolver = None, \
             mom_reorder = True, algo = "nelec", tmpDir = "/tmp", **kwargs):
-        # algo can be nelec, energy and local
+        # additional required keywords
+        #  - nelec: nelecas
+        #  - energy: none
+        #  - local: nocc, PAOidx
+        assert(algo in ["nelec", "energy", "local"])
+        self.get_qps = get_qps(ncas, algo, **kwargs)
+
         self.ncas = ncas
         self.splitloc = splitloc
         log.eassert(cisolver is not None, "No default ci solver is available" \
                 " with CASCI, you have to use Block")
         self.cisolver = cisolver
         self.scfsolver = scf.SCF()
-        self.get_qps = get_qps(ncas, algo, **kwargs)
 
         # reorder scheme for restart block calculations
         if mom_reorder:

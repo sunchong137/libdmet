@@ -59,6 +59,27 @@ def DiagBdG(Fock, vcor, mu):
         ew[i], ev[i] = la.eigh(temp)
     return ew, ev
 
+def DiagBdGsymm(Fock, vcor, mu, lattice):
+    ncells = Fock.shape[0]
+    nscsites = Fock.shape[1]
+    ew = np.empty((ncells, nscsites * 2))
+    ev = np.empty((ncells, nscsites * 2, nscsites * 2), dtype = complex)
+    temp = np.empty((nscsites * 2, nscsites * 2), dtype = complex)
+
+    computed = set()
+    for i in range(ncells):
+        neg_i = lattice.cell_pos2idx(-lattice.cell_idx2pos(i))
+        if neg_i in computed:
+            ew[i], ev[i] = ew[neg_i], ev[neg_i].conj()
+        else:
+            temp[:nscsites, :nscsites] = Fock[i] + vcor.get(i, True)[0] - mu * np.eye(nscsites)
+            temp[nscsites:, nscsites:] = -Fock[i] - vcor.get(i, True)[1] + mu * np.eye(nscsites)
+            temp[:nscsites, nscsites:] = vcor.get(i, True)[2]
+            temp[nscsites:, :nscsites] = vcor.get(i, True)[2].T
+            ew[i], ev[i] = la.eigh(temp)
+            computed.add(i)
+    return ew, ev
+
 def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
     # ires: more results, eg. total energy, gap, ew, ev
     log.eassert(beta >= 0, "beta cannot be negative")
@@ -117,6 +138,8 @@ def HFB(lattice, vcor, restricted, mu = 0., beta = np.inf, ires = False):
         log.error("restricted Hartree-Fock-Bogoliubov not implemented")
     else:
         log.debug(1, "unrestricted Hartree-Fock-Bogoliubov")
+        # use inversion symmetry F(k) = F(-k)^*
+        #ew, ev = DiagBdGsymm(Fock, vcor, mu, lattice)
         ew, ev = DiagBdG(Fock, vcor, mu)
 
     ewocc = 1 * (ew < 0.)
@@ -130,7 +153,8 @@ def HFB(lattice, vcor, restricted, mu = 0., beta = np.inf, ires = False):
     GRho = np.empty_like(ev) # k-space
     GRhoT = np.empty_like(GRho) # real space
     for i in range(GRho.shape[0]): # kpoints
-        GRho[i] = mdot(ev[i], np.diag(ewocc[i]), ev[i].T.conj())
+        nocc = np.sum(ewocc[i])
+        GRho[i] = np.dot(ev[i,:,:nocc], ev[i,:,:nocc].T.conj())
     GRhoT = lattice.FFTtoT(GRho)
 
     if np.allclose(GRhoT.imag, 0.):

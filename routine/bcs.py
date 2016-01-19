@@ -10,8 +10,7 @@ from slater import MatSqrt, orthonormalizeBasis
 from mfd import assignocc, HFB
 from fit import minimize
 from libdmet.utils.misc import mdot, find
-
-save_mem = True
+from libdmet import settings
 
 def embBasis(lattice, GRho, local = True, **kwargs):
     if local:
@@ -134,12 +133,13 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
     nscsites = lattice.supercell.nsites
     nbasis = basis.shape[-1]
 
-    if save_mem:
+    if settings.save_mem:
         if local:
             return {"ccdd": lattice.getH2()[np.newaxis,:], "cccd": None, "cccc": None}, \
                     None, 0.
         else:
             log.warning("Basis nonlocal, ignoring memory saving option")
+            settings.save_mem = False
 
     if "mmap" in kwargs.keys() and kwargs["mmap"]:
         log.debug(0, "Use memory map for 2-electron integral")
