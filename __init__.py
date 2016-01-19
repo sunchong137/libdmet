@@ -6,5 +6,3 @@ libDMET   version %s
 A periodic DMET library
 by %s
 """ % (__version__, __author__)
-
-save_mem = True

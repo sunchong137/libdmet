@@ -10,7 +10,7 @@ import libdmet.utils.logger as log
 from libdmet.system import integral
 from libdmet.utils.misc import mdot
 from libdmet.routine.bcs_helper import extractRdm, extractH1
-from libdmet import save_mem
+from libdmet import settings
 
 # logger wrapper for pyscf
 class flush(object):
@@ -72,7 +72,7 @@ class UIHF(UHF):
         if isinstance(dm, np.ndarray) and dm.ndim == 2:
             dm = np.array([dm*0.5, dm*0.5])
         if self._eri is not None:
-            if save_mem:
+            if settings.save_mem:
                 eri = self._eri[0]
                 norb = dm[0].shape[0]
                 nImp = eri.shape[0]
@@ -174,7 +174,7 @@ class UHFB(hf.RHF):
 
         rhoA, rhoB, kappaBA = extractRdm(dm)
 
-        if save_mem:
+        if settings.save_mem:
             va, vb, vd = _get_veff_bcs_save_mem(rhoA, rhoB, kappaBA, \
                     self._eri["ccdd"])
         else:
@@ -271,14 +271,14 @@ def newton(mf):
     class newtonUHFB(UHFB):
         def __init__(self):
             self._scf = mf
-            self.max_cycle_inner = 30
             self.max_stepsize = 0.05
 
             self.ah_start_tol = 5.
-            # the following two are the most useful options
-            # seems 6 / 0. gives good results
+            # the following three are the most useful options
+            # seems 6 / 0. / 15 gives good results
             self.ah_start_cycle = 6
             self.ah_level_shift = 0.
+            self.max_cycle_inner = 15
 
             self.ah_conv_tol = 1e-12
             self.ah_lindep = 1e-14
@@ -293,29 +293,29 @@ def newton(mf):
             self._keys = self_keys.union(mf._keys)
 
         def dump_flags(self):
-            pyscflogger.info('\n')
-            pyscflogger.info('******** SCF Newton Raphson flags ********')
-            pyscflogger.info('SCF tol = %g', self.conv_tol)
-            pyscflogger.info('conv_tol_grad = %s',    self.conv_tol_grad)
-            pyscflogger.info('max. SCF cycles = %d', self.max_cycle)
-            pyscflogger.info('direct_scf = %s', self._scf.direct_scf)
+            pyscflogger.info(self, '\n')
+            pyscflogger.info(self, '******** SCF Newton Raphson flags ********')
+            pyscflogger.info(self, 'SCF tol = %g', self.conv_tol)
+            pyscflogger.info(self, 'conv_tol_grad = %s',    self.conv_tol_grad)
+            pyscflogger.info(self, 'max. SCF cycles = %d', self.max_cycle)
+            pyscflogger.info(self, 'direct_scf = %s', self._scf.direct_scf)
             if self._scf.direct_scf:
-                pyscflogger.info('direct_scf_tol = %g', self._scf.direct_scf_tol)
+                pyscflogger.info(self, 'direct_scf_tol = %g', self._scf.direct_scf_tol)
             if self.chkfile:
-                pyscflogger.info('chkfile to save SCF result = %s', self.chkfile)
-            pyscflogger.info('max_cycle_inner = %d',  self.max_cycle_inner)
-            pyscflogger.info('max_stepsize = %g', self.max_stepsize)
-            pyscflogger.info('ah_start_tol = %g',     self.ah_start_tol)
-            pyscflogger.info('ah_level_shift = %g',   self.ah_level_shift)
-            pyscflogger.info('ah_conv_tol = %g',      self.ah_conv_tol)
-            pyscflogger.info('ah_lindep = %g',        self.ah_lindep)
-            pyscflogger.info('ah_start_cycle = %d',   self.ah_start_cycle)
-            pyscflogger.info('ah_max_cycle = %d',     self.ah_max_cycle)
-            pyscflogger.info('ah_grad_trust_region = %g', self.ah_grad_trust_region)
-            pyscflogger.info('keyframe_interval = %d', self.keyframe_interval)
-            pyscflogger.info('keyframe_interval_rate = %g', self.keyframe_interval_rate)
-            pyscflogger.info('augmented hessian decay rate = %g', self.ah_decay_rate)
-            pyscflogger.info('max_memory %d MB (current use %d MB)',
+                pyscflogger.info(self, 'chkfile to save SCF result = %s', self.chkfile)
+            pyscflogger.info(self, 'max_cycle_inner = %d',  self.max_cycle_inner)
+            pyscflogger.info(self, 'max_stepsize = %g', self.max_stepsize)
+            pyscflogger.info(self, 'ah_start_tol = %g',     self.ah_start_tol)
+            pyscflogger.info(self, 'ah_level_shift = %g',   self.ah_level_shift)
+            pyscflogger.info(self, 'ah_conv_tol = %g',      self.ah_conv_tol)
+            pyscflogger.info(self, 'ah_lindep = %g',        self.ah_lindep)
+            pyscflogger.info(self, 'ah_start_cycle = %d',   self.ah_start_cycle)
+            pyscflogger.info(self, 'ah_max_cycle = %d',     self.ah_max_cycle)
+            pyscflogger.info(self, 'ah_grad_trust_region = %g', self.ah_grad_trust_region)
+            pyscflogger.info(self, 'keyframe_interval = %d', self.keyframe_interval)
+            pyscflogger.info(self, 'keyframe_interval_rate = %g', self.keyframe_interval_rate)
+            pyscflogger.info(self, 'augmented hessian decay rate = %g', self.ah_decay_rate)
+            pyscflogger.info(self, 'max_memory %d MB (current use %d MB)',
                      self.max_memory, pyscf.lib.current_memory()[0])
 
         def get_fock_(self, h1e, s1e, vhf, dm, cycle=-1, adiis=None,
@@ -522,21 +522,23 @@ class SCF(object):
                     mo_occ[1], mo_coeff[1] = la.eigh(InitGuess[1])
 
                     newtonUIHF = newton(self.mf)
-                    newtonUIHF.max_cycle_inner = 30
+                    newtonUIHF.max_cycle_inner = 15
                     newtonUIHF.ah_start_cycle = 6
+                    newtonUIHF.dump_flags()
                     conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUIHF, \
                             tuple(mo_coeff), tuple(mo_occ), \
-                            max_cycle=50, verbose=5)
+                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
                 else:
                     self.mf.max_cycle = 0
                     self.mf.scf(np.zeros((2, self.integral.norb, self.integral.norb)))
 
                     newtonUIHF = newton(self.mf)
-                    newtonUIHF.max_cycle_inner = 30
+                    newtonUIHF.max_cycle_inner = 15
                     newtonUIHF.ah_start_cycle = 6
+                    newtonUIHF.dump_flags()
                     conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUIHF, \
                             self.mf.mo_coeff, self.mf.mo_occ, \
-                            max_cycle=50, verbose=5)
+                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
 
                 self.mf.mo_energy = mo_energy
                 self.mf.mo_coeff = mo_coeff
@@ -596,23 +598,21 @@ class SCF(object):
                     mo_occ[:nmo], mo_occ[nmo:] = 0, 1
 
                     newtonUHFB = newton(self.mf)
-                    newtonUHFB.max_cycle_inner = 30
-                    newtonUHFB.ah_start_cycle = 6
+                    newtonUHFB.dump_flags()
 
                     conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUHFB, mo_coeff, mo_occ, \
-                            max_cycle=50, verbose=5)
+                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
                 else:
                     # do an initial traditional HF to generate orbitals
                     self.mf.max_cycle = 1
                     self.mf.scf(np.zeros((norb*2, norb*2)))
 
                     newtonUHFB = newton(self.mf)
-                    newtonUHFB.max_cycle_inner = 30
-                    newtonUHFB.ah_start_cycle = 6
+                    newtonUHFB.dump_flags()
 
                     conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUHFB, \
                             self.mf.mo_coeff, self.mf.mo_occ, \
-                            max_cycle=50, verbose=5)
+                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
 
                 self.mf.mo_energy = mo_energy
                 self.mf.mo_coeff = mo_coeff

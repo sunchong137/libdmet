@@ -9,7 +9,7 @@ from fit import minimize
 from mfd import assignocc, HF
 from math import sqrt
 from copy import deepcopy
-from libdmet import save_mem
+from libdmet import settings
 
 TmpDir = "/tmp"
 
@@ -186,12 +186,12 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
     nbasis = basis.shape[-1]
     spin = basis.shape[0]
 
-    if save_mem:
+    if settings.save_mem:
         if local:
             return {"ccdd": lattice.getH2()[np.newaxis, :]}
         else:
             log.warning("Basis nonlocal, ignoring memory saving option")
-            libdmet.save_mem = False
+            settings.save_mem = False
 
     if "mmap" in kwargs.keys() and kwargs["mmap"]:
         log.debug(0, "Use memory map for 2-electron integral")
