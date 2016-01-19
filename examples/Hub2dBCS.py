@@ -3,7 +3,7 @@ import libdmet.dmet.HubbardBCS as dmet
 import numpy as np
 import numpy.linalg as la
 
-log.verbose = "INFO"
+log.verbose = "DEBUG0"
 
 U = 4
 LatSize = [36, 36]
@@ -27,7 +27,7 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.Block(nproc = 4, nnode = 1, \
+solver = dmet.impurity_solver.StackBlock(nproc = 2, nthread = 2, nnode = 1, \
         bcs = True, reorder = True, tol = 1e-7, maxM = M)
 
 log.section("\nfitting chemical potential\n")
