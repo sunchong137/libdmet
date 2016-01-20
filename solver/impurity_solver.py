@@ -1,13 +1,20 @@
-from libdmet.solver import block, scf, casscf, bcs_dmrgscf
+from libdmet.solver import block
 from libdmet.solver.afqmc import AFQMC
-from libdmet.solver.dmrgci import DmrgCI, get_orbs
-from libdmet.solver.bcs_dmrgci import BCSDmrgCI, get_qps, get_BCS_mo
 from libdmet.system import integral
 import libdmet.utils.logger as log
 import numpy as np
 import numpy.linalg as la
 
-__all__ = ["AFQMC", "Block", "StackBlock", "DmrgCI", "CASSCF", "BCSDmrgCI"]
+try:
+    from libdmet.solver import scf, casscf, bcs_dmrgscf
+    from libdmet.solver.dmrgci import DmrgCI, get_orbs
+    from libdmet.solver.bcs_dmrgci import BCSDmrgCI, get_qps, get_BCS_mo
+    __all__ = ["AFQMC", "Block", "StackBlock", "DmrgCI", "CASSCF", "BCSDmrgCI"]
+
+except ImportError:
+    log.warning("Cannot import pyscf, self-consistent HF/HFB and CASCI/CASSCF"
+            "solvers are not available")
+    __all__ = ["AFQMC", "Block", "StackBlock"]
 
 class Block(object):
     def __init__(self, nproc, nnode = 1, TmpDir = "/tmp", SharedDir = None, \
