@@ -297,7 +297,7 @@ class BCS_DMRGSCF(mc1step_uhf.CASSCF):
             if block.Block.reorder:
                 log.warning("Using maximal overlap method (MOM) to reorder localized "\
                         "orbitals, turning off Block reorder option")
-                block.Block.reoder = False
+                block.Block.reorder = False
         self.mom_reorder = mom_reorder
         self.tmpDir = TmpDir
         self.rot = None
