@@ -100,7 +100,6 @@ def get_qps_local(ncas, nPAO, PAOidx, mo, mo_energy, nImp, ImpHam):
     assert(ImpHam.H2["cccd"] is None or la.norm(ImpHam.H2["cccd"]) < 1e-10)
     assert(ImpHam.H2["cccc"] is None or la.norm(ImpHam.H2["cccc"]) < 1e-10)
     if settings.save_mem:
-        nImp = ImpHam.H2["ccdd"][0].shape[0]
         w = transform_local_qp(cAO[:nImp], cBO[:nImp], \
                 cAO[norb:norb+nImp], cBO[norb:norb+nImp], ImpHam.H2["ccdd"][0])
     else:
@@ -463,7 +462,7 @@ class BCSDmrgCI(object):
             nA_HFB, nB_HFB = np.sum(np.diag(GRhoHFB)[:nImp]), np.sum(1. - np.diag(GRhoHFB)[nbasis:nbasis+nImp])
             log.info("nelec (HFB) = %20.12f" % (nA_HFB + nB_HFB))
 
-        core, cas, casinfo = self.get_qps(mo, mo_energy, basis.shape[-2], Ham)
+        core, cas, casinfo = self.get_qps(mo, mo_energy, basis.shape[-2] / 2, Ham)
         coreGRho = np.dot(core[0], core[0].T)
         casHam, _ = buildCASHamiltonian(Ham, core, cas)
 
