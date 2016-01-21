@@ -126,8 +126,8 @@ def get_qps_local(ncas, nPAO, PAOidx, mo, mo_energy, nImp, ImpHam):
     log.debug(1, "Spin B:\nCoulomb repulsion: \n%s\nImpurity weight: \n%s", \
             fB[ordB], wB[ordB])
     # take out core and cas from occupied set
-    coreOA, casOA = cAOloc[:, ordA[:-nelecas]], cAOloc[:, ordA[-nelecas:]]
-    coreOB, casOB = cBOloc[:, ordB[:-nelecas]], cBOloc[:, ordB[-nelecas:]]
+    coreOA, casOA = cAOloc[:, ordA[:len(AO)-nelecas]], cAOloc[:, ordA[len(AO)-nelecas:]]
+    coreOB, casOB = cBOloc[:, ordB[:len(BO)-nelecas]], cBOloc[:, ordB[len(BO)-nelecas:]]
     # handle virtual orbitals
     coreVA, casVA = proj_virtual(cAV, PAOidx, nPAO)
     coreVB, casVB = proj_virtual(cBV, PAOidx, nPAO)
@@ -341,7 +341,7 @@ def split_localize(orbs, info, Ham, basis = None):
             localorbs[s, :, occ:norbs-virt] = \
                     np.dot(orbs[s,:,occ:norbs-virt], part_coefs)
             rotmat[s, occ:norbs-virt, occ:norbs-virt] = part_coefs
-    if basis is not None:
+    if basis is not None and 0:
         # match alpha, beta basis
         # localorbs contain v and u parts with respect to embedding quasiparticles
         localbasis = basisToSpin(np.tensordot(basisToCanonical(basis), \
