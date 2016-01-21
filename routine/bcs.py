@@ -24,10 +24,13 @@ def __embBasis_proj(lattice, GRho, **kwargs):
     # spins give an additional factor of 2
     basis = np.zeros((2, ncells, nscsites*2, nscsites*2))
     # A is square root of impurity part
-    A = MatSqrt(GRho[0])
-    B = np.swapaxes(np.tensordot(la.inv(A), GRho[1:], axes = (1,1)), 0, 1)
-    B = np.swapaxes(B, 1, 2)
-    B = orthonormalizeBasis(B)
+    #A = MatSqrt(GRho[0])
+    #B = np.swapaxes(np.tensordot(la.inv(A), GRho[1:], axes = (1,1)), 0, 1)
+    #B = np.swapaxes(B, 1, 2)
+    #B = orthonormalizeBasis(B)
+    GRhoImpEnv = np.transpose(GRho[1:], (1, 0, 2)).reshape(nscsites*2, nscsites*(ncells-1)*2)
+    _, _, vt = la.svd(GRhoImpEnv, full_matrices = False)
+    B = np.transpose(vt.reshape((nscsites*2, ncells-1, nscsites*2)), (1, 2, 0))
     basis[0, 0, :nscsites, :nscsites] = np.eye(nscsites)
     basis[1, 0, :nscsites, :nscsites] = np.eye(nscsites)
     # FIXME cut B to gain the largest particle property?
