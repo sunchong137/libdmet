@@ -450,10 +450,12 @@ class BCSDmrgCI(object):
         self.localized_cas = None
         self.tmpDir = tmpDir
 
-    def run(self, Ham, ci_args = {}, guess = None, basis = None, similar = False):
+    def run(self, Ham, ci_args = {}, guess = None, basis = None, similar = False, scf = True):
         # ci_args is a list or dict for ci solver, or None
-
-        mo, mo_energy = get_BCS_mo(self.scfsolver, Ham, guess)
+        if scf:
+            mo, mo_energy = get_BCS_mo(self.scfsolver, Ham, guess)
+        else:
+            mo, mo_energy = guess
         if basis is not None:
             nmodes = np.sum(mo_energy < 0)
             GRhoHFB = np.dot(mo[:, :nmodes], mo[:, :nmodes].T)
