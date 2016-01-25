@@ -74,17 +74,25 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
         LineSearchFn = lambda step: fn(x - step * dx)
 
         def FindStep():
-            scale = np.average(steps[-2:])
+            scale = abs(np.average(steps[-2:]))
             grid = list(np.arange(0.,2.001,0.1) * scale)
             if multi:
                 val = p.map(LineSearchFn, grid)
             else:
                 val = map(LineSearchFn, grid)
+            #print val
             s = grid[np.argmin(val)]
             if abs(s) > 1e-4:
                 return s
             else:
-                return fmin(LineSearchFn, np.array([0.001]), disp = 0, xtol = 1e-10)[0]
+                xopt, fopt, _, _, _ = fmin(LineSearchFn, np.array([0.001]), disp = 0, \
+                        xtol = 1e-10, full_output = True)
+                # in case fmin doesn't work
+                if fopt < np.min(val):
+                    return xopt
+                else:
+                    return s
+
 
         step = FindStep()
         steps.append(step)
