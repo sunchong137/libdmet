@@ -2,4 +2,6 @@ Dependencies:
 
 pyscf   https://github.com/sunqm/pyscf
 pathos  https://github.com/uqfoundation/pathos (optional for multithreading)
-StackBlock   https://github.com/zhengbx/StackBlock  (optional, to use StackBlock as impurity solver, install from GitHub and create a symbolic link to the StackBlock path in the libdmet folder.)
+StackBlock   https://github.com/zhengbx/StackBlock  (optional, to use
+StackBlock as impurity solver, install from GitHub and create a symbolic
+link to the StackBlock path in the libdmet folder.)
