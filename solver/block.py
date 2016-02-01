@@ -50,9 +50,9 @@ class Schedule(object):
         log.debug(1, "Generate default schedule with restart calculation M = %d, " \
                 "maxiter = %d", M, self.maxiter)
         self.arrayM = [M, M, M]
-        self.arraySweep = [0, 1, 2]
-        self.arrayTol = [self.sweeptol * 5., self.sweeptol, self.sweeptol * 0.1]
-        self.arrayNoise = [self.sweeptol * 5., self.sweeptol, 0]
+        self.arraySweep = [0, 1, 3]
+        self.arrayTol = [self.sweeptol, self.sweeptol * 0.1, self.sweeptol * 0.1]
+        self.arrayNoise = [self.sweeptol, self.sweeptol * 0.1, 0]
 
         log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)
         log.debug(2, "at sweeps       " + " %d" * len(self.arraySweep), *self.arraySweep)
@@ -64,10 +64,10 @@ class Schedule(object):
         log.debug(2, "twodot_to_onedot %d", self.twodot_to_onedot)
         log.debug(2, "maxiter          %d", self.maxiter)
 
-        if self.twodot_to_onedot + 2 > self.maxiter:
+        if self.twodot_to_onedot + 3 > self.maxiter:
             log.warning("only %d onedot iterations\nmodify maxiter to %d", \
-                self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 2)
-            self.maxiter = self.twodot_to_onedot + 2
+                self.maxiter - self.twodot_to_onedot, self.twodot_to_onedot + 3)
+            self.maxiter = self.twodot_to_onedot + 3
         self.initialized = True
 
     def gen_extrapolate(self, M):
