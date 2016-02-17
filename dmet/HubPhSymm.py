@@ -120,7 +120,7 @@ def VcorLocalPhSymm(U, bogoliubov, ImpSize, subA, subB, r = None):
     # VA_{ij} + (-)^{i+j}VB_{ij} = 0
     # D_{ij} = (-)^{i+j}D_{ji}
     # AA=+, AB=-, BB=+
-    assert(np.asarray(ImpSize).shape == (2,))
+    assert(np.asarray(ImpSize).shape in [(2,), (1,)])
     subA, subB = set(subA), set(subB)
     log.eassert(len(subA) == len(subB), "number of sites in two sublattices are equal")
     nscsites = len(subA) * 2
