@@ -42,7 +42,7 @@ def to_full(nc, nsc, Hsparse):
     return H
 
 def rotate_term(rot1d, H):
-    # rotate a signle 1d Hamiltonian term
+    # rotate a single 1d Hamiltonian term
     nc, nsc = H.shape
     assert(rot1d.shape == (nc, nsc, nsc))
     
