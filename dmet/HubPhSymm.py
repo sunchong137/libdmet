@@ -120,7 +120,7 @@ def VcorLocalPhSymm(U, bogoliubov, ImpSize, subA, subB, r = None):
     # VA_{ij} + (-)^{i+j}VB_{ij} = 0
     # D_{ij} = (-)^{i+j}D_{ji}
     # AA=+, AB=-, BB=+
-    assert(np.asarray(ImpSize).shape == (2,))
+    assert(np.asarray(ImpSize).shape in [(1,), (2,)])
     subA, subB = set(subA), set(subB)
     log.eassert(len(subA) == len(subB), "number of sites in two sublattices are equal")
     nscsites = len(subA) * 2
@@ -198,6 +198,105 @@ def VcorLocalPhSymm(U, bogoliubov, ImpSize, subA, subB, r = None):
     v.evaluate = types.MethodType(evaluate, v)
     v.gradient = types.MethodType(gradient, v)
     v.length = types.MethodType(lambda self: nV+nD, v)
+    return v
+
+def VcorDCAPhSymm(U, ImpSize, subA, subB):
+    # Bogoliubov is always False
+    assert(np.asarray(ImpSize).shape in [(1,), (2,)])
+    subA, subB = set(subA), set(subB)
+    log.eassert(len(subA) == len(subB), "number of sites in two sublattices are equal")
+    nscsites = len(subA) * 2
+    log.eassert(subA | subB == set(range(nscsites)), "sublattice designation problematic")
+    nscsites = np.product(ImpSize)
+    log.eassert(subA | subB == set(range(nscsites)), "sublattice designation problematic")
+
+    sites = list(it.product(*map(range, ImpSize)))
+    sitedict = dict(zip(sites, range(len(sites))))
+
+    nV = len(sites)/2 + 1
+
+    v = vcor.Vcor()
+    v.grad = None
+
+    def evaluate(self):
+        log.eassert(self.param.shape == (nV,), "wrong parameter shape, require %s", (nV,))
+        V = np.zeros((2, nscsites, nscsites))
+        for idxv, x in enumerate(self.param):
+            for idx1, site1 in enumerate(sites):
+                idx2 = sitedict[
+                        tuple((np.asarray(sites[idx1]) + np.asarray(sites[idxv])) % ImpSize)
+                ]
+                if idx1 in subA and idx2 in subA:
+                    V[0, idx1, idx2] = x
+                    V[1, idx1, idx2] = -x
+                elif idx1 in subB and idx2 in subB:
+                    V[0, idx1, idx2] = -x
+                    V[1, idx1, idx2] = x
+                else:
+                    V[0, idx1, idx2] = x
+                    V[1, idx1, idx2] = x
+
+                idx3 = sitedict[
+                        tuple((np.asarray(sites[idx1]) - np.asarray(sites[idxv])) % ImpSize)
+                ]
+                if idx3 == idx2:
+                    continue
+
+                if idx1 in subA and idx3 in subA:
+                    V[0, idx1, idx3] = x
+                    V[1, idx1, idx3] = -x
+                elif idx1 in subB and idx3 in subB:
+                    V[0, idx1, idx3] = -x
+                    V[1, idx1, idx3] = x
+                else:
+                    V[0, idx1, idx3] = x
+                    V[1, idx1, idx3] = x
+
+        V[0] += np.eye(nscsites) * (U/2)
+        V[1] += np.eye(nscsites) * (U/2)
+        return V
+
+    def gradient(self):
+        if self.grad is None:
+            g = np.zeros((nV, 2, nscsites, nscsites))
+
+            for idxv in range(nV):
+                for idx1, site1 in enumerate(sites):
+                    idx2 = sitedict[
+                            tuple((np.asarray(sites[idx1]) + np.asarray(sites[idxv])) % ImpSize)
+                    ]
+                    if idx1 in subA and idx2 in subA:
+                        g[idxv, 0, idx1, idx2] = 1
+                        g[idxv, 1, idx1, idx2] = -1
+                    elif idx1 in subB and idx2 in subB:
+                        g[idxv, 0, idx1, idx2] = -1
+                        g[idxv, 1, idx1, idx2] = 1
+                    else:
+                        g[idxv, 0, idx1, idx2] = 1
+                        g[idxv, 1, idx1, idx2] = 1
+
+                    idx3 = sitedict[
+                            tuple((np.asarray(sites[idx1]) - np.asarray(sites[idxv])) % ImpSize)
+                    ]
+                    if idx3 == idx2:
+                        continue
+
+                    if idx1 in subA and idx3 in subA:
+                        g[idxv, 0, idx1, idx3] = 1
+                        g[idxv, 1, idx1, idx3] = -1
+                    elif idx1 in subB and idx3 in subB:
+                        g[idxv, 0, idx1, idx3] = -1
+                        g[idxv, 1, idx1, idx3] = 1
+                    else:
+                        g[idxv, 0, idx1, idx3] = 1
+                        g[idxv, 1, idx1, idx3] = 1
+            self.grad = g
+
+        return self.grad
+
+    v.evaluate = types.MethodType(evaluate, v)
+    v.gradient = types.MethodType(gradient, v)
+    v.length = types.MethodType(lambda self: nV, v)
     return v
 
 def FitVcor(rho, lattice, basis, vcor, beta, MaxIter1 = 300, MaxIter2 = 20):

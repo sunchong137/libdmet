@@ -49,6 +49,40 @@ def Square3Band(lx, ly, scx, scy):
     lat.neighborDist = [1., 2.**0.5, 2.]
     return lat
 
+def Square3BandSymm(cx, cy):
+    # 2x2 symmetric supercells
+    #        |
+    #        O
+    #        |        |
+    #     - Cu - O - Cu - O -
+    #        |        |
+    #        O        O
+    #        |        |
+    # - O - Cu - O - Cu -
+    #        |        |
+    #                 O
+    #                 |
+    uc = UnitCell(np.eye(2)*4, [
+      (np.array([1, 1]), "Cu"),
+      (np.array([0, 1]), "O"),
+      (np.array([1, 2]), "O"),
+      (np.array([1, 3]), "Cu"),
+      (np.array([1, 4]), "O"),
+      (np.array([2, 3]), "O"),
+      (np.array([3, 3]), "Cu"),
+      (np.array([4, 3]), "O"),
+      (np.array([3, 2]), "O"),
+      (np.array([3, 1]), "Cu"),
+      (np.array([3, 0]), "O"),
+      (np.array([2, 1]), "O"),
+    ])
+    sc = SuperCell(uc, np.asarray([1,1]))
+    lat = Lattice(sc, np.asarray([cx, cy]))
+    lat.neighborDist = [1., 2.**0.5, 2.]
+    for x in enumerate(zip(lat.names, lat.sites)):
+        print x
+    return lat
+
 def HoneycombLattice(lx, ly, scx, scy):
     log.error("honeycomb lattice not implemented yet")
 
