@@ -73,7 +73,7 @@ def dumpOptions(filename, settings):
         "%d  #seed: 0 will random set the seed, otherwise use the value"
     ]) + "\n"
 
-    params = (settings["dt"], 1, 1, settings["bg_cap"], settings["therm_sweep"], \
+    params = (settings["dt"], settings["decomp"], 1, settings["bg_cap"], settings["therm_sweep"], \
             settings["meas_sweep"], settings["mgs_step"], 0, \
             int(settings["beta"]/settings["dt"]), \
             int(settings["blksize"]/settings["dt"]), \
@@ -106,6 +106,7 @@ class AFQMC(object):
     env_slurm = "SLURM_JOBID" in os.environ
     settings = {
         "dt": 0.01,
+        "decomp": 1, # use 3 for large U
         "beta": 50,
         "blksize": 0.1,
         "meas_interval": 0.5,
