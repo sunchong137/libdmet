@@ -213,7 +213,22 @@ def VcorDCAPhSymm(U, ImpSize, subA, subB):
     sites = list(it.product(*map(range, ImpSize)))
     sitedict = dict(zip(sites, range(len(sites))))
 
-    nV = len(sites)/2 + 1
+    container = set()
+    vectors = []
+
+    for s in sites:
+        vec = []
+        if not s in container:
+            vec.append(np.asarray(s))
+            container.add(s)
+        s1 = tuple((-np.asarray(s)) % ImpSize)
+        if not s1 in container:
+            vec.append(np.asarray(s1))
+            container.add(s1)
+        if len(vec) > 0:
+            vectors.append(vec)
+
+    nV = len(vectors)
 
     v = vcor.Vcor()
     v.grad = None
@@ -221,36 +236,22 @@ def VcorDCAPhSymm(U, ImpSize, subA, subB):
     def evaluate(self):
         log.eassert(self.param.shape == (nV,), "wrong parameter shape, require %s", (nV,))
         V = np.zeros((2, nscsites, nscsites))
-        for idxv, x in enumerate(self.param):
-            for idx1, site1 in enumerate(sites):
-                idx2 = sitedict[
-                        tuple((np.asarray(sites[idx1]) + np.asarray(sites[idxv])) % ImpSize)
-                ]
-                if idx1 in subA and idx2 in subA:
-                    V[0, idx1, idx2] = x
-                    V[1, idx1, idx2] = -x
-                elif idx1 in subB and idx2 in subB:
-                    V[0, idx1, idx2] = -x
-                    V[1, idx1, idx2] = x
-                else:
-                    V[0, idx1, idx2] = x
-                    V[1, idx1, idx2] = x
 
-                idx3 = sitedict[
-                        tuple((np.asarray(sites[idx1]) - np.asarray(sites[idxv])) % ImpSize)
-                ]
-                if idx3 == idx2:
-                    continue
-
-                if idx1 in subA and idx3 in subA:
-                    V[0, idx1, idx3] = x
-                    V[1, idx1, idx3] = -x
-                elif idx1 in subB and idx3 in subB:
-                    V[0, idx1, idx3] = -x
-                    V[1, idx1, idx3] = x
-                else:
-                    V[0, idx1, idx3] = x
-                    V[1, idx1, idx3] = x
+        for idxp, p in enumerate(self.param):
+            for vec in vectors[idxp]:
+                for idx1, site1 in enumerate(sites):
+                    idx2 = sitedict[
+                            tuple((np.asarray(site1) + vec) % ImpSize)
+                    ]
+                    if idx1 in subA and idx2 in subA:
+                        V[0, idx1, idx2] = p
+                        V[1, idx1, idx2] = -p
+                    elif idx1 in subB and idx2 in subB:
+                        V[0, idx1, idx2] = -p
+                        V[1, idx1, idx2] = p
+                    else:
+                        V[0, idx1, idx2] = p
+                        V[1, idx1, idx2] = p
 
         V[0] += np.eye(nscsites) * (U/2)
         V[1] += np.eye(nscsites) * (U/2)
@@ -260,38 +261,22 @@ def VcorDCAPhSymm(U, ImpSize, subA, subB):
         if self.grad is None:
             g = np.zeros((nV, 2, nscsites, nscsites))
 
-            for idxv in range(nV):
-                for idx1, site1 in enumerate(sites):
-                    idx2 = sitedict[
-                            tuple((np.asarray(sites[idx1]) + np.asarray(sites[idxv])) % ImpSize)
-                    ]
-                    if idx1 in subA and idx2 in subA:
-                        g[idxv, 0, idx1, idx2] = 1
-                        g[idxv, 1, idx1, idx2] = -1
-                    elif idx1 in subB and idx2 in subB:
-                        g[idxv, 0, idx1, idx2] = -1
-                        g[idxv, 1, idx1, idx2] = 1
-                    else:
-                        g[idxv, 0, idx1, idx2] = 1
-                        g[idxv, 1, idx1, idx2] = 1
-
-                    idx3 = sitedict[
-                            tuple((np.asarray(sites[idx1]) - np.asarray(sites[idxv])) % ImpSize)
-                    ]
-                    if idx3 == idx2:
-                        continue
-
-                    if idx1 in subA and idx3 in subA:
-                        g[idxv, 0, idx1, idx3] = 1
-                        g[idxv, 1, idx1, idx3] = -1
-                    elif idx1 in subB and idx3 in subB:
-                        g[idxv, 0, idx1, idx3] = -1
-                        g[idxv, 1, idx1, idx3] = 1
-                    else:
-                        g[idxv, 0, idx1, idx3] = 1
-                        g[idxv, 1, idx1, idx3] = 1
-            self.grad = g
-
+            for idxp, p in enumerate(self.param):
+                for vec in vectors[idxp]:
+                    for idx1, site1 in enumerate(sites):
+                        idx2 = sitedict[
+                            tuple((np.asarray(site1) + vec) % ImpSize)
+                        ]
+                        if idx1 in subA and idx2 in subA:
+                            g[idxp, 0, idx1, idx2] = 1
+                            g[idxp, 1, idx1, idx2] = -1
+                        elif idx1 in subB and idx2 in subB:
+                            g[idxp, 0, idx1, idx2] = -1
+                            g[idxp, 1, idx1, idx2] = 1
+                        else:
+                            g[idxp, 0, idx1, idx2] = 1
+                            g[idxp, 1, idx1, idx2] = 1
+ 
         return self.grad
 
     v.evaluate = types.MethodType(evaluate, v)
