@@ -109,6 +109,22 @@ def AFInitGuess(ImpSize, U, Filling, polar = None, bogoliubov = False, rand = 0.
         v.assign(np.asarray([init_v+init_p, init_v-init_p]))
     return v
 
+def PMInitGuess(ImpSize, U, Filling, bogoliubov = False, rand = 0.):
+    nscsites = np.product(ImpSize)
+    shift = U * Filling
+    init_v = np.eye(nscsites) * shift
+    v = VcorLocal(True, bogoliubov, nscsites)
+    if bogoliubov:
+        init_d = np.zeros((nscsites, nscsites)) 
+        v.assign(np.asarray([init_v, int_v, init_d]))
+    else:
+        v.assign(np.asarray([init_v, init_v]))
+
+    if rand > 0.:
+        np.random.seed(32499823)
+        v.update(v.param + (np.random.rand(v.length()) - 0.5) * rand)
+    return v
+
 def VcorLocal(restricted, bogoliubov, nscsites):
     if restricted:
         nV = nscsites * (nscsites + 1) / 2
@@ -128,16 +144,18 @@ def VcorLocal(restricted, bogoliubov, nscsites):
     if restricted and not bogoliubov:
         def evaluate(self):
             log.eassert(self.param.shape == (nV,), "wrong parameter, require %s", (nV,))
-            V = np.zeros((1, nscsites, nscsites))
+            V = np.zeros((2, nscsites, nscsites))
             for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
                 V[0,i,j] = V[0,j,i] = self.param[idx]
+                V[1,i,j] = V[1,j,i] = self.param[idx]
             return V
 
         def gradient(self):
             if self.grad is None:
-                g = np.zeros((nV, 1, nscsites, nscsites))
+                g = np.zeros((nV, 2, nscsites, nscsites))
                 for idx, (i,j) in enumerate(it.combinations_with_replacement(range(nscsites), 2)):
                     g[idx,0,i,j] = g[idx,0,j,i] = 1
+                    g[idx,1,i,j] = g[idx,1,j,i] = 1
                 self.grad = g
             return self.grad
 
