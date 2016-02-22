@@ -94,27 +94,30 @@ def AFInitGuessIdx(v, nscsites, AFidx, PMidx, shift = 0., polar = 0.5, \
         s[0] += s[0].T
         vguess[np.ix_([2], subA+subB, subA+subB)] = s * rand
 
-    # FIXME a hack, directly update the parameters
-    p = np.zeros(v.length())
-    psite = lambda site: (2*nscsites+1-site)*site/2
-    for site in subA:
-        p[psite(site)] = shift + polar
-        p[psite(site) + psite(nscsites)] = shift - polar
-    for site in subB:
-        p[psite(site)] = shift - polar
-        p[psite(site) + psite(nscsites)] = shift + polar
-    for site in subC:
-        p[psite(site)] = p[psite(site) + psite(nscsites)] = shift
-    if bogoliubov:
-        for site1 in subA+subB:
-            for site2 in subA+subB:
-                p[psite(nscsites)*2+site1*nscsites+site2] = \
-                        vguess[2, site1, site2]
-
-    v.update(p)
-    log.eassert(la.norm(v.get() - vguess) < 1e-10, \
-            "initial guess cannot be assgned directly")
+    v.assign(vguess)
     return v
+
+    # FIXME a hack, directly update the parameters
+    #p = np.zeros(v.length())
+    #psite = lambda site: (2*nscsites+1-site)*site/2
+    #for site in subA:
+    #    p[psite(site)] = shift + polar
+    #    p[psite(site) + psite(nscsites)] = shift - polar
+    #for site in subB:
+    #    p[psite(site)] = shift - polar
+    #    p[psite(site) + psite(nscsites)] = shift + polar
+    #for site in subC:
+    #    p[psite(site)] = p[psite(site) + psite(nscsites)] = shift
+    #if bogoliubov:
+    #    for site1 in subA+subB:
+    #        for site2 in subA+subB:
+    #            p[psite(nscsites)*2+site1*nscsites+site2] = \
+    #                    vguess[2, site1, site2]
+
+    #v.update(p)
+    #log.eassert(la.norm(v.get() - vguess) < 1e-10, \
+    #        "initial guess cannot be assgned directly")
+    #return v
 
 
 def AFInitGuessOrbs(v, lattice, AForbs, PMorbs, shift = 0., polar = 0.5, \
