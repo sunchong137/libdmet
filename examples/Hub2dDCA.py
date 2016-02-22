@@ -6,17 +6,21 @@ import numpy.linalg as la
 log.verbose = "DEBUG1"
 
 U = 4
-LatSize = [76, 76]
-ImpSize = [4,4]
+LatSize = [76]
+ImpSize = [4]
 MaxIter = 20
 DiisStart = 4
 DiisDim = 4
 
-Lat = dmet.SquareLattice(*(LatSize + ImpSize))
+Lat = dmet.ChainLattice(*(LatSize + ImpSize))
 Ham = dmet.HubbardDCA(Lat, U)
 Lat.setHam(Ham)
 
-vcor = dmet.InitGuess(ImpSize, U, 1.)
+#vcor = dmet.InitGuess(ImpSize, U, 1.)
+subA, subB = dmet.BipartiteSquare(ImpSize)
+vcor = dmet.VcorDCAPhSymm(U, ImpSize, subA, subB)
+vcor.update(np.random.rand(vcor.length())-0.5)
+
 dc = dmet.FDiisContext(DiisDim)
 
 conv = False
@@ -24,8 +28,7 @@ conv = False
 history = dmet.IterHistory()
 
 dmet.impurity_solver.AFQMC.settings["meas_sweep"] = 200
-solver = dmet.impurity_solver.AFQMC(nproc = 4, nnode = 1, \
-        TmpDir = "/scratch/boxiao/DMETTemp")
+solver = dmet.impurity_solver.AFQMC(nproc = 4, nnode = 1)
 
 for iter in range(MaxIter):
     log.section("\nDMET Iteration %d\n", iter)
