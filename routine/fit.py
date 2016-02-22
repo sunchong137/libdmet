@@ -68,7 +68,6 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
         g = fgrad(x)
         if la.norm(g) < 1e-5:
             break
-
         dx = GetDir(y, g)
 
         LineSearchFn = lambda step: fn(x - step * dx)
@@ -76,11 +75,7 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
         def FindStep():
             scale = abs(np.average(steps[-2:]))
             grid = list(np.arange(0.,2.001,0.1) * scale)
-            if multi:
-                val = p.map(LineSearchFn, grid)
-            else:
-                val = map(LineSearchFn, grid)
-            #print val
+            val = map(LineSearchFn, grid)
             s = grid[np.argmin(val)]
             if abs(s) > 1e-4:
                 return s
@@ -93,8 +88,32 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
                 else:
                     return s
 
+        def FindStep2():
+            scale = abs(np.average(steps[-2:])) * 2.
+            
+            def find(a, b):
+                log.debug(2, "find(a, b)  a = %f   b = %f", a, b)
+                grid = list(np.linspace(a, b, 21))
+                val = p.map(LineSearchFn, grid)
+                idxmin = np.argmin(val)
+                s = grid[idxmin]
 
-        step = FindStep()
+                if abs(a-b) < 1e-9 or abs(s) > 1e-3:
+                    return s
+                else:
+                    if idxmin == 0:
+                        return find(grid[idxmin], grid[idxmin+1])
+                    elif idxmin == len(grid) - 1:
+                        return find(grid[idxmin-1], grid[idxmin])
+                    else:
+                        return find(grid[idxmin-1], grid[idxmin+1])
+
+            return find(-0.1*scale, 1.9*scale)
+
+        if multi:
+            step = FindStep2()
+        else:
+            step = FindStep()
         steps.append(step)
         dx *= step
         y_new = fn(x - dx)
