@@ -324,7 +324,7 @@ class DmrgCI(object):
         log.eassert(cisolver is not None, "No default ci solver is available" \
                 " with CASCI, you have to use Block")
         self.cisolver = cisolver
-        self.scfsolver = scf.SCF()
+        self.scfsolver = scf.SCF(newton_ah = False)
 
         # reorder scheme for restart block calculations
         if mom_reorder:

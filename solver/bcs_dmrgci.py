@@ -57,7 +57,7 @@ def proj_virtual(mo, idx, n):
     u, s, _ = la.svd(p)
     log.debug(1, "projection singular values:\n%s" % s)
     if n < nao:
-        log.warning("using incompleted projected virtual space is an experimental feature," \
+        log.warning("using incomplete projected virtual space is an experimental feature," \
                 " use with caution")
         log.debug(0, "current projected virtual space cut-off = %10.4f", s[n])
     else:
