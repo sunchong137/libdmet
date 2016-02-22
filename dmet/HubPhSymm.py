@@ -276,7 +276,7 @@ def VcorDCAPhSymm(U, ImpSize, subA, subB):
                         else:
                             g[idxp, 0, idx1, idx2] = 1
                             g[idxp, 1, idx1, idx2] = 1
- 
+            self.grad = g 
         return self.grad
 
     v.evaluate = types.MethodType(evaluate, v)
