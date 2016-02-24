@@ -54,15 +54,14 @@ Hubbard.transformResults = lambda GRhoEmb, E, basis, ImpHam, H_energy: \
 
 def ConstructImpHam(Lat, GRho, v, mu, matching = True, local = True, **kwargs):
     log.result("Making embedding basis")
-    basis = bcs.embBasis(Lat, GRho, local = local)
+    basis = bcs.embBasis(Lat, GRho, local = local, **kwargs)
     if matching:
         log.result("Rotate bath orbitals to match alpha and beta basis")
-        nscsites = Lat.supercell.nsites
+        nbasis = basis.shape[-1]
         if local:
-            basis[:, :, :, nscsites:] = basisMatching(basis[:, :, :, nscsites:])
+            basis[:, :, :, nbasis/2:] = basisMatching(basis[:, :, :, nbasis/2:])
         else:
             basis = basisMatching(basis)
-
     log.result("Constructing impurity Hamiltonian")
     ImpHam, (H1e, H0e) = bcs.embHam(Lat, basis, v, mu, local = local, **kwargs)
 

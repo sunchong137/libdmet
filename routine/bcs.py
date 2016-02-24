@@ -21,33 +21,71 @@ def embBasis(lattice, GRho, local = True, **kwargs):
 def __embBasis_proj(lattice, GRho, **kwargs):
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
-    # spins give an additional factor of 2
-    basis = np.zeros((2, ncells, nscsites*2, nscsites*2))
-    # A is square root of impurity part
-    #A = MatSqrt(GRho[0])
-    #B = np.swapaxes(np.tensordot(la.inv(A), GRho[1:], axes = (1,1)), 0, 1)
-    #B = np.swapaxes(B, 1, 2)
-    #B = orthonormalizeBasis(B)
-    GRhoImpEnv = np.transpose(GRho[1:], (1, 0, 2)).reshape(nscsites*2, nscsites*(ncells-1)*2)
-    _, _, vt = la.svd(GRhoImpEnv, full_matrices = False)
-    B = np.transpose(vt.reshape((nscsites*2, ncells-1, nscsites*2)), (1, 2, 0))
-    basis[0, 0, :nscsites, :nscsites] = np.eye(nscsites)
-    basis[1, 0, :nscsites, :nscsites] = np.eye(nscsites)
-    # FIXME cut B to gain the largest particle property?
-    w = np.diag(np.tensordot(B[:,:nscsites], B[:,:nscsites], axes = ((0,1),(0,1))))
-    order = np.argsort(w)[::-1]
-    w1 = np.sort(w)[::-1]
-    orderA, orderB = order[:nscsites], order[nscsites:]
-    wA, wB = w1[:nscsites], 1. - w1[nscsites:]
-    log.debug(0, "particle character:\nspin A max %.2f min %.2f mean %.2f"
-            "\nspin B max %.2f min %.2f mean %.2f", np.max(wA), np.min(wA), \
-            np.average(wA), np.max(wB), np.min(wB), np.average(wB))
-    basis[0, 1:, :, nscsites:] = B[:,:,orderA]
-    basis[1, 1:, :nscsites, nscsites:], basis[1, 1:, nscsites:, nscsites:] = \
-            B[:, nscsites:, orderB], B[:, :nscsites, orderB]
+    if "sites" in kwargs:
+        Imps = kwargs["sites"]
+        ImpIdx = Imps + map(lambda i: i+nscsites, Imps)
+        EnvIdx = filter(lambda i: not i in ImpIdx, range(2*nscsites*ncells))
+        nImp = len(Imps)
+        basis = np.zeros((2, ncells*nscsites*2, nImp*2))
+        GRhoImpEnv = np.delete(np.transpose(GRho, \
+                (1, 0, 2)).reshape(nscsites*2, nscsites*ncells*2)[ImpIdx], ImpIdx, 1)
+        _, _, vt = la.svd(GRhoImpEnv, full_matrices = False)
+        log.debug(1, "bath orbitals\n%s", vt)
+        B = vt.T
+        basis[np.ix_([0], Imps, range(nImp))] = np.eye(nImp)
+        basis[np.ix_([1], Imps, range(nImp))] = np.eye(nImp)
+        BathIdxV = range(nscsites-nImp)
+        BathIdxU = range(nscsites-nImp, 2*(nscsites-nImp))
+        for i in range(ncells-1):
+            BathIdxV += range(2*(nscsites-nImp)+nscsites*i*2, \
+                    2*(nscsites-nImp)+nscsites*(2*i+1))
+            BathIdxU += range(2*(nscsites-nImp)+nscsites*(2*i+1), \
+                    2*(nscsites-nImp)+nscsites*(2*i+2))
+        EnvIdxV = [EnvIdx[i] for i in BathIdxV]
+        EnvIdxU = [EnvIdx[i] for i in BathIdxU]
+        w = np.diag(np.dot(B[BathIdxV].T, B[BathIdxV]))
+        order = np.argsort(w)[::-1]
+        w1 = np.sort(w)[::-1]
+        orderA, orderB = order[:nImp], order[nImp:]
+        wA, wB = w1[:nImp], 1. - w1[nImp:]
+        log.debug(0, "particle character:\nspin A max %.2f min %.2f mean %.2f"
+                "\nspin B max %.2f min %.2f mean %.2f", np.max(wA), np.min(wA), \
+                np.average(wA), np.max(wB), np.min(wB), np.average(wB))
+        basis[np.ix_([0], EnvIdx, range(nImp, nImp*2))] = B[:, orderA]
+        basis[np.ix_([1], EnvIdxV, range(nImp, nImp*2))] = B[np.ix_(BathIdxU, orderB)]
+        basis[np.ix_([1], EnvIdxU, range(nImp, nImp*2))] = B[np.ix_(BathIdxV, orderB)]
+        basis = basis.reshape((2, ncells, nscsites*2, nImp*2))
+    else:
+        # spins give an additional factor of 2
+        basis = np.zeros((2, ncells, nscsites*2, nscsites*2))
+        # A is square root of impurity part
+        #A = MatSqrt(GRho[0])
+        #B = np.swapaxes(np.tensordot(la.inv(A), GRho[1:], axes = (1,1)), 0, 1)
+        #B = np.swapaxes(B, 1, 2)
+        #B = orthonormalizeBasis(B)
+        GRhoImpEnv = np.transpose(GRho[1:], (1, 0, 2)).reshape(nscsites*2, nscsites*(ncells-1)*2)
+        _, _, vt = la.svd(GRhoImpEnv, full_matrices = False)
+        log.debug(1, "bath orbitals\n%s", vt)
+        B = np.transpose(vt.reshape((nscsites*2, ncells-1, nscsites*2)), (1, 2, 0))
+        basis[0, 0, :nscsites, :nscsites] = np.eye(nscsites)
+        basis[1, 0, :nscsites, :nscsites] = np.eye(nscsites)
+        # FIXME cut B to gain the largest particle property?
+        w = np.diag(np.tensordot(B[:,:nscsites], B[:,:nscsites], axes = ((0,1),(0,1))))
+        order = np.argsort(w)[::-1]
+        w1 = np.sort(w)[::-1]
+        orderA, orderB = order[:nscsites], order[nscsites:]
+        wA, wB = w1[:nscsites], 1. - w1[nscsites:]
+        log.debug(0, "particle character:\nspin A max %.2f min %.2f mean %.2f"
+                "\nspin B max %.2f min %.2f mean %.2f", np.max(wA), np.min(wA), \
+                np.average(wA), np.max(wB), np.min(wB), np.average(wB))
+        basis[0, 1:, :, nscsites:] = B[:,:,orderA]
+        basis[1, 1:, :nscsites, nscsites:], basis[1, 1:, nscsites:, nscsites:] = \
+                B[:, nscsites:, orderB], B[:, :nscsites, orderB]
     return basis
 
 def __embBasis_phsymm(lattice, GRho, **kwargs):
+    if "sites" in kwargs:
+        log.error('keyword "sites" not supported.')
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
     basis = np.empty((2, ncells, nscsites*2, nscsites*2))
@@ -211,7 +249,6 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
     nbasis = basis.shape[-1]
     (embHA, embHB), embD, _ = transform_trans_inv_sparse(basis, lattice, \
             lattice.getFock(kspace = False))
-
     embH = np.empty((nbasis*2, nbasis*2))
     embH[:nbasis, :nbasis] = embHA
     embH[nbasis:, nbasis:] = -embHB
@@ -299,19 +336,98 @@ def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
     vcor.update(param)
     return vcor, err_begin, err_end
 
-def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0):
+def FitVcorFullK(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
+    nscsites = lattice.supercell.nsites
+
+    def costfunc(param, v = False):
+        vcor.update(param)
+        verbose = log.verbose
+        log.verbose = "RESULT"
+        GRhoT, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
+        log.verbose = verbose
+
+        tempRdm = map(extractRdm, GRhoT)
+        rhoAT = np.asarray([rhoA for (rhoA, rhoB, kappaBA) in tempRdm])
+        rhoBT = np.asarray([rhoB for (rhoA, rhoB, kappaBA) in tempRdm])
+        kappaBA0 = tempRdm[0][2]
+
+        kinetic = np.sum((rhoAT+rhoBT) * lattice.getFock(kspace = False))
+
+        rhoA, rhoB, kappaBA = extractRdm(GRho)
+        rhoAImp = rhoA[:nscsites, :nscsites]
+        rhoBImp = rhoB[:nscsites, :nscsites]
+        kappaBAImp = kappaBA[:nscsites, :nscsites]
+
+        constraint = np.sum((vcor.get()[0]-mu*np.eye(nscsites)) * (rhoAT[0] - rhoAImp)) + \
+                np.sum((vcor.get()[1]-mu*np.eye(nscsites)) * (rhoBT[0] - rhoBImp)) + \
+                np.sum(vcor.get()[2] * (kappaBA0 - kappaBAImp).T) + \
+                np.sum(vcor.get()[2].T * (kappaBA0 - kappaBAImp))
+
+        if v:
+            return kinetic, constraint
+        else:
+            return -(kinetic + constraint)
+
+    def grad(param):
+        vcor.update(param)
+        verbose = log.verbose
+        log.verbose = "RESULT"
+        GRhoT, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
+        log.verbose = verbose
+
+        rhoA0, rhoB0, kappaBA0 = extractRdm(GRhoT[0])
+        rhoA, rhoB, kappaBA = extractRdm(GRho)
+
+        dRho = np.asarray([rhoA0 - rhoA[:nscsites, :nscsites], \
+                rhoB0 - rhoB[:nscsites, :nscsites], \
+                2 * (kappaBA0.T - kappaBA.T[:nscsites, :nscsites])])
+        return -np.tensordot(vcor.gradient(), dRho, axes = ((1,2,3), (0,1,2)))
+
+    from scipy.optimize import minimize
+    ke_begin, c_begin = costfunc(vcor.param, v = True)
+    log.info("begin: \nkinetic energy = %20.12f    constraint = %20.12f", ke_begin, c_begin)
+    param = minimize(costfunc, vcor.param, jac = grad).x
+    ke_end, c_end = costfunc(param, v = True)
+    log.info("end: \nkinetic energy = %20.12f    constraint = %20.12f", ke_end, c_end)
+
+    vcor.update(param)
+    return vcor, c_begin, c_end
+
+
+def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0, kinetic = False):
     vcor_new = deepcopy(vcor)
     log.result("Using two-step vcor fitting")
-    if MaxIter1 > 0:
-        log.info("Impurity model stage  max %d steps", MaxIter1)
-        vcor_new, err_begin, err_end = FitVcorEmb(GRho, lattice, basis, vcor_new, \
-            mu, MaxIter = MaxIter1, serial = True)
-        log.result("residue (begin) = %20.12f", err_begin)
-        log.info("residue (end)   = %20.12f", err_end)
-    if MaxIter2 > 0:
-        log.info("Full lattice stage  max %d steps", MaxIter2)
-        vcor_new, _, err_end = FitVcorFull(GRho, lattice, basis, vcor_new, \
-                mu, MaxIter = MaxIter2)
+    err_begin = None
+    if kinetic:
+        log.check(MaxIter1 > 0, "Embedding fitting with kinetic energy minimization does not work!\n"
+                "Skipping Embedding fitting")
+        if MaxIter2 == 0:
+            log.warning("Setting MaxIter2 to 1")
+            MaxIter2 = 1
+
+        vcor_new, err_begin, err_end = FitVcorFullK(GRho, lattice, basis, vcor_new, \
+                    mu, MaxIter = MaxIter2)
+    else:
+        if MaxIter1 > 0:
+            log.info("Impurity model stage  max %d steps", MaxIter1)
+            vcor_new, err_begin1, err_end1 = FitVcorEmb(GRho, lattice, basis, vcor_new, \
+                    mu, MaxIter = MaxIter1, serial = True)
+            log.info("Embedding Stage:\nbegin %20.12f    end %20.12f" % (err_begin1, err_end1))
+        if MaxIter2 > 0:
+            log.info("Full lattice stage  max %d steps", MaxIter2)
+            vcor_new, err_begin2, err_end2 = FitVcorFull(GRho, lattice, basis, vcor_new, \
+                    mu, MaxIter = MaxIter2)
+            log.info("Full Lattice Stage:\nbegin %20.12f    end %20.12f" % (err_begin2, err_end2))
+        if MaxIter1 > 0:
+            err_begin = err_begin1
+        else:
+            err_begin = err_begin2
+        if MaxIter2 > 0:
+            err_end = err_end2
+        else:
+            err_end = err_end1
+
+    log.result("residue (begin) = %20.12f", err_begin)
     log.result("residue (end)   = %20.12f", err_end)
     return vcor_new, err_begin
 
