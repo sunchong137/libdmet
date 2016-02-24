@@ -79,8 +79,6 @@ def Square3BandSymm(cx, cy):
     sc = SuperCell(uc, np.asarray([1,1]))
     lat = Lattice(sc, np.asarray([cx, cy]))
     lat.neighborDist = [1., 2.**0.5, 2.]
-    for x in enumerate(zip(lat.names, lat.sites)):
-        print x
     return lat
 
 def HoneycombLattice(lx, ly, scx, scy):
