@@ -341,7 +341,7 @@ def split_localize(orbs, info, Ham, basis = None):
             localorbs[s, :, occ:norbs-virt] = \
                     np.dot(orbs[s,:,occ:norbs-virt], part_coefs)
             rotmat[s, occ:norbs-virt, occ:norbs-virt] = part_coefs
-    if basis is not None and 0:
+    if basis is not None:
         # match alpha, beta basis
         # localorbs contain v and u parts with respect to embedding quasiparticles
         localbasis = basisToSpin(np.tensordot(basisToCanonical(basis), \
