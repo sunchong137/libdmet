@@ -108,20 +108,54 @@ def HubbardDCA(lattice, U, tlist = [1.]):
 
     return HamNonInt(lattice, H1, H2)
 
-def Hubbard3band(lattice, Ud, Up, ed, tpd, tpp):
+def Hubbard3band(lattice, Ud, Up, ed, tpd, tpp, tpp1 = 0.):
     ncells = lattice.ncells
     nscsites = lattice.supercell.nsites
     H1 = np.zeros((ncells, nscsites, nscsites))
     H2 = np.zeros((nscsites,) * 4)
     d_pd = lattice.neighborDist[0]
     d_pp = lattice.neighborDist[1]
+    d_pp1 = lattice.neighborDist[2]
     log.warning("Searching neighbor within only one supercell")
+
+    def get_vec(s1, s2):
+        vec = (lattice.sites[s1] - lattice.sites[s2]) % np.diag(lattice.size)
+        for i in range(vec.shape[0]):
+            if vec[i] > lattice.size[i,i] / 2:
+                vec[i] -= lattice.size[i,i]
+        return vec
+
     pd_pairs = lattice.neighbor(dis = d_pd, sitesA = range(nscsites))
     for i, j in pd_pairs:
-        H1[j / nscsites, i, j % nscsites] = tpd
+        if lattice.names[i] == "Cu":
+            vec = get_vec(j, i)
+        else:
+            vec = get_vec(i, j)
+
+        if vec[0] == 1. or vec[1] == -1.:
+            sign = -1.
+        elif vec[1] == 1. or vec[0] == -1.:
+            sign = 1.
+        else:
+            log.error("invalid p-d neighbor")
+
+        H1[j / nscsites, i, j % nscsites] = sign * tpd
+
     pp_pairs = lattice.neighbor(dis = d_pp, sitesA = range(nscsites))
     for i, j in pp_pairs:
-        H1[j / nscsites, i, j % nscsites] = tpp
+        vec = get_vec(j, i)
+        if vec[0] * vec[1] > 0:
+            sign = 1.
+        else:
+            sign = -1.
+        H1[j / nscsites, i, j % nscsites] = sign * tpp
+
+    Osites = [idx for (idx, name) in \
+            zip(range(nscsites), lattice.names[:nscsites]) if name == "O"]
+    pp1_pairs = lattice.neighbor(dis = d_pp1, sitesA = Osites)
+    for i, j in pp1_pairs:
+        H1[j / nscsites, i, j % nscsites] = tpp1
+
     for i, orb in enumerate(lattice.supercell.names):
         if orb == "Cu":
             H1[0,i,i] = ed
