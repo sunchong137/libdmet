@@ -145,16 +145,16 @@ def Hubbard3band(lattice, Ud, Up, ed, tpd, tpp, tpp1 = 0.):
     for i, j in pp_pairs:
         vec = get_vec(j, i)
         if vec[0] * vec[1] > 0:
-            sign = 1.
-        else:
             sign = -1.
+        else:
+            sign = 1.
         H1[j / nscsites, i, j % nscsites] = sign * tpp
 
     Osites = [idx for (idx, name) in \
             zip(range(nscsites), lattice.names[:nscsites]) if name == "O"]
     pp1_pairs = lattice.neighbor(dis = d_pp1, sitesA = Osites)
     for i, j in pp1_pairs:
-        H1[j / nscsites, i, j % nscsites] = tpp1
+        H1[j / nscsites, i, j % nscsites] = -tpp1
 
     for i, orb in enumerate(lattice.supercell.names):
         if orb == "Cu":
