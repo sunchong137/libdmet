@@ -120,6 +120,18 @@ class MuSolver(object):
                 self.history.append(record)
                 return rhoEmb2, EnergyEmb2, ImpHam, delta1
 
+    def save(self, filename):
+        import pickle as p
+        log.info("saving chemical potential fitting history to %s", filename)
+        with open(filename, "w") as f:
+            p.dump(self.history, f)
+
+    def load(self, filename):
+        import pickle as p
+        log.info("loading chemical potential fitting history from %s", filename)
+        with open(filename, "r") as f:
+            self.history = p.load(f)
+
     def predict(self, nelec, target):
         # we assume the chemical potential landscape more or less the same for
         # previous fittings
