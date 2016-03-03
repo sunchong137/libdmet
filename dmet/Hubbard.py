@@ -58,39 +58,169 @@ def SolveImpHam_with_dmu(lattice, ImpHam, basis, dmu, solver, solver_args = {}):
     ImpHam = apply_dmu(lattice, ImpHam, basis, -dmu)
     return result
 
-def SolveImpHam_with_fitting(lattice, filling, ImpHam, basis, solver, \
-        solver_args = {}, delta = 0.02, thrnelec = 1e-5, step = 0.05):
-    solve_with_mu = lambda mu: SolveImpHam_with_dmu(lattice, ImpHam, basis, \
-            mu, solver, solver_args)
-    rhoEmb, EnergyEmb = solve_with_mu(0.)
-    nelec = transformResults(rhoEmb, None, basis, None, None)
-    log.result("nelec = %20.12f (target is %20.12f)", nelec, filling*2)
+# FIXME it is better to define this class in a file contained under the folder routine/
+class MuSolver(object):
+    def __init__(self, adaptive = True, trust_region = 2.5):
+        self.adaptive = adaptive
+        self.trust_region = trust_region
+        self.history = []
 
-    solver_args["similar"] = True
-    if abs(nelec/(filling*2) - 1.) < thrnelec:
-        log.info("chemical potential fitting unnecessary")
-        return rhoEmb, EnergyEmb, ImpHam, 0.
-    else:
-        delta *= -1. if (nelec > filling*2) else 1.
-        log.result("chemical potential fitting:\n" \
-                "finite difference dMu = %20.12f" % delta)
-        rhoEmb1, EnergyEmb1 = solve_with_mu(delta)
-        nelec1 = transformResults(rhoEmb1, None, basis, None, None)
-        log.result("nelec = %20.12f (target is %20.12f)", nelec1, filling*2)
-        if abs(nelec1/(filling*2) - 1.) < thrnelec:
-            ImpHam = apply_dmu(lattice, ImpHam, basis, delta)
-            return rhoEmb1, EnergyEmb1, ImpHam, delta
+    def __call__(self, lattice, filling, ImpHam, basis, solver, \
+            solver_args = {}, delta = 0.02, thrnelec = 1e-5, step = 0.05):
+        solve_with_mu = lambda mu: SolveImpHam_with_dmu(lattice, ImpHam, basis, \
+                mu, solver, solver_args)
+        rhoEmb, EnergyEmb = solve_with_mu(0.)
+        nelec = transformResults(rhoEmb, None, basis, None, None)
+        record = [(0., nelec)]
+        log.result("nelec = %20.12f (target is %20.12f)", nelec, filling*2)
+
+        solver_args["similar"] = True
+
+        if abs(nelec/(filling*2) - 1.) < thrnelec:
+            log.info("chemical potential fitting unnecessary")
+            self.history.append(record)
+            return rhoEmb, EnergyEmb, ImpHam, 0.
         else:
-            nprime = (nelec1 - nelec) / delta
-            delta1 = (filling*2 - nelec) / nprime
-            if abs(delta1) > step:
-                delta1 = copysign(step, delta1)
-            log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
-            log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
-            log.result("extrapolated to dMu = %20.12f", delta1)
-            rhoEmb2, EnergyEmb2 = solve_with_mu(delta1)
-            ImpHam = apply_dmu(lattice, ImpHam, basis, delta1)
-            return rhoEmb2, EnergyEmb2, ImpHam, delta1
+            if self.adaptive:
+                # predict delta using historic information
+                temp_delta = self.predict(nelec, filling*2)
+                if temp_delta is not None:
+                    delta = temp_delta
+                    step = abs(delta) * self.trust_region
+                else:
+                    delta = abs(delta) * (-1 if (nelec > filling*2) else 1)
+            else:
+                delta = abs(delta) * (-1 if (nelec > filling*2) else 1)
+
+            log.result("chemical potential fitting:\n" \
+                    "finite difference dMu = %20.12f" % delta)
+            rhoEmb1, EnergyEmb1 = solve_with_mu(delta)
+            nelec1 = transformResults(rhoEmb1, None, basis, None, None)
+            record.append((delta, nelec1))
+            log.result("nelec = %20.12f (target is %20.12f)", nelec1, filling*2)
+
+            if abs(nelec1/(filling*2) - 1.) < thrnelec:
+                ImpHam = apply_dmu(lattice, ImpHam, basis, delta)
+                self.history.append(record)
+                return rhoEmb1, EnergyEmb1, ImpHam, delta
+            else:
+                nprime = (nelec1 - nelec) / delta
+                delta1 = (filling*2 - nelec) / nprime
+                if abs(delta1) > step:
+                    delta1 = copysign(step, delta1)
+                log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
+                log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
+                log.result("extrapolated to dMu = %20.12f", delta1)
+                rhoEmb2, EnergyEmb2 = solve_with_mu(delta1)
+                nelec2 = transformResults(rhoEmb2, None, basis, None, None)
+                record.append((delta1, nelec2))
+                log.result("nelec = %20.12f (target is %20.12f)", nelec2, filling*2)
+
+                ImpHam = apply_dmu(lattice, ImpHam, basis, delta1)
+                self.history.append(record)
+                return rhoEmb2, EnergyEmb2, ImpHam, delta1
+
+    def predict(self, nelec, target):
+        # we assume the chemical potential landscape more or less the same for
+        # previous fittings
+        # the simplest thing to do is predicting a delta from each previous
+        # fitting, and compute a weighted average. The weight should prefer
+        # lattest runs, and prefer the fittigs that have has points close to
+        # current and target filling
+        from math import sqrt, exp
+        vals = []
+        weights = []
+
+        # hyperparameters
+        damp_factor = np.e
+        sigma2, sigma3 = 0.00025, 0.0005
+
+        for i, record in enumerate(self.history):
+            # exponential
+            weight = damp_factor ** (i + 1 - len(self.history))
+
+            if len(record) == 1:
+                val, weight = 0., 0.
+                continue
+
+            elif len(record) == 2:
+                # we fit a line
+                (mu1, n1), (mu2, n2) = record
+                slope = (n2 - n1) / (mu2 - mu1)
+                val = (target - nelec) / slope
+                # weight factor
+                metric = min(
+                        (target-n1)**2 + (nelec-n2)**2,
+                        (target-n2)**2 + (nelec-n1)**2)
+
+                # Gaussian weight
+                weight *= exp(- 0.5 * metric / sigma2)
+
+            else: # len(record) == 3
+                # we need to check data sanity: should be monotonic
+                (mu1, n1), (mu2, n2), (mu3, n3) = sorted(record)
+                if (not n1 < n2) or (not n2 < n3):
+                    val, weight = 0., 0.
+                    continue
+
+                # parabola between mu1 and mu3, linear outside the region
+                # with f' continuous
+                a, b, c = np.dot(la.inv(np.asarray([
+                    [mu1**2, mu1, 1],
+                    [mu2**2, mu2, 1],
+                    [mu3**2, mu3, 1]
+                ])), np.asarray([n1,n2,n3]).reshape(-1,1)).reshape(-1)
+
+                # if the parabola is not monotonic, use linear interpolation instead
+                if mu1 < -0.5*b/a < mu3:
+                    def find_mu(n):
+                        if n < n2:
+                            slope = (n2-n1) / (mu2-mu1)
+                        else:
+                            slope = (n2-n3) / (mu2-mu3)
+                        return mu2 + (n-n2) / slope
+
+                else:
+                    def find_mu(n):
+                        if n < n1:
+                            slope = 2 * a * mu1 + b
+                            return mu1 + (n-n1) / slope
+                        elif n > n3:
+                            slope = 2 * a * mu3 + b
+                            return mu3 + (n-n3) / slope
+                        else:
+                            return 0.5 * (-b + sqrt(b**2 - 4 * a * (c-n))) / a
+
+                val = find_mu(target) - find_mu(nelec)
+                # weight factor
+                metric = min(
+                        (target-n1)**2 + (nelec-n2)**2,
+                        (target-n1)**2 + (nelec-n3)**2,
+                        (target-n2)**2 + (nelec-n1)**2,
+                        (target-n2)**2 + (nelec-n3)**2,
+                        (target-n3)**2 + (nelec-n1)**2,
+                        (target-n3)**2 + (nelec-n2)**2,
+                )
+                weight *= exp(-0.5 * metric / sigma3)
+
+            vals.append(val)
+            weights.append(weight)
+
+        log.debug(1, "dmu predictions:\n    value      weight")
+        for v, w in zip(vals, weights):
+            log.debug(1, "%10.6f %10.6f" % (v, w))
+
+        if np.sum(weights) > 1e-3:
+            dmu = np.dot(vals, weights) / np.sum(weights)
+            if abs(dmu) > 0.5:
+                dmu = copysign(0.5, dmu)
+            log.info("adaptive chemical potential fitting, dmu = %20.12f", dmu)
+            return dmu
+        else:
+            log.info("adaptive chemical potential fitting not used")
+            return None
+
+SolveImpHam_with_fitting = MuSolver(adaptive = True)
 
 def AFInitGuess(ImpSize, U, Filling, polar = None, bogoliubov = False, rand = 0.):
     subA, subB = BipartiteSquare(ImpSize)
