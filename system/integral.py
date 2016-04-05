@@ -1,5 +1,4 @@
 import libdmet.utils.logger as log
-import h5py
 import numpy as np
 import itertools as it
 import os
@@ -268,6 +267,7 @@ def dumpHDF5(filename, integral):
 
 
 def readHDF5(filename, norb, restricted, bogoliubov):
+    import h5py
     log.eassert(h5py.is_hdf5(filename), "File %s is not hdf5 file", filename)
     f = h5py.File(filename)
     log.eassert(f["restricted"] == restricted, "spin restriction is not consistent")
