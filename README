@@ -1,7 +1,15 @@
-Dependencies:
+## Dependencies
 
-pyscf   https://github.com/sunqm/pyscf
-pathos  https://github.com/uqfoundation/pathos (optional for multithreading)
-StackBlock   https://github.com/zhengbx/StackBlock  (optional, to use
-StackBlock as impurity solver, install from GitHub and create a symbolic
-link to the StackBlock path in the libdmet folder.)
+All dependencies are optional
+
+- pyscf (https://github.com/sunqm/pyscf): provides routines to run quantum 
+chemistry impurity solvers. If you need to use CASCI, CASSCF, DMRGCI or 
+DMRGSCF, please install pyscf
+
+- pathos (https://github.com/uqfoundation/pathos): provides multithreading 
+for various python matrix operations
+
+- StackBlock (https://github.com/zhengbx/StackBlock): an faster alternative 
+to the default Block DMRG solver. To use StackBlock as impurity solver, 
+install from GitHub and create a symbolic link to the StackBlock path in the 
+libdmet folder.
