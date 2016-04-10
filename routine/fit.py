@@ -77,14 +77,11 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, callback = None, **kwargs):
             break
         dx = GetDir(y, g)
 
-        LineSearchFn = lambda step: fn(x - step * dx)
-
-        def LineSearchFn(step):
-            if callback is None:
-                return fn(x - step * dx)
-            else:
-                ref = callback(x)
-                return fn(x - step * dx, ref)
+        if callback is None:
+            LineSearchFn = lambda step: fn(x - step * dx)
+        else:
+            ref_ = callback(x)
+            LineSearchFn = lambda step: fn(x - step * dx, ref_)
 
         def FindStep():
             scale = abs(np.average(steps[-2:]))
