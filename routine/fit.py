@@ -5,7 +5,7 @@ from scipy.optimize import fmin
 from scipy.linalg import lstsq
 
 
-def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
+def minimize(fn, x0, MaxIter = 300, fgrad = None, callback = None, **kwargs):
     nx = x0.shape[0]
     if "serial" in kwargs.keys() and kwargs["serial"]:
         multi = False
@@ -25,12 +25,19 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
                 " to load multiprocessing module, using single core")
 
     def grad(x):
+        if not callback is None:
+            ref = callback(x)
+            fn1 = lambda x1: fn(x1, ref = ref)
+        else:
+            fn1 = fn
+
         g = np.zeros_like(x)
         step = 1e-5
         def gix(ix):
+            #log.debug(1, "Gradient: %d of %d", ix, x.shape[0])
             dx = np.zeros_like(x)
             dx[ix] = step
-            return (0.5/step) * (fn(x+dx) - fn(x-dx))
+            return (0.5/step) * (fn1(x+dx) - fn1(x-dx))
         if multi:
             g = np.asarray(p.map(gix, range(nx)))
         else:
@@ -71,6 +78,13 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
         dx = GetDir(y, g)
 
         LineSearchFn = lambda step: fn(x - step * dx)
+
+        def LineSearchFn(step):
+            if callback is None:
+                return fn(x - step * dx)
+            else:
+                ref = callback(x)
+                return fn(x - step * dx, ref)
 
         def FindStep():
             scale = abs(np.average(steps[-2:]))
@@ -123,8 +137,7 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
 
         x -= dx
         y = y_new
-        if hasattr(fn, "callback"):
-            fn.callback(x)
+
         log.debug(1, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
 
     return x, y

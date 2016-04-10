@@ -323,30 +323,28 @@ def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
     nbasis = basis.shape[-1]
     verbose = log.verbose
 
-    class err(object):
-        def __init__(self):
-            pass
+    def callback(param):
+        vcor.update(param)
+        log.verbose = "RESULT"
+        GRhoTRef, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
+        log.verbose = verbose
+        GRho1Ref = foldRho(GRhoTRef, lattice, basis, thr = 1e-8)
+        return {"GRhoTRef": GRhoTRef, "GRho1Ref": GRho1Ref}
 
-        def callback(self, param):
-            vcor.update(param)
-            log.verbose = "RESULT"
-            self.GRhoTRef, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
-            log.verbose = verbose
-            self.GRho1Ref = foldRho(self.GRhoTRef, lattice, basis, thr = 1e-8)
+    def errfunc(param, ref = None):
+        vcor.update(param)
+        log.verbose = "RESULT"
+        GRhoT, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
+        log.verbose = verbose
+        if ref is None:
+            GRho1 = foldRho(GRhoT, lattice, basis, thr = 1e-8)
+        else:
+            GRho1 = foldRho(GRhoT - ref["GRhoTRef"], lattice, basis, thr = 1e-8) \
+                    + ref["GRho1Ref"]
+        return la.norm(GRho - GRho1) / sqrt(2.)
 
-        def __call__(self, param):
-            vcor.update(param)
-            log.verbose = "RESULT"
-            GRhoT, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
-            log.verbose = verbose
-            GRho1 = foldRho(GRhoT - self.GRhoTRef, lattice, basis, thr = 1e-8) \
-                    + self.GRho1Ref
-            return la.norm(GRho - GRho1) / sqrt(2.)
-
-    errfunc = err()
-    errfunc.callback(vcor.param)
     err_begin = errfunc(vcor.param)
-    param, err_end = minimize(errfunc, vcor.param, MaxIter, **kwargs)
+    param, err_end = minimize(errfunc, vcor.param, MaxIter, callback = callback, **kwargs)
     vcor.update(param)
     return vcor, err_begin, err_end
 
