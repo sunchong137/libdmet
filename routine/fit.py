@@ -123,6 +123,8 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, **kwargs):
 
         x -= dx
         y = y_new
+        if hasattr(fn, "callback"):
+            fn.callback(x)
         log.debug(1, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
 
     return x, y

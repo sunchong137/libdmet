@@ -224,7 +224,7 @@ def foldRho(GRho, Lat, basis, thr = 1e-7):
     mask_basis = set(find(True, map(lambda a: la.norm(a) > thr, basisCanonical)))
     mask_GRho = set(find(True, map(lambda a: la.norm(a) > thr, GRho)))
     if len(mask_GRho) < len(mask_basis):
-        for i, Hidx in enumerate(mask_GRho):
+        for Hidx in mask_GRho:
             for i in mask_basis:
                 j = Lat.add(i, Hidx)
                 if j in mask_basis:
@@ -321,16 +321,30 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
 
 def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
     nbasis = basis.shape[-1]
+    verbose = log.verbose
 
-    def errfunc(param):
-        vcor.update(param)
-        verbose = log.verbose
-        log.verbose = "RESULT"
-        GRhoT, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
-        log.verbose = verbose
-        GRho1 = foldRho(GRhoT, lattice, basis)
-        return la.norm(GRho - GRho1) / sqrt(2.)
+    class err(object):
+        def __init__(self):
+            pass
 
+        def callback(self, param):
+            vcor.update(param)
+            log.verbose = "RESULT"
+            self.GRhoTRef, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
+            log.verbose = verbose
+            self.GRho1Ref = foldRho(self.GRhoTRef, lattice, basis, thr = 1e-8)
+
+        def __call__(self, param):
+            vcor.update(param)
+            log.verbose = "RESULT"
+            GRhoT, _, _ = HFB(lattice, vcor, False, mu = mu, beta = np.inf)
+            log.verbose = verbose
+            GRho1 = foldRho(GRhoT - self.GRhoTRef, lattice, basis, thr = 1e-8) \
+                    + self.GRho1Ref
+            return la.norm(GRho - GRho1) / sqrt(2.)
+
+    errfunc = err()
+    errfunc.callback(vcor.param)
     err_begin = errfunc(vcor.param)
     param, err_end = minimize(errfunc, vcor.param, MaxIter, **kwargs)
     vcor.update(param)
