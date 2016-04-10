@@ -212,9 +212,9 @@ def contract_pdm_term(ops, indices, cidx, aidx):
             [i for i in indices if i in core_idx], cidx)
     apart = contract_pdm_active(active, \
             [i for i in indices if i in active_idx], aidx)
-    if cpart is None and not apart is None:
+    if cpart is None and apart is not None:
         return apart[0]
-    elif apart is None and not cpart is None:
+    elif apart is None and cpart is not None:
         return cpart[0]
     else:
         expr = 'np.einsum("%s,%s->%s", @01, @02)' % \

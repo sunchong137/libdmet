@@ -25,7 +25,7 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, callback = None, **kwargs):
                 " to load multiprocessing module, using single core")
 
     def grad(x):
-        if not callback is None:
+        if callback is not None:
             ref = callback(x)
             fn1 = lambda x1: fn(x1, ref = ref)
         else:
