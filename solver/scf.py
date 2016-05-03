@@ -138,6 +138,26 @@ def _get_veff_bcs(rhoA, rhoB, kappaBA, eri):
     vd = vl10
     return va, vb, vd
 
+def _get_veff_bcs_full(rhoA, rhoB, kappaBA, eri, eri2, eri4):
+    eriA, eriB, eriAB = eri
+    eri2A, eri2B = eri2
+    eri4AB = eri4[0]
+    vj00 = np.tensordot(rhoA, eriA, ((0,1), (0,1)))
+    vj11 = np.tensordot(rhoB, eriB, ((0,1), (0,1)))
+    vj10 = np.tensordot(rhoA, eriAB, ((0,1), (0,1)))
+    vj01 = np.tensordot(eriAB, rhoB, ((2,3), (0,1)))
+    vk00 = np.tensordot(rhoA, eriA, ((0,1), (0,3)))
+    vk11 = np.tensordot(rhoB, eriB, ((0,1), (0,3)))
+    vl10 = np.tensordot(kappaBA, eriAB, ((1,0), (0,2)))
+    vy00 = -np.tensordot(kappaBA, eri2A, ((1,0), (0,2)))
+    vy11 = np.tensordot(kappaBA, eri2B, ((0,1), (0,2)))
+    vy10 = np.tensordot(rhoA, eri2A, ((0,1), (0,3))).T - np.tensordot(rhoB, eri2B, ((0,1), (0,3)))
+    vx10 = np.tensordot(kappaBA, eri4AB, ((1,0), (0,2))).T
+    va = vj00 + vj01 - vk00 + vy00 + vy00.T
+    vb = vj11 + vj10 - vk11 + vy11 + vy11.T
+    vd = vl10 + vy10 - vx10
+    return va, vb, vd
+
 def _get_veff_bcs_save_mem(rhoA, rhoB, kappaBA, _eri):
     eri = _eri[0]
     nImp = eri.shape[0]
