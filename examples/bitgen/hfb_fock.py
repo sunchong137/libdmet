@@ -90,14 +90,14 @@ for (factor, opstring) in energy:
     elif opstring[1].name == "rho_B":
         FB += d1opstring
     elif opstring[1].name == "kappa_BA":
-        FD += 0.5*d1opstring
+        FD += 0.5*d1opstring.replace_indices(('k', 'l'), ('l','k'))
  
     if opstring[2].name == "rho_A":
         FA += d2opstring
     elif opstring[2].name == "rho_B":
         FB += d2opstring
     elif opstring[2].name == "kappa_BA":
-        FD += 0.5*d2opstring
+        FD += 0.5*d2opstring.replace_indices(('k', 'l'), ('l','k'))
 
 log.result("Fock (alpha)\n%s\n", merge_terms(FA))
 log.result("Fock (beta)\n%s\n", merge_terms(FB))
