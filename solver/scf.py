@@ -279,6 +279,7 @@ def newton(mf):
             self.ah_start_cycle = 6
             self.ah_level_shift = 0.
             self.max_cycle_inner = 15
+            self.canonicalization = False
 
             self.ah_conv_tol = 1e-12
             self.ah_lindep = 1e-14
@@ -347,7 +348,7 @@ def newton(mf):
             dr = dr - dr.T
             return np.dot(u0, scipy.linalg.expm(dr))
 
-        def update_mo_coeff(self, mo_coeff, u):
+        def rotate_mo(self, mo_coeff, u, log = None):
             return np.dot(mo_coeff, u)
 
         def get_mo_energy(self, fock, s1e, dm):
