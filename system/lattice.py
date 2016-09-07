@@ -49,7 +49,7 @@ def Square3Band(lx, ly, scx, scy):
     lat.neighborDist = [1., 2.**0.5, 2.]
     return lat
 
-def Square3BandSymm(cx, cy):
+def Square3BandSymm(lx, ly, scx = 1, scy = 1):
     # 2x2 symmetric supercells
     #        |
     #        O
@@ -76,8 +76,8 @@ def Square3BandSymm(cx, cy):
       (np.array([3, 0]), "O"),
       (np.array([2, 1]), "O"),
     ])
-    sc = SuperCell(uc, np.asarray([1,1]))
-    lat = Lattice(sc, np.asarray([cx, cy]))
+    sc = SuperCell(uc, np.asarray([scx, scy]))
+    lat = Lattice(sc, np.asarray([lx, ly]))
     lat.neighborDist = [1., 2.**0.5, 2.]
     return lat
 

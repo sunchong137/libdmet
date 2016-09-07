@@ -121,6 +121,7 @@ class AFQMC(object):
     def __init__(self, nproc, nnode = 1, TmpDir = "/tmp"):
         AFQMC.nproc = nproc
         AFQMC.nnode = nnode
+        sub.check_call(["mkdir", "-p", TmpDir])
         self.tmpDir = mkdtemp(prefix = "AFQMC", dir = TmpDir)
         log.info("AFQMC working dir %s", self.tmpDir)
         log.info("running with %d nodes, %d processors per node", \
