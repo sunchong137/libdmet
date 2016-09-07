@@ -27,7 +27,7 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.StackBlock(nproc = 2, nthread = 2, nnode = 1, \
+solver = dmet.impurity_solver.Block(nproc = 2, nnode = 1, \
         bcs = True, reorder = True, tol = 1e-7, maxM = M)
 
 log.section("\nfitting chemical potential\n")

@@ -36,7 +36,15 @@ class BaseTensor(object):
             tensor1.set_idx(idx)
             equivs.append(tensor1)
         return equivs
-            
+
+    def opposite(self):
+        oppos = []
+        for idx in self.symm.antisymm(self.idx):
+            tensor1 = deepcopy(self)
+            tensor1.set_idx(idx)
+            equivs.append(tensor1)
+        return equivs
+
 
 class Fermion(BaseTensor):
     # a single fermion creation / destruction operator
