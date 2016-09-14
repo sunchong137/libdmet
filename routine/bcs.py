@@ -64,7 +64,7 @@ def __embBasis_proj(lattice, GRho, **kwargs):
         #B = np.swapaxes(B, 1, 2)
         #B = orthonormalizeBasis(B)
         GRhoImpEnv = np.transpose(GRho[1:], (1, 0, 2)).reshape(nscsites*2, nscsites*(ncells-1)*2)
-        _, _, vt = la.svd(GRhoImpEnv, full_matrices = False)
+        _, s, vt = la.svd(GRhoImpEnv, full_matrices = False)
         log.debug(1, "bath orbitals\n%s", vt)
         B = np.transpose(vt.reshape((nscsites*2, ncells-1, nscsites*2)), (1, 2, 0))
         basis[0, 0, :nscsites, :nscsites] = np.eye(nscsites)
@@ -81,6 +81,7 @@ def __embBasis_proj(lattice, GRho, **kwargs):
         basis[0, 1:, :, nscsites:] = B[:,:,orderA]
         basis[1, 1:, :nscsites, nscsites:], basis[1, 1:, nscsites:, nscsites:] = \
                 B[:, nscsites:, orderB], B[:, :nscsites, orderB]
+        log.info("Bath coupling strength\n%s\n%s", s[orderA], s[orderB])
     return basis
 
 def __embBasis_phsymm(lattice, GRho, **kwargs):

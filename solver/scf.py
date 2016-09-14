@@ -117,8 +117,8 @@ class UIHF(UHF):
 
 def _UHFB_get_grad(mo_coeff, mo_occ, fock_ao):
     '''RHF Gradients'''
-    occidx = np.where(mo_occ> 0)[0]
-    viridx = np.where(mo_occ==0)[0]
+    occidx = np.where(mo_occ > 0)[0]
+    viridx = np.where(mo_occ == 0)[0]
 
     fock = reduce(np.dot, (mo_coeff.T.conj(), fock_ao, mo_coeff))
     g = fock[viridx[:,None],occidx]
@@ -247,6 +247,30 @@ class UHFB(hf.RHF):
         return self.get_fock_(h1e, s1e, vhf, dm*2., cycle, adiis, \
                 diis_start_cycle, level_shift_factor, damp_factor)
 
+    def get_fock_(self, h1e, s1e, vhf, dm, cycle=-1, adiis=None,
+                  diis_start_cycle=None, level_shift_factor=None,
+                  damp_factor=None):
+        return h1e + vhf
+
+    def canonicalize(mf, mo_coeff, mo_occ, fock = None):
+        if fock is None:
+            dm = mf.make_rdm1(mo_coeff, mo_occ)
+            fock = mf.get_hcore() + mf.get_veff(mol, dm)
+        coreidx = mo_occ == 1
+        viridx = mo_occ == 0
+        mo = np.empty_like(mo_coeff)
+        mo_e = np.empty(mo_occ.size)
+        for idx in (coreidx, viridx):
+            if np.count_nonzero(idx) > 0:
+                orb = mo_coeff[:, idx]
+                f1 = np.dot(orb.T.conj(), np.dot(fock, orb))
+                e, c = la.eigh(f1)
+                mo[:, idx] = np.dot(mo_coeff[:, idx], c)
+                mo_e[idx] = e
+        order = np.argsort(mo_e)
+        mo_e = mo_e[order]
+        mo = mo[:, order]
+        return mo_e, mo
 
 # Newton Raphson method for unrestricted Hartre-Fock Bogoliubov
 
@@ -299,7 +323,7 @@ def newton(mf):
             self.ah_start_cycle = 6
             self.ah_level_shift = 0.
             self.max_cycle_inner = 15
-            self.canonicalization = False
+            self.canonicalization = True
 
             self.ah_conv_tol = 1e-12
             self.ah_lindep = 1e-14
@@ -338,11 +362,6 @@ def newton(mf):
             pyscflogger.info(self, 'augmented hessian decay rate = %g', self.ah_decay_rate)
             pyscflogger.info(self, 'max_memory %d MB (current use %d MB)',
                      self.max_memory, pyscf.lib.current_memory()[0])
-
-        def get_fock_(self, h1e, s1e, vhf, dm, cycle=-1, adiis=None,
-                      diis_start_cycle=None, level_shift_factor=None,
-                      damp_factor=None):
-            return h1e + vhf
 
         def from_dm(self, dm):
             '''Transform density matrix to the initial guess'''
@@ -565,7 +584,6 @@ class SCF(object):
                 self.mf.mo_coeff = mo_coeff
                 self.mf.mo_occ = mo_occ
                 self.mf.converged = conv
-
             else:
                 if InitGuess is not None:
                     E = self.mf.scf(InitGuess)
@@ -616,7 +634,8 @@ class SCF(object):
                     # get orbitals for initial guess, and round out fractions in occupation number
                     mo_occ, mo_coeff = la.eigh(InitGuess)
                     nmo = mo_occ.shape[0]/2
-                    mo_occ[:nmo], mo_occ[nmo:] = 0, 1
+                    mo_occ[:nmo], mo_occ[nmo:] = 1, 0
+                    mo_coeff = mo_coeff[:, ::-1]
 
                     newtonUHFB = newton(self.mf)
                     newtonUHFB.dump_flags()
@@ -639,7 +658,6 @@ class SCF(object):
                 self.mf.mo_coeff = mo_coeff
                 self.mf.mo_occ = mo_occ
                 self.mf.converged = conv
-
             else:
                 if InitGuess is not None:
                     E = self.mf.scf(InitGuess)
