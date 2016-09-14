@@ -7,7 +7,7 @@ import numpy.linalg as la
 from libdmet.solver import block, scf
 from libdmet.system import integral
 import libdmet.utils.logger as log
-from libdmet.utils.misc import mdot
+from libdmet.utils.misc import mdot, grep
 from libdmet.routine.localizer import Localizer
 from libdmet.utils.munkres import Munkres, make_cost_matrix
 
@@ -269,11 +269,14 @@ def gaopt(Ham, tmp = "/tmp"):
             sub.check_call(["mpirun", "-np", "%d" % nproc, \
                     executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
                     "-integral", os.path.join(wd, "Kmat")], stdout = f)
-
-    with open(os.path.join(wd, "output"), "r") as f:
-        result = f.readlines()[-1]
-        log.debug(1, "gaopt result: %s", result)
-        reorder = map(lambda i: int(i)-1, result.split(','))
+    
+    result = grep("DMRG REORDER FORMAT", os.path.join(wd, "output"), A = 1).split("\n")[1]
+    log.debug(1, "gaopt result: %s", result)
+    reorder = map(lambda i: int(i)-1, result.split(','))
+    #with open(os.path.join(wd, "output"), "r") as f:
+    #    result = f.readlines()[-1]
+    #    log.debug(1, "gaopt result: %s", result)
+    #    reorder = map(lambda i: int(i)-1, result.split(','))
 
     sub.check_call(["rm", "-rf", wd])
 
