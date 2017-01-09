@@ -128,7 +128,7 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, callback = None, **kwargs):
         steps.append(step)
         dx *= step
         y_new = fn(x - dx)
-
+ 
         if y_new > y * 1.5 or abs(y - y_new) < 1e-7 or la.norm(dx) < 1e-6:
             break
 
@@ -138,3 +138,8 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, callback = None, **kwargs):
         log.debug(1, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
 
     return x, y
+
+if __name__ == "__main__":
+    log.verbose = "DEBUG1"
+    x, y = minimize(lambda x: x[0]**2 + x[1]**4 + 2*x[1]**2 + 2*x[0] + 2., np.asarray([10., 20.]), MaxIter = 300)
+    log.result("x = %s\ny=%20.12f", x, y)
