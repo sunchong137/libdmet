@@ -103,6 +103,10 @@ def mono_fit(fn, y0, x0, thr, increase = True):
 
     while sec_x[1] - sec_x[0] > 0.1 * thr:
         f = (y0-sec_y[0]) / (sec_y[1] - sec_y[0])
+        if f < 0.2:
+            f = 0.2
+        elif f > 0.8:
+            f = 0.8
         x1 = sec_x[0] * (1.-f) + sec_x[1] * f
         y1 = evaluate(x1)
         if abs(y1 - y0) < thr:
