@@ -93,7 +93,6 @@ def HF(lattice, vcor, occ, restricted, mu0 = 0., beta = np.inf, ires = False):
         log.info("unrestricted Hartree-Fock")
         ew, ev = DiagUHF(Fock, vcor)
     nelec = ew.size * occ # rhf: per spin  uhf: total nelec
-
     ew_sorted = np.sort(np.ravel(ew))
     ewocc, mu, nerr = assignocc(ew, nelec, beta, mu0)
     rho = np.empty_like(ev)
@@ -167,6 +166,8 @@ def HFB(lattice, vcor, restricted, mu = 0., beta = np.inf, ires = False):
         vcorT = np.asarray(map(lambda i: vcor.get(i, kspace = False), range(lattice.ncells)))
 
     rhoTA, rhoTB, kappaTBA = np.swapaxes(np.asarray(map(extractRdm, GRhoT)), 0, 1)
+    for c in range(1, rhoTB.shape[0]):
+        rhoTB[c] -= np.eye(rhoTB.shape[1])
 
     n = np.trace(rhoTA[0]) + np.trace(rhoTB[0])
     E = 0.5 * np.sum((FockT+H1T) * (rhoTA + rhoTB))
