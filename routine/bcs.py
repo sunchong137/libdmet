@@ -246,6 +246,7 @@ def addDiag(v, scalar):
     return v
 
 def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
+    param_begin = vcor.param.copy()
     nscsites = lattice.supercell.nsites
     nbasis = basis.shape[-1]
     (embHA, embHB), embD, _ = transform_trans_inv_sparse(basis, lattice, \
@@ -317,7 +318,45 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
 
     err_begin = errfunc(vcor.param)
     log.info("Using analytic gradient")
-    param, err_end = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
+    param, err_end, converge_pattern = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
+    
+    # ZHC NOTE
+    gnorm_res = la.norm(gradfunc(param))
+    print "Minimizer converge pattern: %d "%converge_pattern
+    print "Current function value: %15.8f"%err_end
+    print "Norm of gradients: %15.8f"%gnorm_res
+    print "Norm diff of x: %15.8f"%(la.norm(param- param_begin))
+    
+    CG_check = False
+
+    if CG_check and (converge_pattern == 0 or gnorm_res > 1.0e-4):
+        
+        print "Not converge in Bo-Xiao's minimizer, try mixed solver in scipy..."
+
+        param_new = param.copy()
+        gtol = 5.0e-5
+
+        from scipy import optimize as opt
+        min_result = opt.minimize(errfunc, param_new, method = 'CG', jac = gradfunc ,\
+                options={'maxiter': 10 * len(param_new), 'disp': True, 'gtol': gtol})
+        param_new_2 = min_result.x
+    
+        print "CG Final Diff: ", min_result.fun, "Converged: ",min_result.status,\
+                " Jacobian: ", la.norm(min_result.jac)      
+        if(not min_result.success):
+            print "WARNING: Minimization unsuccessful. Message: ",min_result.message
+    
+        gnorm_new = la.norm(min_result.jac)
+        if (gnorm_new < gnorm_res) and (min_result.fun < err_end) and (np.max(np.abs(param_new_2 - param_new)) < 0.5):
+            print "CG result used"
+            vcor.param = param_new_2
+            err_end = min_result.fun
+        else:
+            print "BX result used"
+    else:
+        print "BX result used"
+
+
     return vcor, err_begin, err_end
 
 def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
@@ -345,7 +384,7 @@ def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
         return la.norm(GRho - GRho1) / sqrt(2.)
 
     err_begin = errfunc(vcor.param)
-    param, err_end = minimize(errfunc, vcor.param, MaxIter, callback = callback, **kwargs)
+    param, err_end, converge_pattern = minimize(errfunc, vcor.param, MaxIter, callback = callback, **kwargs)
     vcor.update(param)
     return vcor, err_begin, err_end
 
@@ -439,6 +478,7 @@ def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0,
             err_end = err_end2
         else:
             err_end = err_end1
+
 
     log.result("residue (begin) = %20.12f", err_begin)
     log.result("residue (end)   = %20.12f", err_end)

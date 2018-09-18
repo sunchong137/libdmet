@@ -253,16 +253,27 @@ def gaopt(Ham, tmp = "/tmp"):
         f.write("scale 1.0\n")
         f.write("method gauss\n")
 
-    executable = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
-            "../block/genetic/gaopt"))
+    #executable = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
+    #        "../block/genetic/gaopt"))
+    executable = "/home/zhcui/program/libdmet_ZHC/stackblock_bx/genetic/gaopt"
     log.debug(0, "gaopt executable: %s", executable)
 
     log.debug(0, "call gaopt")
     with open(os.path.join(wd, "output"), "w") as f:
-        if block.Block.env_slurm:
-            sub.check_call(" ".join(["srun", \
+        #if block.Block.env_slurm:
+        if 1:
+            print " ".join([ "srun", executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
+                 "-integral", os.path.join(wd, "Kmat")])
+            #sub.check_call(" ".join(["srun", \
+            #        executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
+            #        "-integral", os.path.join(wd, "Kmat")]), stdout = f, shell = True)
+            sub.check_call(" ".join([ "srun", \
                     executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
                     "-integral", os.path.join(wd, "Kmat")]), stdout = f, shell = True)
+            #print " ".join([ executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
+            #     "-integral", os.path.join(wd, "Kmat")])
+            #sub.check_call(" ".join([ executable, "-s", "-config", os.path.join(wd, "ga.conf"), \
+            #        "-integral", os.path.join(wd, "Kmat")]), stdout = f, shell = True)
         else:
             nproc = max(block.Block.nproc * block.Block.nnode, block.StackBlock.nproc \
                     * block.StackBlock.nthread * block.StackBlock.nnode)
@@ -316,7 +327,7 @@ def reorder(order, Ham, orbs, rot = None):
 
 class DmrgCI(object):
     def __init__(self, ncas, nelecas, MP2natorb = False, spinAverage = False, \
-            splitloc = True, cisolver = None, mom_reorder = True, tmpDir = "/tmp"):
+            splitloc = True, cisolver = None, mom_reorder = True, tmpDir = "./tmp"):
         log.eassert(ncas * 2 >= nelecas, \
                 "CAS size not compatible with number of electrons")
         self.ncas = ncas

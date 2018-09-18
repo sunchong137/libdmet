@@ -30,6 +30,32 @@ def HartreeFockBogoliubov(Lat, v, filling, mu0, thrnelec = 1e-6):
     # present results
     return rho, mu
 
+def HartreeFockBogoliubov_full(Lat, v, filling, mu0, thrnelec = 1e-6):
+    # fit chemical potential
+    if filling is None:
+        mu = mu0
+    else:
+        # fit mu to get correct filling
+        log.info("chemical potential fitting, target = %20.12f", filling)
+        log.info("before fitting, mu = %20.12f", mu0)
+        fn = lambda mu: HFB(Lat, v, False, mu = mu, beta = np.inf, \
+                ires = False)[1] / 2. / Lat.supercell.nsites
+        mu = mono_fit(fn, filling, mu0, thrnelec, increase = True)
+        log.info("after fitting, mu = %20.12f", mu)
+    rho, n, E, res = HFB(Lat, v, False, mu = mu, beta = np.inf, \
+            ires = True)
+    rhoA, rhoB, kappaBA = extractRdm(rho[0])
+    if filling is None:
+        log.result("Local density matrix (mean-field): alpha, beta and pairing"
+                "\n%s\n%s\n%s", rhoA, rhoB, kappaBA.T)
+        nscsites = Lat.supercell.nsites
+        log.result("nelec per site (mean-field) = %20.12f", n/nscsites)
+        log.result("Energy per site (mean-field) = %20.12f", E/nscsites)
+        log.result("Gap (mean-field) = %20.12f" % res["gap"])
+
+    # present results
+    return rho, mu, res
+
 def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
     nscsites = basis.shape[-2] / 2
     GRhoImp, Efrag, nelec = bcs.transformResults(GRhoEmb, E, lattice, \
@@ -55,6 +81,11 @@ Hubbard.transformResults = lambda GRhoEmb, E, basis, ImpHam, H_energy: \
 def ConstructImpHam(Lat, GRho, v, mu, matching = True, local = True, **kwargs):
     log.result("Making embedding basis")
     basis = bcs.embBasis(Lat, GRho, local = local, **kwargs)
+    #print "local"
+    #print local
+    #print "matching"
+    #print matching
+    #exit()
     if matching:
         log.result("Rotate bath orbitals to match alpha and beta basis")
         nbasis = basis.shape[-1]

@@ -301,5 +301,13 @@ class IterHistory(object):
         for idx, item in enumerate(self.history):
             log.result(" %3d %20.12f %20.12f %20.12f %20.12f  %2d %2d", idx, *item)
         log.result("")
+    def write_table(self):
+        #import os
+        #if not os.path.exists('./table.txt'):
+        f_table = open('./table.txt', 'w')
+        f_table.write("  Iter         Energy               RdmErr               Nelec                 dVcor      DIIS \n")
+        for idx, item in enumerate(self.history):
+            f_table.write(" %3d %20.12f %20.12f %20.12f %20.12f  %2d %2d \n"%((idx,) + tuple(item)))
+        f_table.close()
 
 foldRho = slater.foldRho

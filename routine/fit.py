@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 import numpy as np
 import numpy.linalg as la
 import libdmet.utils.logger as log
@@ -62,18 +63,22 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, callback = None, **kwargs):
 
     x = x0
 
-    log.debug(1, "  Iter           Value               Grad                 Step\n"
+    log.debug(0, "  Iter           Value               Grad                 Step\n"
         "---------------------------------------------------------------------")
 
     y = fn(x)
 
     steps = [1.]
+    
+    converge_pattern = 0
 
     for iter in range(MaxIter):
         if (y < 1e-6 and iter != 0):
+            converge_pattern = 1
             break
         g = fgrad(x)
         if la.norm(g) < 1e-5:
+            converge_pattern = 2
             break
         dx = GetDir(y, g)
 
@@ -130,16 +135,19 @@ def minimize(fn, x0, MaxIter = 300, fgrad = None, callback = None, **kwargs):
         y_new = fn(x - dx)
  
         if y_new > y * 1.5 or abs(y - y_new) < 1e-7 or la.norm(dx) < 1e-6:
+            converge_pattern = 3
             break
 
         x -= dx
         y = y_new
 
-        log.debug(1, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
+        log.debug(0, "%4d %20.12f %20.12f %20.12f", iter, y, la.norm(g), la.norm(dx))
 
-    return x, y
+    return x, y, converge_pattern
 
 if __name__ == "__main__":
     log.verbose = "DEBUG1"
-    x, y = minimize(lambda x: x[0]**2 + x[1]**4 + 2*x[1]**2 + 2*x[0] + 2., np.asarray([10., 20.]), MaxIter = 300)
+    x0 = np.asarray([10., 20.])
+    x, y, converge_pattern = minimize(lambda x: x[0]**2 + x[1]**4 + 2*x[1]**2 + 2*x[0] + 2., x0, MaxIter = 300)
     log.result("x = %s\ny=%20.12f", x, y)
+    print "x0", x0

@@ -481,7 +481,7 @@ class UMP2(MP2):
 # main class for uihf, uhfb and ump2
 
 class SCF(object):
-    def __init__(self, tmp = "/tmp", newton_ah = True):
+    def __init__(self, tmp = "/tmp", newton_ah = False):
         self.sys_initialized = False
         self.integral_initialized = False
         self.doneHF = False
@@ -552,7 +552,7 @@ class SCF(object):
             self.mf.conv_tol = tol
 
             if self.newton_ah:
-                from pyscf.scf.newton_ah import kernel, newton
+                from pyscf.soscf.newton_ah import kernel, newton
 
                 if InitGuess is not None:
 
@@ -625,7 +625,7 @@ class SCF(object):
             self.mf.conv_tol = tol
 
             if self.newton_ah:
-                from pyscf.scf.newton_ah import kernel
+                from pyscf.soscf.newton_ah import kernel
 
                 if InitGuess is not None:
                     # use traditional HF: uncomment this

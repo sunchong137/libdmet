@@ -6,11 +6,11 @@ import numpy.linalg as la
 log.verbose = "DEBUG0"
 
 U = 4
-LatSize = [36, 36]
+LatSize = [18, 18]
 ImpSize = [2, 2]
-Filling = 0.875/2
+Filling = 0.80/2.0
 MaxIter = 20
-M = 400
+M = 200
 DiisStart = 4
 TraceStart = 2
 DiisDim = 4
@@ -27,7 +27,7 @@ conv = False
 
 history = dmet.IterHistory()
 
-solver = dmet.impurity_solver.Block(nproc = 2, nnode = 1, \
+solver = dmet.impurity_solver.StackBlock(nproc = 1, nthread = 28, nnode = 1, \
         bcs = True, reorder = True, tol = 1e-7, maxM = M)
 
 log.section("\nfitting chemical potential\n")
@@ -54,7 +54,7 @@ for iter in range(MaxIter):
 
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(GRhoEmb, Lat, basis, vcor, Mu, \
-            MaxIter1 = 200, MaxIter2 = 0)
+            MaxIter1 = max(len(vcor.param) * 20, 3000), MaxIter2 = 0)
 
     if iter >= TraceStart:
         # to avoid spiral increase of vcor and mu
@@ -70,12 +70,12 @@ for iter in range(MaxIter):
     history.update(EnergyImp, err, nelecImp, \
             np.max(abs(vcor.get() - vcor_new.get())), dc)
 
-    if np.max(abs(vcor.get() - vcor_new.get())) < 1e-5:
+    if np.max(abs(vcor.get() - vcor_new.get())) < 1e-4:
         conv = True
         break
 
     if not conv:
-        skipDiis = (iter < DiisStart) and (la.norm(vcor_new.param - vcor.param) > 0.01)
+        skipDiis = (iter < DiisStart) and (la.norm(vcor_new.param - vcor.param) > len(vcor.param) * 0.01)
         pvcor, dpvcor, _ = dc.Apply( \
                 np.hstack((vcor_new.param, Mu_new)), \
                 np.hstack((vcor_new.param - vcor.param, Mu_new - Mu)), \
@@ -83,7 +83,7 @@ for iter in range(MaxIter):
         vcor.update(pvcor[:-1])
         Mu = pvcor[-1]
 
-solver.cleanup()
+#solver.cleanup()
 
 if conv:
     log.result("DMET converged")

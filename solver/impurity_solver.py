@@ -17,7 +17,7 @@ except ImportError:
     __all__ = ["AFQMC", "Block", "StackBlock"]
 
 class Block(object):
-    def __init__(self, nproc, nnode = 1, TmpDir = "/tmp", SharedDir = None, \
+    def __init__(self, nproc, nnode = 1, TmpDir = "./tmp", SharedDir = None, \
             reorder = False, minM = 100, maxM = None, tol = 1e-6, spinAdapted = False, \
             bcs = False):
         log.eassert(nnode == 1 or SharedDir is not None, \
@@ -33,6 +33,7 @@ class Block(object):
         self.spinAdapted = spinAdapted
         self.bcs = bcs
 
+    #def run(self, Ham, M = None, nelec = None, schedule = None, similar = False, restart = False):
     def run(self, Ham, M = None, nelec = None, schedule = None, similar = False, restart = True):
         if M is None:
             M = self.maxM
@@ -73,9 +74,9 @@ class Block(object):
         self.cisolver.cleanup()
 
 class StackBlock(Block):
-    def __init__(self, nproc, nthread = 1, nnode = 1, TmpDir = "/tmp", SharedDir = None, \
+    def __init__(self, nproc, nthread = 1, nnode = 1, TmpDir = "./tmp", SharedDir = None, \
             reorder = False, minM = 100, maxM = None, tol = 1e-6, spinAdapted = False, \
-            bcs = False):
+            bcs = False, mem = 80):
         log.eassert(nnode == 1 or SharedDir is not None, \
                 "Running on multiple nodes (nnod = %d), must specify shared directory", \
                 nnode)
@@ -88,7 +89,7 @@ class StackBlock(Block):
         self.maxM = maxM
         self.spinAdapted = spinAdapted
         self.bcs = bcs
-
+        self.cisolver.mem = mem
 
 class CASSCF(object):
 

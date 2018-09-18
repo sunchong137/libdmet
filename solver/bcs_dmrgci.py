@@ -424,7 +424,7 @@ def reorder(order, Ham, orbs, rot = None):
 
 class BCSDmrgCI(object):
     def __init__(self, ncas, splitloc = False, cisolver = None, \
-            mom_reorder = True, algo = "nelec", tmpDir = "/tmp", **kwargs):
+            mom_reorder = True, algo = "nelec", tmpDir = "./tmp", doscf = True, **kwargs):
         # additional required keywords
         #  - nelec: nelecas
         #  - energy: none
@@ -449,9 +449,13 @@ class BCSDmrgCI(object):
         self.mom_reorder = mom_reorder
         self.localized_cas = None
         self.tmpDir = tmpDir
+        self.doscf = doscf
 
-    def run(self, Ham, ci_args = {}, guess = None, basis = None, similar = False, scf = True):
+    #def run(self, Ham, ci_args = {}, guess = None, basis = None, similar = False, scf = True):
+    def run(self, Ham, ci_args = {}, guess = None, basis = None, similar = False, scf = None):
         # ci_args is a list or dict for ci solver, or None
+        if scf is None:
+            scf = self.doscf
         if scf:
             mo, mo_energy = get_BCS_mo(self.scfsolver, Ham, guess)
         else:

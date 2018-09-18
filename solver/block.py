@@ -15,7 +15,7 @@ class Schedule(object):
         self.sweeptol = sweeptol
 
     def gen_initial(self, minM, maxM):
-        defaultM = [100, 250, 400, 800, 1500, 2500]
+        defaultM = [100, 250, 400, 800, 1500, 2500, 3500]
         log.debug(1, "Generate default schedule with startM = %d maxM = %d, maxiter = %d", \
             minM, maxM, self.maxiter)
 
@@ -187,8 +187,10 @@ def read2pdm_bcs(filename):
 
 class Block(object):
 
-    execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
-            "../block"))
+    #execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
+    #        "../block"))
+    execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx/' # ZHC add
+    #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx_pdm_new_git/' # ZHC add
     nproc = 1
     nnode = 1
     intFormat = "FCIDUMP"
@@ -210,8 +212,8 @@ class Block(object):
         cls.nnode = nnode
         log.info("Block interface  running with %d nodes, %d processors per node", \
             cls.nnode, cls.nproc)
-        log.info("Block running on nodes:\n%s", sub.check_output(Block.mpipernode + \
-                ["hostname"]).replace("\n", "\t"))
+        #log.info("Block running on nodes:\n%s", sub.check_output(Block.mpipernode + \
+        #        ["hostname"]).replace("\n", "\t"))
 
     def __init__(self):
         self.sys_initialized = False
@@ -220,13 +222,13 @@ class Block(object):
         self.optimized = False
         self.count = 0
 
-        self.warmup_method = "local_2site"
+        self.warmup_method = "local_4site"
         self.outputlevel = 0
         self.restart = False
 
         log.debug(0, "Using %s version %s", type(self).name, type(self).execPath)
 
-    def createTmp(self, tmp = "/tmp", shared = None):
+    def createTmp(self, tmp = "./tmp", shared = None):
         sub.check_call(["mkdir", "-p", tmp])
         self.tmpDir = mkdtemp(prefix = type(self).name, dir = tmp)
         log.info("%s working dir %s", type(self).name, self.tmpDir)
@@ -321,7 +323,8 @@ class Block(object):
         log.info("%s call No. %d", type(self).name, self.count)
         log.debug(0, "Written to file %s", outputfile)
         with open(outputfile, "w", buffering = 1) as f:
-            if type(self).env_slurm:
+            #if type(self).env_slurm:
+            if True:
                 sub.check_call(" ".join(["srun", \
                     os.path.join(type(self).execPath, "block.spin_adapted"), \
                     os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)]), \
@@ -341,7 +344,8 @@ class Block(object):
         log.info("OH call No. %d", self.count)
         log.debug(0, "Written to file %s", outputfile)
         with open(outputfile, "w", buffering = 1) as f:
-            if type(self).env_slurm:
+            #if type(self).env_slurm:
+            if True:
                 sub.check_call(" ".join(["srun", "-n", "1", \
                     os.path.join(type(self).execPath, "OH"), os.path.join(self.tmpDir, \
                     "dmrg.conf.%03d" % self.count)]), \
@@ -374,15 +378,15 @@ class Block(object):
     def onepdm(self):
         norb = self.integral.norb
         if self.spinRestricted:
-            rho = read1pdm(os.path.join(self.tmpDir, "spatial_onepdm.0.0.txt")) / 2
+            rho = read1pdm(os.path.join(self.tmpDir, "/node0/spatial_onepdm.0.0.txt")) / 2
             rho = rho.reshape((1, norb, norb))
         else:
-            rho0 = read1pdm(os.path.join(self.tmpDir, "onepdm.0.0.txt"))
+            rho0 = read1pdm(os.path.join(self.tmpDir, "/node0/onepdm.0.0.txt"))
             rho = np.empty((2, norb, norb))
             rho[0] = rho0[::2, ::2]
             rho[1] = rho0[1::2, 1::2]
         if self.bogoliubov:
-            kappa = read1pdm(os.path.join(self.tmpDir, "spatial_pairmat.0.0.txt"))
+            kappa = read1pdm(os.path.join(self.tmpDir, "/node0/spatial_pairmat.0.0.txt"))
             if self.spinRestricted:
                 kappa = (kappa + kappa.T) / 2
             GRho = np.zeros((norb*2, norb*2))
@@ -560,8 +564,10 @@ class Block(object):
 
 class StackBlock(Block):
 
-    execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
-            "../StackBlock"))
+    #execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
+    #        "../StackBlock"))
+    execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx/' # ZHC add
+    #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx_pdm_new_git/' # ZHC add
     nthread = 1
 
     # File names
@@ -579,18 +585,21 @@ class StackBlock(Block):
         log.info("StackBlock interface  running with %d nodes,"
                 " %d processes per node, %d threads per process", \
             cls.nnode, cls.nproc, cls.nthread)
-        log.info("StackBlock running on nodes:\n%s", \
-                sub.check_output(StackBlock.mpipernode + ["hostname"]).replace("\n", "\t"))
+        #log.info("StackBlock running on nodes:\n%s", \
+        #        sub.check_output(StackBlock.mpipernode + ["hostname"]).replace("\n", "\t"))
 
 
     def __init__(self):
         Block.__init__(self)
-        self.outputlevel = 3
+        self.outputlevel = 8
+        self.mem = 80
 
     def write_conf(self, f):
         Block.write_conf(self, f)
         f.write("num_thrds %d\n" % type(self).nthread)
         f.write("prebuild\n")
+        #adding memory spec
+        f.write("mem %s g\n"%(str(self.mem)))
 
     def callBlock(self):
         sub.check_call(" ".join(

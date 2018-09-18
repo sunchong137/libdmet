@@ -64,6 +64,7 @@ class MuSolver(object):
         self.adaptive = adaptive
         self.trust_region = trust_region
         self.history = []
+        self.first_run = True
 
     def __call__(self, lattice, filling, ImpHam, basis, solver, \
             solver_args = {}, delta = 0.02, thrnelec = 1e-5, step = 0.05):
@@ -74,7 +75,8 @@ class MuSolver(object):
         record = [(0., nelec)]
         log.result("nelec = %20.12f (target is %20.12f)", nelec, filling*2)
 
-        solver_args["similar"] = True
+        #solver_args["similar"] = True
+        solver_args["similar"] = False
 
         if abs(nelec/(filling*2) - 1.) < thrnelec:
             log.info("chemical potential fitting unnecessary")
@@ -115,6 +117,8 @@ class MuSolver(object):
                 nelec2 = transformResults(rhoEmb2, None, basis, None, None)
                 record.append((delta1, nelec2))
                 log.result("nelec = %20.12f (target is %20.12f)", nelec2, filling*2)
+                
+                
 
                 ImpHam = apply_dmu(lattice, ImpHam, basis, delta1)
                 self.history.append(record)

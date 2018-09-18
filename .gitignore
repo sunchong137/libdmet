@@ -18,3 +18,5 @@ block/genetic/gaopt
 *.aux
 *.dvi
 *.log
+
+tmp*
