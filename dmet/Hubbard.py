@@ -75,8 +75,8 @@ class MuSolver(object):
         record = [(0., nelec)]
         log.result("nelec = %20.12f (target is %20.12f)", nelec, filling*2)
 
-        #solver_args["similar"] = True
-        solver_args["similar"] = False
+        solver_args["similar"] = True
+        #solver_args["similar"] = False
 
         if abs(nelec/(filling*2) - 1.) < thrnelec:
             log.info("chemical potential fitting unnecessary")
