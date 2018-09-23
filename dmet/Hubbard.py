@@ -109,6 +109,7 @@ class MuSolver(object):
                 nprime = (nelec1 - nelec) / delta
                 delta1 = (filling*2 - nelec) / nprime
                 if abs(delta1) > step:
+                    log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta1, step)
                     delta1 = copysign(step, delta1)
                 log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
                 log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
@@ -118,11 +119,38 @@ class MuSolver(object):
                 record.append((delta1, nelec2))
                 log.result("nelec = %20.12f (target is %20.12f)", nelec2, filling*2)
                 
-                
+                if abs(nelec2/(filling*2) - 1.) < thrnelec:    
 
-                ImpHam = apply_dmu(lattice, ImpHam, basis, delta1)
-                self.history.append(record)
-                return rhoEmb2, EnergyEmb2, ImpHam, delta1
+                    ImpHam = apply_dmu(lattice, ImpHam, basis, delta1)
+                    self.history.append(record)
+                    return rhoEmb2, EnergyEmb2, ImpHam, delta1
+                else:
+                    log.info("use quadratic fitting.")
+                    from quad_fit import quad_fit
+                    step *= 2.0
+                    mus = np.array([0.0, delta, delta1])
+                    delta_nelec = np.array([nelec, nelec1, nelec2]) - (filling * 2.0)
+                    delta2, status = quad_fit(mus, delta_nelec, tol = 1e-12)
+                    if not status:
+                        log.info("quadratic fails, use linear extrapolation.")
+                        slope = (nelec2 - nelec1) / (delta1 - delta)
+                        intercept = nelec1 - slope * delta
+                        delta2 = (filling * 2.0 - intercept) / slope
+
+                    if abs(delta2) > step:
+                        log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta2, step)
+                        delta2 = copysign(step, delta2)
+                    
+                    log.result("extrapolated to dMu = %20.12f", delta2)
+                    rhoEmb3, EnergyEmb3 = solve_with_mu(delta2)
+                    nelec3 = transformResults(rhoEmb3, None, basis, None, None)
+                    record.append((delta2, nelec3))
+                    log.result("nelec = %20.12f (target is %20.12f)", nelec3, filling * 2.0)
+                    
+
+                    ImpHam = apply_dmu(lattice, ImpHam, basis, delta2)
+                    self.history.append(record)
+                    return rhoEmb3, EnergyEmb3, ImpHam, delta2
 
     def save(self, filename):
         import pickle as p
