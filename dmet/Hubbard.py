@@ -110,7 +110,9 @@ class MuSolver(object):
                 delta1 = (filling*2 - nelec) / nprime
                 if abs(delta1) > step:
                     log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta1, step)
-                    delta1 = copysign(step, delta1)
+                    delta1_tmp = copysign(step, delta1)
+                    step = abs(delta1)
+                    delta1 = delta1_tmp
                 log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
                 log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
                 log.result("extrapolated to dMu = %20.12f", delta1)
@@ -200,7 +202,7 @@ class MuSolver(object):
                 # Gaussian weight
                 weight *= exp(- 0.5 * metric / sigma2)
 
-            else: # len(record) == 3
+            elif len(record) == 3:
                 # we need to check data sanity: should be monotonic
                 (mu1, n1), (mu2, n2), (mu3, n3) = sorted(record)
                 if (not n1 < n2) or (not n2 < n3):
@@ -246,6 +248,72 @@ class MuSolver(object):
                         (target-n3)**2 + (nelec-n2)**2,
                 )
                 weight *= exp(-0.5 * metric / sigma3)
+
+            else: # len(record) == 4:
+                # first find three most nearest points
+                mus, nelecs = zip(*record)
+                mus = np.asarray(mus)
+                nelecs = np.asarray(nelecs)
+                delta_nelecs = np.abs(nelecs - target)
+                idx_dN = np.argsort(delta_nelecs)
+                mus_sub = mus[idx_dN][:3]
+                nelecs_sub = nelecs[idx_dN][:3]
+
+
+                # we need to check data sanity: should be monotonic
+                (mu1, n1), (mu2, n2), (mu3, n3) = sorted(zip(mus_sub, nelecs_sub))
+                if (not n1 < n2) or (not n2 < n3):
+                    val, weight = 0., 0.
+                    continue
+
+                # parabola between mu1 and mu3, linear outside the region
+                # with f' continuous
+                a, b, c = np.dot(la.inv(np.asarray([
+                    [mu1**2, mu1, 1],
+                    [mu2**2, mu2, 1],
+                    [mu3**2, mu3, 1]
+                ])), np.asarray([n1,n2,n3]).reshape(-1,1)).reshape(-1)
+
+                # if the parabola is not monotonic, use linear interpolation instead
+                if mu1 < -0.5*b/a < mu3:
+                    def find_mu(n):
+                        if n < n2:
+                            slope = (n2-n1) / (mu2-mu1)
+                        else:
+                            slope = (n2-n3) / (mu2-mu3)
+                        return mu2 + (n-n2) / slope
+
+                else:
+                    def find_mu(n):
+                        if n < n1:
+                            slope = 2 * a * mu1 + b
+                            return mu1 + (n-n1) / slope
+                        elif n > n3:
+                            slope = 2 * a * mu3 + b
+                            return mu3 + (n-n3) / slope
+                        else:
+                            return 0.5 * (-b + sqrt(b**2 - 4 * a * (c-n))) / a
+
+                val = find_mu(target) - find_mu(nelec)
+                # weight factor
+                metric = min(
+                        (target-n1)**2 + (nelec-n2)**2,
+                        (target-n1)**2 + (nelec-n3)**2,
+                        (target-n2)**2 + (nelec-n1)**2,
+                        (target-n2)**2 + (nelec-n3)**2,
+                        (target-n3)**2 + (nelec-n1)**2,
+                        (target-n3)**2 + (nelec-n2)**2,
+                )
+                weight *= exp(-0.5 * metric / sigma3)
+                
+                log.debug(0, "%d record ", i)
+                log.debug(0, "target: %20.12f ", target)
+                log.debug(0, "mus: %s ", mus)
+                log.debug(0, "nelecs: %s ", nelecs)
+                log.debug(0, "mus_sub: %s ", mus_sub)
+                log.debug(0, "nelecs_sub: %s ", nelecs_sub)
+                log.debug(0, "mu_predict(val): %s ", val)
+                log.debug(0, "weight: %s ", weight)
 
             vals.append(val)
             weights.append(weight)
