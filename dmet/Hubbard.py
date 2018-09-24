@@ -149,10 +149,42 @@ class MuSolver(object):
                     record.append((delta2, nelec3))
                     log.result("nelec = %20.12f (target is %20.12f)", nelec3, filling * 2.0)
                     
+                    if abs(nelec3/(filling*2) - 1.) < thrnelec:    
 
-                    ImpHam = apply_dmu(lattice, ImpHam, basis, delta2)
-                    self.history.append(record)
-                    return rhoEmb3, EnergyEmb3, ImpHam, delta2
+                        ImpHam = apply_dmu(lattice, ImpHam, basis, delta2)
+                        self.history.append(record)
+                        return rhoEmb3, EnergyEmb3, ImpHam, delta2
+                    else:
+                        log.info("use quadratic fitting #2.")
+                        
+                        mus = np.array([0.0, delta, delta1, delta2])
+                        delta_nelecs = np.array([nelec, nelec1, nelec2, nelec3]) - (filling * 2.0)
+                        dN_abs = np.abs(delta_nelecs)
+                        
+                        idx_dN = np.argsort(dN_abs)
+                        mus_sub = mus[idx_dN][:3]
+                        delta_nelecs_sub = delta_nelecs[idx_dN][:3]
+                        
+                        delta3, status = quad_fit(mus_sub, delta_nelecs_sub, tol = 1e-12)
+                        if not status:
+                            log.info("quadratic fails, use linear extrapolation.")
+                            from scipy import stats
+                            slope, intercept, r_value, p_value, std_err = stats.linregress(delta_nelecs_sub, mus_sub)
+                            delta3 = intercept
+
+                        if abs(delta3) > step:
+                            log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta3, step)
+                            delta3 = copysign(step, delta3)
+                        
+                        log.result("extrapolated to dMu = %20.12f", delta3)
+                        rhoEmb4, EnergyEmb4 = solve_with_mu(delta3)
+                        nelec4 = transformResults(rhoEmb4, None, basis, None, None)
+                        record.append((delta3, nelec4))
+                        log.result("nelec = %20.12f (target is %20.12f)", nelec4, filling * 2.0)
+                        
+                        ImpHam = apply_dmu(lattice, ImpHam, basis, delta3)
+                        self.history.append(record)
+                        return rhoEmb4, EnergyEmb4, ImpHam, delta3
 
     def save(self, filename):
         import pickle as p
@@ -249,7 +281,7 @@ class MuSolver(object):
                 )
                 weight *= exp(-0.5 * metric / sigma3)
 
-            else: # len(record) == 4:
+            else: # len(record) >= 4:
                 # first find three most nearest points
                 mus, nelecs = zip(*record)
                 mus = np.asarray(mus)

@@ -294,20 +294,24 @@ class IterHistory(object):
         self.history = []
 
     def update(self, energy, err, nelec, dvcor, dc):
-        self.history.append([energy, err, nelec, dvcor, dc.nDim, dc.iNext])
+        if self.history == []:
+            self.history.append([energy, energy, err, nelec, dvcor, dc.nDim, dc.iNext])
+        else:
+            self.history.append([energy, energy - self.history[-1][0], err, nelec, dvcor, dc.nDim, dc.iNext])
+
         log.section("\nDMET Progress\n")
-        log.result("  Iter         Energy               RdmErr         " \
+        log.result("  Iter         Energy                 dE                RdmErr         " \
             "       Nelec                 dVcor      DIIS")
         for idx, item in enumerate(self.history):
-            log.result(" %3d %20.12f %20.12f %20.12f %20.12f  %2d %2d", idx, *item)
+            log.result(" %3d %20.12f     %15.3e %20.12f %20.12f %20.5e  %2d %2d", idx, *item)
         log.result("")
     def write_table(self):
         #import os
         #if not os.path.exists('./table.txt'):
         f_table = open('./table.txt', 'w')
-        f_table.write("  Iter         Energy               RdmErr               Nelec                 dVcor      DIIS \n")
+        f_table.write("  Iter         Energy                  dE                RdmErr               Nelec                 dVcor      DIIS \n")
         for idx, item in enumerate(self.history):
-            f_table.write(" %3d %20.12f %20.12f %20.12f %20.12f  %2d %2d \n"%((idx,) + tuple(item)))
+            f_table.write(" %3d %20.12f     %15.3e %20.12f %20.12f %20.5e  %2d %2d \n"%((idx,) + tuple(item)))
         f_table.close()
 
 foldRho = slater.foldRho

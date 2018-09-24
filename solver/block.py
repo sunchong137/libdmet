@@ -572,7 +572,7 @@ class StackBlock(Block):
     #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx_pdm_new_git/' # ZHC add
     execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
     #execPath = '/home/zcui/program/stackblock_bx_new_pdm/' # ZHC add
-    nthread = 1
+    nthread = 28
 
     # File names
     restartFiles = ["node0/RestartReorder.dat", "node0/Rotation*", "node0/StateInfo*", "node0/statefile*", "node0/wave*"]
@@ -582,7 +582,7 @@ class StackBlock(Block):
     name = "StackBlock"
 
     @classmethod
-    def set_nproc(cls, nproc, nthread = 1, nnode = 1):
+    def set_nproc(cls, nproc, nthread = 28, nnode = 1):
         cls.nproc = nproc
         cls.nnode = nnode
         cls.nthread = nthread

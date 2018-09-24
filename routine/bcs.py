@@ -277,6 +277,7 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
 
     def Vemb_param(param):
         V = np.tensordot(param, dV_dparam, axes = (0, 0))
+        # add contribution of chemical potential # ZHC NOTE
         V[:nbasis, :nbasis] += A0
         V[nbasis:, nbasis:] -= B0
         V[:nbasis, nbasis:] += D0
@@ -358,6 +359,175 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
 
 
     return vcor, err_begin, err_end
+
+def FitVcorEmb_triu(GRho, lattice, basis, vcor, mu, MaxIter = 300, **kwargs):
+    param_begin = vcor.param.copy()
+    nscsites = lattice.supercell.nsites
+    nbasis = basis.shape[-1]
+    
+    # ZHC transform lattice H -> emb space
+    # ZHC NOTE use more accurate one?
+    (embHA, embHB), embD, _ = transform_trans_inv_sparse(basis, lattice, \
+            lattice.getFock(kspace = False))
+    #(embHA, embHB), embD, _ = transform_trans_inv(basis, lattice, \
+    #        lattice.getFock(kspace = False))
+
+    embH = np.empty((nbasis*2, nbasis*2))
+    embH[:nbasis, :nbasis] = embHA
+    embH[nbasis:, nbasis:] = -embHB
+    embH[:nbasis, nbasis:] = embD
+    embH[nbasis:, :nbasis] = embD.T
+
+    # now compute dV/dparam (will be used in gradient)
+    dV_dparam = np.empty((vcor.length(), nbasis*2, nbasis*2))
+    for ip in range(vcor.length()):
+        (dA_dV, dB_dV), dD_dV, _ = \
+                transform_local(basis, lattice, vcor.gradient()[ip])
+        dV_dparam[ip, :nbasis, :nbasis] = dA_dV
+        dV_dparam[ip, nbasis:, nbasis:] = -dB_dV
+        dV_dparam[ip, :nbasis, nbasis:] = dD_dV
+        dV_dparam[ip, nbasis:, :nbasis] = dD_dV.T
+
+    vcor_zero = deepcopy(vcor)
+    vcor_zero.update(np.zeros(vcor_zero.length()))
+    v0 = vcor_zero.get()
+    v0[0] -= mu * np.eye(nscsites)
+    v0[1] -= mu * np.eye(nscsites)
+    (A0, B0), D0, _ = \
+            transform_local(basis, lattice, v0)
+    
+    ll = np.triu_indices(GRho.shape[0])
+
+    def Vemb_param(param):
+        V = np.tensordot(param, dV_dparam, axes = (0, 0))
+        # add contribution of chemical potential # ZHC NOTE
+        V[:nbasis, :nbasis] += A0
+        V[nbasis:, nbasis:] -= B0
+        V[:nbasis, nbasis:] += D0
+        V[nbasis:, :nbasis] += D0.T
+        return V
+
+    def errfunc(param):
+        vcor.update(param)
+        embHeff = embH + Vemb_param(param)
+        ew, ev = la.eigh(embHeff)
+        occ = 1 * (ew < 0.)
+        GRho1 = mdot(ev, np.diag(occ), ev.T)
+        return la.norm((GRho - GRho1)[ll])**2
+
+    def gradfunc(param):
+        vcor.update(param)
+        embHeff = embH + Vemb_param(param)
+        ew, ev = la.eigh(embHeff)
+        nocc = 1 * (ew < 0.)
+        GRho1 = mdot(ev, np.diag(nocc), ev.T)
+        
+        jac = np.zeros((len(param), embHeff.shape[1], embHeff.shape[1]), dtype = param.dtype)
+
+        #Only concerned with corners
+        for k, vep in enumerate(dV_dparam):
+            drho = analyticGradientO(ev, ew, vep, nbasis)
+            jac[k] = drho
+
+        #Gradient function: careful with complex stuff
+        gradfn = np.zeros(len(param), dtype=np.float64)
+        diffrdm = (GRho1 - GRho)[ll] 
+        diffrdmR = diffrdm.real
+        diffrdmI = diffrdm.imag
+        
+        for k in xrange(len(param)):
+            J = jac[k][ll]
+            gradfn[k] = 2.*np.sum(np.multiply(J.real,diffrdmR) + np.multiply(J.imag,diffrdmI))
+        
+        return gradfn
+
+    def analyticGradientO(C, E, dH, nocc):
+        
+         L = dH.shape[1]
+         
+         Cocc = C[:, :nocc]
+         Cvir = C[:, nocc:]
+         
+         de_ov = E[:nocc] - E[nocc:][:, None]
+         zero_element = np.abs(de_ov) < 1.0e-5
+         if zero_element.any():
+             print "WARNING: Degeneracy occurs when evaluate gradients! "
+             de_ov[zero_element] = np.sign(de_ov[zero_element] + 1.0e-20) * 0.01
+         
+         Zm = np.divide(np.dot(Cvir.conjugate().T, np.dot(dH,Cocc)), de_ov)
+     
+         Cmocc = np.dot(Cvir, Zm)
+         CCT = np.dot(Cocc, Cmocc.conjugate().T) 
+         result = CCT + CCT.conj().T
+         
+         return result
+
+    """
+    # ZHC NOTE test numerical gradients
+    du = 1e-5
+    param_0 = vcor.param.copy()
+    err_ref = errfunc(param_0)
+    grad_ref = gradfunc(param_0)
+    grad_num = np.zeros_like(grad_ref)
+    for i in xrange(len(param_0)):
+        param_i = (param_0.copy())
+        param_i[i] += du
+        err_i = errfunc(param_i)
+        grad_num[i] = (err_i - err_ref) / du
+    
+    print "GRAD DIFF"
+    print np.linalg.norm(grad_ref - grad_num)
+    
+    """
+
+
+    err_begin = errfunc(vcor.param)
+    log.info("Using analytic gradient")
+    param, err_end, converge_pattern = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
+   
+    
+    # ZHC NOTE
+    gnorm_res = la.norm(gradfunc(param))
+    
+    vcor.param = param
+    
+    print "Minimizer converge pattern: %d "%converge_pattern
+    print "Current function value: %15.8f"%err_end
+    print "Norm of gradients: %15.8f"%gnorm_res
+    print "Norm diff of x: %15.8f"%(la.norm(param- param_begin))
+    
+    CG_check = False
+
+    if CG_check and (gnorm_res > 1.0e-4):
+        
+        print "Not fully converge in Bo-Xiao's minimizer, try mixed solver in scipy..."
+
+        param_new = param.copy()
+        gtol = 5.0e-5
+
+        from scipy import optimize as opt
+        min_result = opt.minimize(errfunc, param_new, method = 'CG', jac = gradfunc ,\
+                options={'maxiter': len(param_new), 'disp': True, 'gtol': gtol})
+        param_new_2 = min_result.x
+    
+        print "CG Final Diff: ", min_result.fun, "Converged: ",min_result.status,\
+                " Jacobian: ", la.norm(min_result.jac)      
+        if(not min_result.success):
+            print "WARNING: Minimization unsuccessful. Message: ",min_result.message
+    
+        gnorm_new = la.norm(min_result.jac)
+        if (gnorm_new < gnorm_res) and (min_result.fun < err_end) and (np.max(np.abs(param_new_2 - param_new)) < 0.5):
+            print "CG result used"
+            vcor.param = param_new_2
+            err_end = min_result.fun
+        else:
+            print "BX result used"
+    else:
+        print "BX result used"
+
+
+    return vcor, err_begin, err_end
+
 
 def FitVcorFull(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
     nbasis = basis.shape[-1]
@@ -446,7 +616,7 @@ def FitVcorFullK(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
     return vcor, c_begin, c_end
 
 
-def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0, kinetic = False):
+def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0, kinetic = False, triu = True):
     vcor_new = deepcopy(vcor)
     log.result("Using two-step vcor fitting")
     err_begin = None
@@ -462,8 +632,13 @@ def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0,
     else:
         if MaxIter1 > 0:
             log.info("Impurity model stage  max %d steps", MaxIter1)
-            vcor_new, err_begin1, err_end1 = FitVcorEmb(GRho, lattice, basis, vcor_new, \
-                    mu, MaxIter = MaxIter1, serial = True)
+            if triu:
+                vcor_new, err_begin1, err_end1 = FitVcorEmb_triu(GRho, lattice, basis, vcor_new, \
+                        mu, MaxIter = MaxIter1, serial = True)
+            else:
+                vcor_new, err_begin1, err_end1 = FitVcorEmb(GRho, lattice, basis, vcor_new, \
+                        mu, MaxIter = MaxIter1, serial = True)
+
             log.info("Embedding Stage:\nbegin %20.12f    end %20.12f" % (err_begin1, err_end1))
         if MaxIter2 > 0:
             log.info("Full lattice stage  max %d steps", MaxIter2)
