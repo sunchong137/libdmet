@@ -75,6 +75,25 @@ def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
 
         return GRhoImp, Efrag/nscsites, nelec/nscsites
 
+def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu, Mu, last_dmu, vcor, U):
+    nscsites = basis.shape[-2] / 2
+    GRhoImp, Efrag, nelec = bcs.transformResults_new(GRhoEmb, E, lattice, \
+            basis, ImpHam, H_energy, dmu, Mu, last_dmu, vcor, U)
+    log.debug(1, "impurity generalized density matrix:\n%s", GRhoImp)
+
+    if Efrag is None:
+        return nelec/nscsites
+    else:
+        log.result("Local density matrix (impurity): alpha, beta and pairing")
+        rhoA, rhoB, kappaBA = extractRdm(GRhoImp)
+        log.result("%s", rhoA)
+        log.result("%s", rhoB)
+        log.result("%s", -kappaBA.T)
+        log.result("nelec per site (impurity) = %20.12f", nelec/nscsites)
+        log.result("Energy per site (impurity) = %20.12f", Efrag/nscsites)
+
+        return GRhoImp, Efrag/nscsites, nelec/nscsites
+
 Hubbard.transformResults = lambda GRhoEmb, E, basis, ImpHam, H_energy: \
       transformResults(GRhoEmb, E, None, basis, ImpHam, H_energy, 0.)
 

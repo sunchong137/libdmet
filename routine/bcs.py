@@ -66,6 +66,7 @@ def __embBasis_proj(lattice, GRho, **kwargs):
         GRhoImpEnv = np.transpose(GRho[1:], (1, 0, 2)).reshape(nscsites*2, nscsites*(ncells-1)*2)
         _, s, vt = la.svd(GRhoImpEnv, full_matrices = False)
         log.debug(1, "bath orbitals\n%s", vt)
+        # ZHC NOTE first two site basis, third emb basis (dim contract with singular value)
         B = np.transpose(vt.reshape((nscsites*2, ncells-1, nscsites*2)), (1, 2, 0))
         basis[0, 0, :nscsites, :nscsites] = np.eye(nscsites)
         basis[1, 0, :nscsites, :nscsites] = np.eye(nscsites)
@@ -657,7 +658,8 @@ def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0,
 
     log.result("residue (begin) = %20.12f", err_begin)
     log.result("residue (end)   = %20.12f", err_end)
-    return vcor_new, err_begin
+    #return vcor_new, err_begin
+    return vcor_new, err_end
 
 def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
     VA, VB, UA, UB = separate_basis(basis)
@@ -684,6 +686,167 @@ def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
         H0eff = ImpHam.H0 - H0energy - tempH0
         Efrag = E - np.sum(CDeff[0] * rhoA + CDeff[1] * rhoB) - \
                 2 * np.sum(CCeff[0] * kappaBA.T) - H0eff
+        
     else:
         Efrag = None
     return GRhoImp, Efrag, nelec
+
+
+def pack_1rdm_fromdmrg(P, nscsites):
+    '''
+        Given P in BCS format from dmrg repack to GHF format
+    '''
+    nbs = P.shape[0]/2
+    ne = nbs-nscsites
+
+    rdm1 = np.zeros_like(P, dtype=P.dtype)
+    rdm1[:nscsites, :nscsites] = P[:nscsites, :nscsites] 
+    rdm1[:nscsites, nscsites:nscsites*2] = P[:nscsites, nbs:nbs+nscsites] 
+    rdm1[nscsites:nscsites*2, :nscsites] = P[nbs:nbs+nscsites, :nscsites] 
+    rdm1[nscsites:nscsites*2, nscsites:nscsites*2] = P[nbs:nbs+nscsites,nbs:nbs+nscsites] 
+
+    rdm1[:nscsites, 2*nscsites:2*nscsites+ne] = P[:nscsites, nscsites:nbs] 
+    rdm1[:nscsites, 2*nscsites+ne:] = P[:nscsites, nbs+nscsites:] 
+    rdm1[nscsites:nscsites*2, 2*nscsites:2*nscsites+ne] = P[nbs:nbs+nscsites, nscsites:nbs] 
+    rdm1[nscsites:nscsites*2, 2*nscsites+ne:] = P[nbs:nbs+nscsites, nbs+nscsites:] 
+
+    rdm1[2*nscsites:,:2*nscsites] = rdm1[:2*nscsites, 2*nscsites:].conj().T 
+
+    rdm1[2*nscsites:-ne, 2*nscsites:-ne] = P[nscsites:nbs, nscsites:nbs] 
+    rdm1[2*nscsites:-ne, -ne:] = P[nscsites:nbs, -ne:] 
+    rdm1[-ne:, 2*nscsites:-ne] = P[-ne:, nscsites:nbs] 
+    rdm1[-ne:, -ne:] = P[-ne:, -ne:]
+
+    return rdm1
+ 
+
+def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu, Mu, last_dmu, vcor, U):
+    VA, VB, UA, UB = separate_basis(basis)
+    nscsites = basis.shape[-2] / 2
+    nbasis = basis.shape[-1]
+    R = np.empty((nscsites*2, nbasis*2))
+    R[:nscsites, :nbasis] = VA[0]
+    R[nscsites:, :nbasis] = UB[0]
+    R[:nscsites, nbasis:] = UA[0]
+    R[nscsites:, nbasis:] = VB[0]
+    GRhoImp = mdot(R, GRhoEmb, R.T)
+    occs = np.diag(GRhoImp)
+    nelec = np.sum(occs[:nscsites]) - np.sum(occs[nscsites:]) + nscsites
+    if E is not None:
+        # FIXME energy expression is definitely wrong with mu built in the
+        # Hamiltonian
+        H1energy, H0energy = H_energy
+        rhoA, rhoB, kappaBA = extractRdm(GRhoEmb)
+
+        #tempCD, tempCC, tempH0 = transform_imp(basis, lattice, dmu * np.eye(nscsites))
+
+        #CDeff = ImpHam.H1["cd"] - H1energy["cd"] - tempCD
+        #CCeff = ImpHam.H1["cc"] - H1energy["cc"] - tempCC
+        #H0eff = ImpHam.H0 - H0energy - tempH0
+        #Efrag = E - np.sum(CDeff[0] * rhoA + CDeff[1] * rhoB) - \
+        #        2 * np.sum(CCeff[0] * kappaBA.T) - H0eff
+        
+        E2 = E - np.sum(ImpHam.H1["cd"][0] * rhoA + ImpHam.H1["cd"][1] * rhoB) - \
+                2 * np.sum(ImpHam.H1["cc"][0] * kappaBA.T) - ImpHam.H0
+        #E1 = 0.0
+        # alpha
+        #-imp-imp
+
+        from libdmet.dmet.Hubbard import apply_dmu
+        ImpHam_copy = apply_dmu(lattice, deepcopy(ImpHam), basis, -last_dmu)
+        #exit() 
+        H1_scaled = deepcopy(ImpHam_copy.H1)
+        
+        
+        # add back the last_dmu
+        #H1_scaled["cd"][0] -= transform_imp(basis[0], lattice, -last_dmu * np.eye(nscsites))
+        #H1_scaled["cd"][1] -= transform_imp(basis[1], lattice, -last_dmu * np.eye(nscsites))
+        #ImpHam.H0 += dmu * nbasis
+         
+        # add back the global mu 
+        v = np.zeros_like(vcor.get())
+        v[0] = Mu * np.eye(nscsites)
+        v[1] = Mu * np.eye(nscsites)
+        tempCD, tempCC, tempH0 = transform_local(basis, lattice, v)
+        H1_scaled["cd"] += tempCD
+        H1_scaled["cc"][0] += tempCC
+        #H0 += tempH0
+
+        # scale by the number of imp indices
+        H1_scaled["cd"][0][:nscsites, nscsites:] *= 0.5
+        H1_scaled["cd"][0][nscsites:, :nscsites] *= 0.5
+        H1_scaled["cd"][0][nscsites:, nscsites:] = 0.0
+        H1_scaled["cd"][1][:nscsites, nscsites:] *= 0.5
+        H1_scaled["cd"][1][nscsites:, :nscsites] *= 0.5
+        H1_scaled["cd"][1][nscsites:, nscsites:] = 0.0
+        H1_scaled["cc"][0][:nscsites, nscsites:] *= 0.5
+        H1_scaled["cc"][0][nscsites:, :nscsites] *= 0.5
+        H1_scaled["cc"][0][nscsites:, nscsites:] = 0.0
+        E1 = np.sum(H1_scaled["cd"][0] * rhoA + H1_scaled["cd"][1] * rhoB) + \
+                2 * np.sum(H1_scaled["cc"][0] * kappaBA.T)
+
+        IRDM1 = pack_1rdm_fromdmrg(GRhoEmb, nscsites)
+        offset = 0.0
+        for orb1 in range(nscsites):
+            offset += U * IRDM1[orb1,orb1]
+        print "E1 + E2"
+        print (E1 + E2) / nscsites
+        print (E1 + E2 - offset) / nscsites
+        Efrag = E1 + E2
+        #for orb1 in range(2*self.Nimp):
+        #    for orb2 in range(ld):
+        #        E1 += self.IRDM1[ orb1, orb2 ]*(h1_emb[ orb2, orb1 ])
+        
+
+        #ld = h1_emb.shape[0]
+        #
+        #E1 = 0.0
+        #E2 = 0.0 
+        #offset = 0.0
+        #for orb1 in range(2*self.Nimp):
+        #    for orb2 in range(ld):
+        #        E1 += self.IRDM1[ orb1, orb2 ]*(h1_emb[ orb2, orb1 ])
+        
+        #Enewn = bestE
+
+        ##Just get out the two-rdm contribution
+        #Pn0 = bestrdm
+        #ll = Pn0.shape[0]/2
+        #ra = Pn0[:ll,:ll].conj().T
+        #rb = Pn0[ll:,ll:].conj().T
+        #rab = Pn0[:ll,ll:].conj().T
+        #dmrgint.H1['cd'][0,:,:] = cd[0,:,:] - bestMumB
+        #dmrgint.H1['cd'][1,:,:] = cd[1,:,:] - bestMumB
+        #dmet.dmrg_2pdme = Enewn - np.dot(dmrgint.H1['cd'][0],ra).trace() - 2*np.dot(dmrgint.H1['cc'][0],rab).trace() + np.dot(dmrgint.H1['cd'][1],rb).trace()- np.trace(dmrgint.H1['cd'][1]) - dmrgint.H0
+    else:
+        Efrag = None
+    return GRhoImp, Efrag, nelec
+
+
+def pack_1rdm_fromdmrg(P, nscsites):
+    '''
+        Given P in BCS format from dmrg repack to GHF format
+    '''
+    nbs = P.shape[0]/2
+    ne = nbs-nscsites
+
+    rdm1 = np.zeros_like(P, dtype=P.dtype)
+    rdm1[:nscsites, :nscsites] = P[:nscsites, :nscsites] 
+    rdm1[:nscsites, nscsites:nscsites*2] = P[:nscsites, nbs:nbs+nscsites] 
+    rdm1[nscsites:nscsites*2, :nscsites] = P[nbs:nbs+nscsites, :nscsites] 
+    rdm1[nscsites:nscsites*2, nscsites:nscsites*2] = P[nbs:nbs+nscsites,nbs:nbs+nscsites] 
+
+    rdm1[:nscsites, 2*nscsites:2*nscsites+ne] = P[:nscsites, nscsites:nbs] 
+    rdm1[:nscsites, 2*nscsites+ne:] = P[:nscsites, nbs+nscsites:] 
+    rdm1[nscsites:nscsites*2, 2*nscsites:2*nscsites+ne] = P[nbs:nbs+nscsites, nscsites:nbs] 
+    rdm1[nscsites:nscsites*2, 2*nscsites+ne:] = P[nbs:nbs+nscsites, nbs+nscsites:] 
+
+    rdm1[2*nscsites:,:2*nscsites] = rdm1[:2*nscsites, 2*nscsites:].conj().T 
+
+    rdm1[2*nscsites:-ne, 2*nscsites:-ne] = P[nscsites:nbs, nscsites:nbs] 
+    rdm1[2*nscsites:-ne, -ne:] = P[nscsites:nbs, -ne:] 
+    rdm1[-ne:, 2*nscsites:-ne] = P[-ne:, nscsites:nbs] 
+    rdm1[-ne:, -ne:] = P[-ne:, -ne:]
+
+    return rdm1
+ 
