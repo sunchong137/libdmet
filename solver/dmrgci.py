@@ -10,6 +10,14 @@ import libdmet.utils.logger as log
 from libdmet.utils.misc import mdot, grep
 from libdmet.routine.localizer import Localizer
 from libdmet.utils.munkres import Munkres, make_cost_matrix
+# Settings
+try:
+    import settings
+except ImportError:
+    import sys
+    sys.stderr.write('settings.py not found.  Please create %s\n'
+                     % os.path.join(os.path.dirname(__file__), 'settings.py'))
+    raise ImportError('settings.py not found')
 
 def cas_from_1pdm(rho, ncas, nelecas, nelec):
     assert(nelecas <= nelec)
@@ -256,8 +264,9 @@ def gaopt(Ham, tmp = "/tmp"):
     #executable = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
     #        "../block/genetic/gaopt"))
     #executable = "/home/zhcui/program/libdmet_ZHC/stackblock_bx/genetic/gaopt"
-    executable = "/home/zcui/program/stackblock_bx/genetic/gaopt"
-    
+    #executable = "/home/zcui/program/stackblock_bx/genetic/gaopt"
+    executable = settings.GAOPTEXE
+
     log.debug(0, "gaopt executable: %s", executable)
 
     log.debug(0, "call gaopt")

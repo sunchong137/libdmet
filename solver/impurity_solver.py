@@ -53,6 +53,7 @@ class Block(object):
                 schedule.gen_restart(M)
             else:
                 self.cisolver.optimized = False
+                schedule.maxiter = 28
                 schedule.gen_initial(minM = self.minM, maxM = M)
 
         self.cisolver.set_schedule(schedule)

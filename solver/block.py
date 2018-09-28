@@ -6,6 +6,14 @@ from libdmet.system import integral
 from libdmet.utils.misc import grep
 from copy import deepcopy
 import subprocess as sub
+# Settings
+try:
+    import settings
+except ImportError:
+    import sys
+    sys.stderr.write('settings.py not found.  Please create %s\n'
+                     % os.path.join(os.path.dirname(__file__), 'settings.py'))
+    raise ImportError('settings.py not found')
 
 class Schedule(object):
     def __init__(self, maxiter = 28, sweeptol = 1e-6):
@@ -191,8 +199,10 @@ class Block(object):
     #        "../block"))
     #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx/' # ZHC add
     #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx_pdm_new_git/' # ZHC add
-    execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
+    #execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
     #execPath = '/home/zcui/program/stackblock_bx_new_pdm/' # ZHC add
+    execPath = settings.BLOCKPATH
+
     nproc = 1
     nnode = 1
     intFormat = "FCIDUMP"
@@ -570,8 +580,9 @@ class StackBlock(Block):
     #        "../StackBlock"))
     #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx/' # ZHC add
     #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx_pdm_new_git/' # ZHC add
-    execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
+    #execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
     #execPath = '/home/zcui/program/stackblock_bx_new_pdm/' # ZHC add
+    execPath = settings.BLOCKPATH
     nthread = 28
 
     # File names
