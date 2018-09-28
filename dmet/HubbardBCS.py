@@ -75,10 +75,10 @@ def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
 
         return GRhoImp, Efrag/nscsites, nelec/nscsites
 
-def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu, Mu, last_dmu, vcor, U):
+def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, last_dmu, Mu):
     nscsites = basis.shape[-2] / 2
     GRhoImp, Efrag, nelec = bcs.transformResults_new(GRhoEmb, E, lattice, \
-            basis, ImpHam, H_energy, dmu, Mu, last_dmu, vcor, U)
+            basis, ImpHam, H_energy, last_dmu, Mu)
     log.debug(1, "impurity generalized density matrix:\n%s", GRhoImp)
 
     if Efrag is None:
@@ -100,11 +100,6 @@ Hubbard.transformResults = lambda GRhoEmb, E, basis, ImpHam, H_energy: \
 def ConstructImpHam(Lat, GRho, v, mu, matching = True, local = True, **kwargs):
     log.result("Making embedding basis")
     basis = bcs.embBasis(Lat, GRho, local = local, **kwargs)
-    #print "local"
-    #print local
-    #print "matching"
-    #print matching
-    #exit()
     if matching:
         log.result("Rotate bath orbitals to match alpha and beta basis")
         nbasis = basis.shape[-1]

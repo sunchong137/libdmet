@@ -189,9 +189,9 @@ class Block(object):
 
     #execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
     #        "../block"))
-    execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx/' # ZHC add
+    #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx/' # ZHC add
     #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx_pdm_new_git/' # ZHC add
-    #execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
+    execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
     #execPath = '/home/zcui/program/stackblock_bx_new_pdm/' # ZHC add
     nproc = 1
     nnode = 1
@@ -568,9 +568,9 @@ class StackBlock(Block):
 
     #execPath = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
     #        "../StackBlock"))
-    execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx/' # ZHC add
+    #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx/' # ZHC add
     #execPath = '/home/zhcui/program/libdmet_ZHC/stackblock_bx_pdm_new_git/' # ZHC add
-    #execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
+    execPath = '/home/zcui/program/stackblock_bx/' # ZHC add
     #execPath = '/home/zcui/program/stackblock_bx_new_pdm/' # ZHC add
     nthread = 28
 

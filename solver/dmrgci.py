@@ -255,8 +255,8 @@ def gaopt(Ham, tmp = "/tmp"):
 
     #executable = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), \
     #        "../block/genetic/gaopt"))
-    executable = "/home/zhcui/program/libdmet_ZHC/stackblock_bx/genetic/gaopt"
-    #executable = "/home/zcui/program/stackblock_bx/genetic/gaopt"
+    #executable = "/home/zhcui/program/libdmet_ZHC/stackblock_bx/genetic/gaopt"
+    executable = "/home/zcui/program/stackblock_bx/genetic/gaopt"
     
     log.debug(0, "gaopt executable: %s", executable)
 
