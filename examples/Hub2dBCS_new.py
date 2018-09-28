@@ -14,9 +14,9 @@ Filling = 0.8 / 2.0
 Mu = U * Filling # initial guess of global Mu
 last_dmu = 0.0 # initial guess of dmu in correlated problem
 MaxIter = 50
-maxM = 600
+maxM = 1200
 LMO = False # LMO or site basis
-save_vcor = False # save vcor or load vcor 
+save_vcor = True # save vcor or load vcor 
 
 # DIIS settings:
 DiisStart = 4 
@@ -77,7 +77,7 @@ for iter in range(MaxIter):
         solver_args = {}
     GRhoEmb, EnergyEmb, ImpHam, dmu = \
             dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver, \
-            delta = 0.05, step = 0.125, thrnelec = 1e-5\
+            delta = 0.05, step = 0.125, thrnelec = 1e-5,\
             solver_args = solver_args) 
             # ZHC NOTE be careful of delta and step
     
