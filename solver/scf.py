@@ -325,6 +325,8 @@ def newton(mf):
             self.max_cycle_inner = 15
             self.canonicalization = True
 
+            self.kf_trust_region = 5 # ZHC NOTE add
+            self.kf_interval = 4 # ZHC NOTE add
             self.ah_conv_tol = 1e-12
             self.ah_lindep = 1e-14
             self.ah_max_cycle = 30
@@ -377,7 +379,7 @@ def newton(mf):
         def gen_g_hop(self, mo_coeff, mo_occ, fock_ao = None, h1e = None):
             return gen_g_hop_uhfb(self, mo_coeff, mo_occ, fock_ao)
 
-        def update_rotate_matrix(self, dx, mo_occ, u0 = 1):
+        def update_rotate_matrix(self, dx, mo_occ, u0 = 1, mo_coeff=None): # ZHC NOTE add mo_coeff
             import scipy
             nmo = len(mo_occ)
             occidx = mo_occ == 1
@@ -715,7 +717,7 @@ if __name__ == "__main__":
         Int2e[2,i,i,i,i] = 4
 
     #scf = SCF(newton_ah = True)
-    scf = SCF()
+    scf = SCF(newton_ah = False)
 
     # UHF
     scf.set_system(8, 0, False, False)
