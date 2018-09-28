@@ -127,10 +127,11 @@ for iter in range(MaxIter):
 
 if dump_file is not None:
     log.result("Dumping the results...")
-    if dump_file[-4:] = '.npy':
-        dump_res = np.array([Mu, last_dmu, vcor.param, basis, GRhoEmb, GRhoImp, EnergyImp, nelecImp])
+    if dump_file[-4:] == '.npy':
+        dump_res = np.array([Mu, last_dmu, vcor.param, basis, GRhoEmb, \
+                GRhoImp, EnergyImp, nelecImp], dtype = object)
         np.save(dump_file, dump_res)
-    elif dump_file[-5:] = '.hdf5':
+    elif dump_file[-5:] == '.hdf5':
         # ZHC TODO add hdf5 format
         raise NotImplementedError
     else:

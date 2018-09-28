@@ -481,7 +481,7 @@ class UMP2(MP2):
 # main class for uihf, uhfb and ump2
 
 class SCF(object):
-    def __init__(self, tmp = "/tmp", newton_ah = False):
+    def __init__(self, tmp = "/tmp", newton_ah = True):
         self.sys_initialized = False
         self.integral_initialized = False
         self.doneHF = False
@@ -714,6 +714,7 @@ if __name__ == "__main__":
         Int2e[1,i,i,i,i] = 4
         Int2e[2,i,i,i,i] = 4
 
+    #scf = SCF(newton_ah = True)
     scf = SCF()
 
     # UHF
@@ -728,6 +729,7 @@ if __name__ == "__main__":
     log.result("HF density matrix:\n%s\n%s", rhoHF[0], rhoHF[1])
 
     # UHFB
+    scf = SCF(newton_ah = True)
     np.random.seed(8)
     scf.set_system(None, 0, True, False)
     scf.set_integral(8, 0, {"cd": Int1e, "cc": np.random.rand(1,8,8) * 0.1}, \

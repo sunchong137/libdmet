@@ -19,7 +19,7 @@ def get_BCS_mo(scfsolver, Ham, guess):
     scfsolver.set_integral(Ham)
 
     E_HFB, GRho_HFB = scfsolver.HFB(Mu = 0, tol = 1e-7, \
-            MaxIter = 50, InitGuess = guess)
+            MaxIter = 100, InitGuess = guess)
     return scfsolver.get_mo(), scfsolver.get_mo_energy()
 
 def get_qps(ncas, algo = "nelec", **kwargs):
