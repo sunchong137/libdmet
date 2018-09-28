@@ -8,7 +8,7 @@ import numpy.linalg as la
 log.verbose = "DEBUG0"
 
 U = 4
-LatSize = [18, 18]
+LatSize = [36, 36]
 ImpSize = [2, 2]
 #Filling = 0.875/2.0
 Filling = 0.8/2.0

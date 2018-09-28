@@ -17,6 +17,9 @@ MaxIter = 50
 maxM = 1200
 LMO = False # LMO or site basis
 save_vcor = True # save vcor or load vcor 
+#dump_file = None
+#dump_file = './dmet.hdf5'
+dump_file = './dmet.npy'
 
 # DIIS settings:
 DiisStart = 4 
@@ -122,9 +125,21 @@ for iter in range(MaxIter):
         conv = True
         break
 
+if dump_file is not None:
+    log.result("Dumping the results...")
+    if dump_file[-4:] = '.npy':
+        dump_res = np.array([Mu, last_dmu, vcor.param, basis, GRhoEmb, GRhoImp, EnergyImp, nelecImp])
+        np.save(dump_file, dump_res)
+    elif dump_file[-5:] = '.hdf5':
+        # ZHC TODO add hdf5 format
+        raise NotImplementedError
+    else:
+        raise ValueError
+
 # fix clean up
 # ZHC TODO FIXME fix the cleanup function
 #solver.cleanup()
+
 
 if conv:
     log.result("DMET converged")
