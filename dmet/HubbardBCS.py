@@ -126,7 +126,7 @@ Hubbard.apply_dmu = apply_dmu
 def AFInitGuess(ImpSize, U, Filling, polar = None, rand = 0.01):
     return Hubbard.AFInitGuess(ImpSize, U, Filling, polar, True, rand)
 
-def get_tiled_vcor(vcor_small, imp_size_small, imp_size_big):
+def get_tiled_vcor(vcor_small, imp_size_small, imp_size_big, rand = 0.0):
     import itertools as it
     from libdmet.system.lattice import SquareLattice
 
@@ -144,7 +144,8 @@ def get_tiled_vcor(vcor_small, imp_size_small, imp_size_big):
     # assign the vcor_small to correct place of vcor_big
     vcor_mat_small = vcor_small.get()
     vcor_mat_big = np.zeros((3, nscsites_big, nscsites_big), dtype = vcor_mat_small.dtype)
-    
+    vcor_mat_big[2] = (np.random.rand(nscsites_big, nscsites_big) - 0.5) * rand
+
     for i, cell_i in enumerate(cell_idx):
         idx = np.ix_(cell_i, cell_i)
         vcor_mat_big[0][idx] = vcor_mat_small[0]
@@ -164,11 +165,11 @@ FitVcor = bcs.FitVcorTwoStep
 foldRho = bcs.foldRho
 
 if __name__ == '__main__':
-    imp_size_big = (4, 4)
+    imp_size_big = (2, 4)
     imp_size_small = (2, 2)
     np.set_printoptions(4, linewidth = 1000, suppress = True)
-    vcor = AFInitGuess(imp_size_small, 8.0, 0.5, rand = 0.001)
-    print get_tiled_vcor(vcor, imp_size_small, imp_size_big).get()
-    vcor_big = AFInitGuess(imp_size_big, 8.0, 0.5, rand = 0.001)
-    print vcor_big.get()
+    vcor = AFInitGuess(imp_size_small, 8.0, 0.5, rand = 0.0)
+    print get_tiled_vcor(vcor, imp_size_small, imp_size_big, rand = 0.001).get()
+    #vcor_big = AFInitGuess(imp_size_big, 8.0, 0.5, rand = 0.001)
+    #print vcor_big.get()
 
