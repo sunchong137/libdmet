@@ -569,7 +569,7 @@ class SCF(object):
                     newtonUIHF.dump_flags()
                     conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUIHF, \
                             tuple(mo_coeff), tuple(mo_occ), \
-                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
+                            max_cycle=100, conv_tol = self.mf.conv_tol, verbose=5)
                 else:
                     self.mf.max_cycle = 0
                     self.mf.scf(np.zeros((2, self.integral.norb, self.integral.norb)))
@@ -580,7 +580,7 @@ class SCF(object):
                     newtonUIHF.dump_flags()
                     conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUIHF, \
                             self.mf.mo_coeff, self.mf.mo_occ, \
-                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
+                            max_cycle=100, conv_tol = self.mf.conv_tol, verbose=5)
 
                 self.mf.mo_energy = mo_energy
                 self.mf.mo_coeff = mo_coeff
@@ -643,7 +643,7 @@ class SCF(object):
                     newtonUHFB.dump_flags()
 
                     conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUHFB, mo_coeff, mo_occ, \
-                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
+                            max_cycle=100, conv_tol = self.mf.conv_tol, verbose=5)
                 else:
                     # do an initial traditional HF to generate orbitals
                     self.mf.max_cycle = 1
@@ -654,7 +654,7 @@ class SCF(object):
 
                     conv, E, mo_energy, mo_coeff, mo_occ = kernel(newtonUHFB, \
                             self.mf.mo_coeff, self.mf.mo_occ, \
-                            max_cycle=50, conv_tol = self.mf.conv_tol, verbose=5)
+                            max_cycle=100, conv_tol = self.mf.conv_tol, verbose=5)
 
                 self.mf.mo_energy = mo_energy
                 self.mf.mo_coeff = mo_coeff
