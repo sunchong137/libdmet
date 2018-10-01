@@ -12,6 +12,7 @@ from fit import minimize
 from libdmet.utils.misc import mdot, find
 from libdmet import settings
 
+
 def embBasis(lattice, GRho, local = True, **kwargs):
     if local:
         return __embBasis_proj(lattice, GRho, **kwargs)
@@ -68,6 +69,11 @@ def __embBasis_proj(lattice, GRho, **kwargs):
         log.debug(1, "bath orbitals\n%s", vt)
         # ZHC NOTE first two site basis, third emb basis (dim contract with singular value)
         B = np.transpose(vt.reshape((nscsites*2, ncells-1, nscsites*2)), (1, 2, 0))
+        if "localize_bath" in kwargs:
+            if kwargs["localize_bath"] == True:
+                # PM localization of bath
+                from localizer import localize_bath
+                B = localize_bath(B)
         basis[0, 0, :nscsites, :nscsites] = np.eye(nscsites)
         basis[1, 0, :nscsites, :nscsites] = np.eye(nscsites)
         # FIXME cut B to gain the largest particle property?
@@ -83,7 +89,10 @@ def __embBasis_proj(lattice, GRho, **kwargs):
         basis[1, 1:, :nscsites, nscsites:], basis[1, 1:, nscsites:, nscsites:] = \
                 B[:, nscsites:, orderB], B[:, :nscsites, orderB]
         log.info("Bath coupling strength\n%s\n%s", s[orderA], s[orderB])
-    return basis
+    if "return_bath" in kwargs:
+        return B
+    else:
+        return basis
 
 def __embBasis_phsymm(lattice, GRho, **kwargs):
     if "sites" in kwargs:
