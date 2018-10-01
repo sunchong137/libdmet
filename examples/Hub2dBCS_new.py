@@ -7,7 +7,7 @@ import numpy.linalg as la
 log.verbose = "DEBUG0"
 
 # System settings:
-LatSize = [36, 36]
+LatSize = [72, 72]
 ImpSize = [2, 2]
 U = 6.0 
 Filling = 0.8 / 2.0 
@@ -119,7 +119,10 @@ for iter in range(MaxIter):
     
     history.update(EnergyImp, err, nelecImp, dVcor_per_ele, dc)
     history.write_table()
-    
+    dump_res_iter = np.array([Mu, last_dmu, vcor.param], dtype = object)
+    np.save('./dmet_iter.npy', dump_res_iter)
+
+
     # ZHC NOTE convergence criterion
     if dVcor_per_ele < 5.0e-5 and abs(dE) < 5.0e-4 and iter > 3 :
         conv = True
