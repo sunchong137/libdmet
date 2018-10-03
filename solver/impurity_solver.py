@@ -28,6 +28,8 @@ class Block(object):
         self.cisolver.createTmp(tmp = TmpDir, shared = SharedDir)
         block.Block.reorder = reorder
         self.schedule = block.Schedule(sweeptol = tol)
+        if minM > maxM:
+            minM = maxM
         self.minM = minM
         self.maxM = maxM
         self.spinAdapted = spinAdapted
@@ -86,6 +88,8 @@ class StackBlock(Block):
         self.cisolver.createTmp(tmp = TmpDir, shared = SharedDir)
         block.StackBlock.reorder = reorder
         self.schedule = block.Schedule(sweeptol = tol)
+        if minM > maxM:
+            minM = maxM
         self.minM = minM
         self.maxM = maxM
         self.spinAdapted = spinAdapted

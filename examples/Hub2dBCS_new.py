@@ -85,6 +85,7 @@ for iter in range(MaxIter):
             # ZHC NOTE be careful of delta and step
     
     last_dmu += dmu
+    log.result("last_dmu = %20.12f", last_dmu)
     
     GRhoImp, EnergyImp, nelecImp = \
             dmet.transformResults_new(GRhoEmb, EnergyEmb, Lat, basis, ImpHam, H_energy, last_dmu, Mu)
