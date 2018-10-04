@@ -224,8 +224,8 @@ class Block(object):
         cls.nnode = nnode
         log.info("Block interface  running with %d nodes, %d processors per node", \
             cls.nnode, cls.nproc)
-        #log.info("Block running on nodes:\n%s", sub.check_output(Block.mpipernode + \
-        #        ["hostname"]).replace("\n", "\t"))
+        log.info("Block running on nodes:\n%s", sub.check_output(Block.mpipernode + \
+                ["hostname"]).replace("\n", "\t"))
 
     def __init__(self):
         self.sys_initialized = False
@@ -600,8 +600,8 @@ class StackBlock(Block):
         log.info("StackBlock interface  running with %d nodes,"
                 " %d processes per node, %d threads per process", \
             cls.nnode, cls.nproc, cls.nthread)
-        #log.info("StackBlock running on nodes:\n%s", \
-        #        sub.check_output(StackBlock.mpipernode + ["hostname"]).replace("\n", "\t"))
+        log.info("StackBlock running on nodes:\n%s", \
+                sub.check_output(StackBlock.mpipernode + ["hostname"]).replace("\n", "\t"))
 
 
     def __init__(self):
