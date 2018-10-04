@@ -356,7 +356,9 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = False, 
             print "WARNING: Minimization unsuccessful. Message: ",min_result.message
     
         gnorm_new = la.norm(min_result.jac)
-        if (gnorm_new < gnorm_res) and (min_result.fun < err_end) and (np.max(np.abs(param_new_2 - param_new)) < 0.5):
+        diff_CG_BX = np.max(np.abs(param_new_2 - param_new))
+        print "max diff in x between CG and BX", diff_CG_BX
+        if (gnorm_new < gnorm_res * 0.5) and (min_result.fun < err_end) and (diff_CG_BX < 1.0):
             print "CG result used"
             vcor.param = param_new_2
             err_end = min_result.fun
@@ -522,7 +524,9 @@ def FitVcorEmb_triu(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = Fa
             print "WARNING: Minimization unsuccessful. Message: ",min_result.message
     
         gnorm_new = la.norm(min_result.jac)
-        if (gnorm_new < gnorm_res) and (min_result.fun < err_end) and (np.max(np.abs(param_new_2 - param_new)) < 0.5):
+        diff_CG_BX = np.max(np.abs(param_new_2 - param_new))
+        print "max diff in x between CG and BX", diff_CG_BX
+        if (gnorm_new < gnorm_res * 0.5) and (min_result.fun < err_end) and (diff_CG_BX < 1.0):
             print "CG result used"
             vcor.param = param_new_2
             err_end = min_result.fun
