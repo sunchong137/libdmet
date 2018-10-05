@@ -157,6 +157,17 @@ def get_tiled_vcor(vcor_small, imp_size_small, imp_size_big, rand = 0.0):
 
     return vcor_big
 
+def restart_from_dmet_iter(vcor0, f_name = './dmet_iter.npy'):
+    Mu, last_dmu, vcor_param = np.load(f_name)
+    vcor0.update(vcor_param)
+    return vcor0, Mu, last_dmu
+
+def restart_from_hdf5():
+    pass
+
+def restart_mu_record():
+    pass
+
 
 addDiag = bcs.addDiag
 

@@ -333,6 +333,9 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = False, 
     
     # ZHC NOTE
     gnorm_res = la.norm(gradfunc(param))
+    
+    vcor.update(param)
+    
     print "Minimizer converge pattern: %d "%converge_pattern
     print "Current function value: %15.8f"%err_end
     print "Norm of gradients: %15.8f"%gnorm_res
@@ -360,7 +363,8 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = False, 
         print "max diff in x between CG and BX", diff_CG_BX
         if (gnorm_new < gnorm_res * 0.5) and (min_result.fun < err_end) and (diff_CG_BX < 1.0):
             print "CG result used"
-            vcor.param = param_new_2
+            #vcor.param = param_new_2
+            vcor.update(param_new_2)
             err_end = min_result.fun
         else:
             print "BX result used"
@@ -499,7 +503,7 @@ def FitVcorEmb_triu(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = Fa
     # ZHC NOTE
     gnorm_res = la.norm(gradfunc(param))
     
-    vcor.param = param
+    vcor.update(param)
     
     print "Minimizer converge pattern: %d "%converge_pattern
     print "Current function value: %15.8f"%err_end
@@ -528,7 +532,7 @@ def FitVcorEmb_triu(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = Fa
         print "max diff in x between CG and BX", diff_CG_BX
         if (gnorm_new < gnorm_res * 0.5) and (min_result.fun < err_end) and (diff_CG_BX < 1.0):
             print "CG result used"
-            vcor.param = param_new_2
+            vcor.update(param_new_2)
             err_end = min_result.fun
         else:
             print "BX result used"
