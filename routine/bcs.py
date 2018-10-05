@@ -368,6 +368,7 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = False, 
             err_end = min_result.fun
         else:
             print "BX result used"
+            vcor.update(param_new)
     else:
         print "BX result used"
 
@@ -536,6 +537,7 @@ def FitVcorEmb_triu(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = Fa
             err_end = min_result.fun
         else:
             print "BX result used"
+            vcor.update(param_new)
     else:
         print "BX result used"
 
