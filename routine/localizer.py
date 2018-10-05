@@ -137,13 +137,13 @@ class Localizer(object):
         Iter = 0
         log.info("Edmiston-Ruedenberg localization")
         initL = self.getL()
-        log.debug(0, "Iter        L            dL     (i , j)   theta/pi")
+        log.debug(1, "Iter        L            dL     (i , j)   theta/pi")
         sweep = []
         for i,j in it.combinations(range(self.norbs), 2):
             sweep.append((i, j) + self.predictor(i, j))
         sweep.sort(key = lambda x: x[3])
         i, j, theta, dL = sweep[-1]
-        log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", \
+        log.debug(1, "%4d %12.6f %12.6f %3d %3d  %10.6f", \
                 Iter, self.getL(), dL, i, j, theta/pi)
         while dL > thr and Iter < MaxIter:
             self.transformInt(i,j,theta)
@@ -154,7 +154,7 @@ class Localizer(object):
                 sweep.append((i, j) + self.predictor(i, j))
             sweep.sort(key = lambda x: x[3])
             i, j, theta, dL = sweep[-1]
-            log.debug(0, "%4d %12.6f %12.6f %3d %3d  %10.6f", \
+            log.debug(1, "%4d %12.6f %12.6f %3d %3d  %10.6f", \
                     Iter, self.getL(), dL, i, j, theta/pi)
         log.info("Localization converged after %4d iterations", Iter)
         log.info("Cost function: init %12.6f   final %12.6f", initL, self.getL())
