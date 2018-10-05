@@ -335,8 +335,8 @@ class Block(object):
         log.info("%s call No. %d", type(self).name, self.count)
         log.debug(0, "Written to file %s", outputfile)
         with open(outputfile, "w", buffering = 1) as f:
-            #if type(self).env_slurm:
-            if True:
+            if type(self).env_slurm:
+            #if True:
                 sub.check_call(" ".join(["srun", \
                     os.path.join(type(self).execPath, "block.spin_adapted"), \
                     os.path.join(self.tmpDir, "dmrg.conf.%03d" % self.count)]), \
@@ -356,8 +356,8 @@ class Block(object):
         log.info("OH call No. %d", self.count)
         log.debug(0, "Written to file %s", outputfile)
         with open(outputfile, "w", buffering = 1) as f:
-            #if type(self).env_slurm:
-            if True:
+            if type(self).env_slurm:
+            #if True:
                 sub.check_call(" ".join(["srun", "-n", "1", \
                     os.path.join(type(self).execPath, "OH"), os.path.join(self.tmpDir, \
                     "dmrg.conf.%03d" % self.count)]), \
