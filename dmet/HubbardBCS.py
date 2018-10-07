@@ -126,7 +126,7 @@ Hubbard.apply_dmu = apply_dmu
 def AFInitGuess(ImpSize, U, Filling, polar = None, rand = 0.01):
     return Hubbard.AFInitGuess(ImpSize, U, Filling, polar, True, rand)
 
-def get_tiled_vcor(vcor_small, imp_size_small, imp_size_big, rand = 0.0):
+def get_tiled_vcor(vcor_small, imp_size_small, imp_size_big, rand = 0.0, U_Filling = None):
     import itertools as it
     from libdmet.system.lattice import SquareLattice
 
@@ -151,8 +151,21 @@ def get_tiled_vcor(vcor_small, imp_size_small, imp_size_big, rand = 0.0):
         vcor_mat_big[0][idx] = vcor_mat_small[0]
         vcor_mat_big[1][idx] = vcor_mat_small[1]
         vcor_mat_big[2][idx] = vcor_mat_small[2]
+
+    if U_Filling is not None:
+        log.info("use default U, Filling to generate diagonal elements of vcor")
+        U, Filling = U_Filling
+    else:
+        U, Filling = 0.0, 0.5
     
-    vcor_big = AFInitGuess(imp_size_big, 0.0, 0.5, rand = 0.0)
+    vcor_big = AFInitGuess(imp_size_big, U, Filling, rand = 0.0)
+
+    if U_Filling is not None:
+
+        vcor_mat_big_default = vcor_big.get()
+        np.fill_diagonal(vcor_mat_big[0], vcor_mat_big_default[0].diagonal())
+        np.fill_diagonal(vcor_mat_big[1], vcor_mat_big_default[1].diagonal())
+    
     vcor_big.assign(vcor_mat_big)
 
     return vcor_big

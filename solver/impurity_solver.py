@@ -19,7 +19,7 @@ except ImportError:
 class Block(object):
     def __init__(self, nproc, nnode = 1, TmpDir = "./tmp", SharedDir = None, \
             reorder = False, minM = 100, maxM = None, tol = 1e-6, spinAdapted = False, \
-            bcs = False):
+            bcs = False, maxiter_initial = 28, maxiter_restart = 14):
         log.eassert(nnode == 1 or SharedDir is not None, \
                 "Running on multiple nodes (nnod = %d), must specify shared directory", \
                 nnode)
@@ -34,6 +34,8 @@ class Block(object):
         self.maxM = maxM
         self.spinAdapted = spinAdapted
         self.bcs = bcs
+        self.maxiter_initial = maxiter_initial
+        self.maxiter_restart = maxiter_restart
 
     #def run(self, Ham, M = None, nelec = None, schedule = None, similar = False, restart = False):
     def run(self, Ham, M = None, nelec = None, schedule = None, similar = False, restart = True):
@@ -51,11 +53,11 @@ class Block(object):
         if schedule is None:
             schedule = self.schedule
             if self.cisolver.optimized and restart:
-                schedule.maxiter = 14
+                schedule.maxiter = self.maxiter_restart
                 schedule.gen_restart(M)
             else:
                 self.cisolver.optimized = False
-                schedule.maxiter = 28
+                schedule.maxiter = self.maxiter_initial
                 schedule.gen_initial(minM = self.minM, maxM = M)
 
         self.cisolver.set_schedule(schedule)
@@ -79,7 +81,7 @@ class Block(object):
 class StackBlock(Block):
     def __init__(self, nproc, nthread = 1, nnode = 1, TmpDir = "./tmp", SharedDir = None, \
             reorder = False, minM = 100, maxM = None, tol = 1e-6, spinAdapted = False, \
-            bcs = False, mem = 80):
+            bcs = False, mem = 80, maxiter_initial = 28, maxiter_restart = 14):
         log.eassert(nnode == 1 or SharedDir is not None, \
                 "Running on multiple nodes (nnod = %d), must specify shared directory", \
                 nnode)
@@ -95,6 +97,8 @@ class StackBlock(Block):
         self.spinAdapted = spinAdapted
         self.bcs = bcs
         self.cisolver.mem = mem
+        self.maxiter_initial = maxiter_initial
+        self.maxiter_restart = maxiter_restart
 
 class CASSCF(object):
 

@@ -61,6 +61,10 @@ class Schedule(object):
         self.arraySweep = [0, 1, 3]
         self.arrayTol = [self.sweeptol, self.sweeptol * 0.1, self.sweeptol * 0.1]
         self.arrayNoise = [self.sweeptol, self.sweeptol * 0.1, 0]
+        #self.arrayM = [M, M, M, M]
+        #self.arraySweep = [0, 2, 4, 6]
+        #self.arrayTol = [self.sweeptol * 10.0, self.sweeptol, self.sweeptol * 0.1, self.sweeptol * 0.1]
+        #self.arrayNoise = [self.sweeptol * 10.0, self.sweeptol, self.sweeptol * 0.1, 0.0]
 
         log.debug(2, "bond dimension  " + " %d" * len(self.arrayM), *self.arrayM)
         log.debug(2, "at sweeps       " + " %d" * len(self.arraySweep), *self.arraySweep)
