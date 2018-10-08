@@ -231,7 +231,7 @@ def split_localize(orbs, info, Ham, basis = None):
     HamLocal = integral.Integral(norbs, False, False, Ham.H0, H1, H2)
     return HamLocal, localorbs, rotmat
 
-def gaopt(Ham, tmp = "/tmp"):
+def gaopt(Ham, tmp = "./tmp"):
     norbs = Ham.norb
     # build K matrix
     K = np.empty((norbs, norbs))

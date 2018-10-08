@@ -7,15 +7,15 @@ import numpy.linalg as la
 log.verbose = "DEBUG0"
 
 # System settings:
-LatSize = [72, 72]
-ImpSize = [2, 2]
+LatSize = (72, 72)
+ImpSize = (2, 2)
 U = 6.0 
 Filling = 0.8 / 2.0 
 Mu = U * Filling # initial guess of global Mu
 last_dmu = 0.0 # initial guess of dmu in correlated problem
 MaxIter = 50
 maxM = 1200
-LMO = False # LMO or site basis
+LMO = True # LMO or site basis
 save_vcor = True # save vcor or load vcor 
 #dump_file = None
 #dump_file = './dmet.hdf5'
@@ -65,11 +65,11 @@ for iter in range(MaxIter):
 
     log.section ("\nsolving mean-field problem\n")
     log.result("Vcor =\n%s", vcor.get())
-    log.result("Mu (guess) = %20.12f", Mu)
+    log.result("Mu (guess) : %20.12f", Mu)
     GRho, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu, thrnelec = 1e-7)
 
     log.section("\nconstructing impurity problem\n")
-    ImpHam, H_energy, basis = dmet.ConstructImpHam(Lat, GRho, vcor, Mu) 
+    ImpHam, H_energy, basis = dmet.ConstructImpHam(Lat, GRho, vcor, Mu, localize_bath = True) 
     ImpHam = dmet.apply_dmu(Lat, ImpHam, basis, last_dmu) 
     log.section("\nsolving impurity problem\n")
     
@@ -80,12 +80,12 @@ for iter in range(MaxIter):
         solver_args = {}
     GRhoEmb, EnergyEmb, ImpHam, dmu = \
             dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver, \
-            delta = 0.05, step = 0.125, thrnelec = 1e-5,\
+            delta = 0.01, step = 0.125, thrnelec = 1e-5,\
             solver_args = solver_args) 
             # ZHC NOTE be careful of delta and step
     
     last_dmu += dmu
-    log.result("last_dmu = %20.12f", last_dmu)
+    log.result("last_dmu : %20.12f", last_dmu)
     
     GRhoImp, EnergyImp, nelecImp = \
             dmet.transformResults_new(GRhoEmb, EnergyEmb, Lat, basis, ImpHam, H_energy, last_dmu, Mu)
@@ -93,7 +93,7 @@ for iter in range(MaxIter):
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(GRhoEmb, Lat, basis, vcor, Mu, \
             MaxIter1 = max(len(vcor.param) * 10, 1000), MaxIter2 = 0,\
-            triu = True, CG_check = False) # ZHC NOTE triu cost function and CG_check
+            triu = False, CG_check = True) # ZHC NOTE triu cost function and CG_check
 
     # ZHC NOTE add damping?
     if iter >= TraceStart:

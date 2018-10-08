@@ -105,8 +105,11 @@ def __embBasis_proj(lattice, rho, **kwargs):
         #B = np.rollaxis(np.tensordot(la.inv(A), rho[s, 1:], axes = (1,1)), 0, 3)
         #B = orthonormalizeBasis(B)
         GRhoImpEnv = np.transpose(rho[s, 1:], (1, 0, 2)).reshape(nscsites, nscsites*(ncells-1))
-        _, _, vt = la.svd(GRhoImpEnv, full_matrices = False)
-        B = np.transpose(vt.reshape((nscsites, ncells-1, nscsites)), (1,2,0))
+        if GRhoImpEnv.shape[1] != 0:
+            _, _, vt = la.svd(GRhoImpEnv, full_matrices = False)
+            B = np.transpose(vt.reshape((nscsites, ncells-1, nscsites)), (1,2,0))
+        else: # special case when no bath
+            B = 0.0
         basis[s, 0, :, :nscsites] = np.eye(nscsites)
         basis[s, 1:, :, nscsites:] = B
     return basis
