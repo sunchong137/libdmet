@@ -488,6 +488,7 @@ class SCF(object):
         self.integral_initialized = False
         self.doneHF = False
         self.newton_ah = newton_ah
+        self.newton_pyscf = False
         log.debug(0, "Using pyscf version %s", pyscf.__version__)
         if self.newton_ah:
             if log.Level[log.verbose] <= log.Level["RESULT"]:
@@ -553,7 +554,23 @@ class SCF(object):
             self.mf._eri = self.integral.H2["ccdd"] #vaa, vbb, vab
             self.mf.conv_tol = tol
 
-            if self.newton_ah:
+            if self.newton_pyscf:
+                from pyscf.scf import UHF
+
+                self.mf = UHF(self.mol)
+                self.mf.get_hcore = lambda *args: self.integral.H1["cd"][0]
+                self.mf.get_ovlp = lambda *args: np.eye(self.integral.norb) 
+                self.mf._eri = ao2mo.restore(8, self.integral.H2["ccdd"][0], self.integral.norb)
+                self.mf = self.mf.newton()
+                
+                if InitGuess is not None:
+                    E = self.mf.run(InitGuess).e_tot
+                else:
+                    E = self.mf.run(np.zeros((2, self.integral.norb, self.integral.norb))).e_tot
+ 
+
+
+            elif self.newton_ah:
                 from pyscf.soscf.newton_ah import kernel, newton
 
                 if InitGuess is not None:
