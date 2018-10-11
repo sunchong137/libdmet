@@ -124,13 +124,22 @@ def quad_fit(mu, deltaN, tol = 1e-12):
             print "roots: ", roots
             return 0, False
 
+def has_duplicate(delta, mus):
+    dmus_abs = np.abs(mus - delta)
+    return (dmus_abs < 1e-6).any()
+
+def violate_previous_mu(delta, mus, target, nelecs):
+    x = delta - mus
+    y = target - nelecs
+    return ((x * y) < 0.0).any()
+
+
 def quad_fit_mu(mus, nelecs, filling, step):
 
     num_fit = len(mus) - 2
     log.info("use quadratic fitting # %d", num_fit)
  
     target = filling * 2.0
-
     dN = nelecs - target
     dN_abs = np.abs(dN)
     
@@ -138,34 +147,41 @@ def quad_fit_mu(mus, nelecs, filling, step):
     idx_dN = np.argsort(dN_abs)
     mus_sub = mus[idx_dN][:3]
     dN_sub = dN[idx_dN][:3]
-    
+   
+    # quadratic fit
     delta, status = quad_fit(mus_sub, dN_sub, tol = 1e-12)
     
     # check duplicates
-    dmus_abs = np.abs(mus - delta)
-    if (dmus_abs < 1e-6).any():
+    if has_duplicate(delta, mus):
         log.info("duplicate in extrapolation.")
         status = False
 
     if not status:
-        log.info("quadratic fails, use linear regression.")
-        #from scipy import stats
+        log.info("quadratic fails or duplicates, use linear regression.")
         slope, intercept, r_value, p_value, std_err = stats.linregress(dN_sub, mus_sub)
         delta = intercept
     
-    # check duplicates
-    dmus_abs = np.abs(mus - delta)
-    if (dmus_abs < 1e-6).any():
-        log.info("duplicate in extrapolation.")
-        delta = copysign(step, delta)
+    # check monotonic for the predict mu:
+    if violate_previous_mu(delta, mus, target, nelecs):
+        log.info("predicted mu violates previous mus. Try linear regression.")
+        slope, intercept, r_value, p_value, std_err = stats.linregress(dN_sub, mus_sub)
+        delta = intercept
+        if violate_previous_mu(delta, mus, target, nelecs):
+            log.info("predicted mu from linear regression also violates. use finite step.")
+            delta = copysign(step, (target - nelecs[-1])) +  mus[-1]
 
-    if abs(delta) > step:
-        log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta, step)
-        delta = copysign(step, delta)
+    if abs(delta - mus[-1]) > step:
+        log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta - mus[-1], step)
+        delta = copysign(step, delta - mus[-1]) + mus[-1]
+    
+    # check duplicates
+    if has_duplicate(delta, mus):
+        log.info("duplicate in extrapolation.")
+        delta = copysign(step, delta - mus[-1]) + mus[-1]
     
     if (delta - mus[-1]) * (target - nelecs[-1]) < 0 and abs(delta - mus[-1]) > 2e-3 :
         log.info("extrapolation gives wrong direction, use finite difference")
-        delta = copysign(step, (target - nelecs[-1]))
+        delta = copysign(step, (target - nelecs[-1])) +  mus[-1]
     
     log.result("extrapolated to dMu = %20.12f", delta)
 

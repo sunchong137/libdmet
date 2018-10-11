@@ -111,7 +111,7 @@ class MuSolver(object):
                 if abs(delta1) > step:
                     log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta1, step)
                     delta1_tmp = copysign(step, delta1)
-                    step = min(abs(delta1), 0.5)
+                    step = min(abs(delta1), 0.25)
                     delta1 = delta1_tmp
                 log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
                 log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
