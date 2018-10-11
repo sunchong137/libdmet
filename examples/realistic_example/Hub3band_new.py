@@ -23,7 +23,7 @@ ImpSize = (2, 2)
 
 #Mu = Ud * Filling * 0.5 + ed
 Mu = 0.8722966985304166
-last_dmu = 1.0544372684455248 
+last_dmu = 1.0844372684455248 
 MaxIter = 50
 
 maxM = 600
@@ -122,7 +122,8 @@ for iter in range(MaxIter):
             delta = 0.02, step = 0.15, thrnelec = 2e-5,\
             solver_args = solver_args) 
             # ZHC NOTE be careful of delta and step
-    
+    dmet.SolveImpHam_with_fitting.save("./frecord")
+
     last_dmu += dmu
     log.result("last_dmu : %20.12f", last_dmu)
     

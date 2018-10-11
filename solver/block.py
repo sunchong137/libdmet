@@ -241,6 +241,7 @@ class Block(object):
         self.warmup_method = "local_4site"
         self.outputlevel = 0
         self.restart = False
+        self.use_global_scratch = True
 
         log.debug(0, "Using %s version %s", type(self).name, type(self).execPath)
 
@@ -331,8 +332,13 @@ class Block(object):
             files += type(self).restartFiles
 
         for f in files:
-            sub.check_call(" ".join(type(self).mpipernode + ["cp", 
-                os.path.join(self.tmpShared, f), self.tmpDir]), shell = True)
+            if not self.use_global_scratch:
+                sub.check_call(" ".join(type(self).mpipernode + ["cp", 
+                    os.path.join(self.tmpShared, f), self.tmpDir]), shell = True)
+            else:
+                sub.check_call(" ".join(["cp", 
+                    os.path.join(self.tmpShared, f), self.tmpDir]), shell = True)
+
 
     def callBlock(self):
         outputfile = os.path.join(self.tmpDir, "dmrg.out.%03d" % self.count)
