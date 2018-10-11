@@ -20,7 +20,7 @@ dump_file = './dmet.npy'
 
 # DIIS settings:
 DiisStart = 4 
-TraceStart = 2 
+TraceStart = 1 
 DiisDim = 4 # ZHC NOTE may be larger?
 dc = dmet.FDiisContext(DiisDim) # I don't know yet whether diis needs to be changed
 
@@ -75,27 +75,34 @@ for iter in range(MaxIter):
     GRho, Mu = dmet.HartreeFockBogoliubov(Lat, vcor, Filling, Mu, thrnelec = 1e-7)
 
     log.section("\nconstructing impurity problem\n")
-    ImpHam, H_energy, basis = dmet.ConstructImpHam(Lat, GRho, vcor, Mu) 
+    ImpHam, H_energy, basis = dmet.ConstructImpHam(Lat, GRho, vcor, Mu, localize_bath = False) 
     ImpHam = dmet.apply_dmu(Lat, ImpHam, basis, last_dmu) 
     log.section("\nsolving impurity problem\n")
     
     if LMO:
-        if iter <= 1:
+        if iter <= 2:
+            solver.localized_cas = None
             solver_args = {"guess": dmet.foldRho(GRho, Lat, basis), "basis": basis, "ci_args": {"restart": False}}
-        elif iter <= 3:
+        elif iter <= 4:
+            solver.localized_cas = None
             solver.cisolver.cisolver.optimized = False # not do restart among different dmet iters
             solver_args = {"guess": dmet.foldRho(GRho, Lat, basis), "basis": basis}
         else:
+            if dVcor_per_ele is not None:
+                if dVcor_per_ele > 0.005:
+                    solver.localized_cas = None
+                    solver.cisolver.cisolver.optimized = False # not do restart among different dmet iters
             solver_args = {"guess": dmet.foldRho(GRho, Lat, basis), "basis": basis}
-
     else:
         solver.cisolver.optimized = False # not do restart among different dmet iters
         solver_args = {}
+    
     GRhoEmb, EnergyEmb, ImpHam, dmu = \
             dmet.SolveImpHam_with_fitting(Lat, Filling, ImpHam, basis, solver, \
             delta = 0.004, step = 0.125, thrnelec = 2e-5,\
             solver_args = solver_args) 
             # ZHC NOTE be careful of delta and step
+    dmet.SolveImpHam_with_fitting.save("./frecord")
     
     last_dmu += dmu
     log.result("last_dmu : %20.12f", last_dmu)
@@ -106,7 +113,7 @@ for iter in range(MaxIter):
     log.section("\nfitting correlation potential\n")
     vcor_new, err = dmet.FitVcor(GRhoEmb, Lat, basis, vcor, Mu, \
             MaxIter1 = max(len(vcor.param) * 5, 1000), MaxIter2 = 0,\
-            triu = True, CG_check = True) # ZHC NOTE triu cost function and CG_check
+            triu = False, CG_check = True) # ZHC NOTE triu cost function and CG_check
 
     # ZHC NOTE add damping?
     if iter >= TraceStart:
