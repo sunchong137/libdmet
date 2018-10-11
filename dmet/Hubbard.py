@@ -111,7 +111,7 @@ class MuSolver(object):
                 if abs(delta1) > step:
                     log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta1, step)
                     delta1_tmp = copysign(step, delta1)
-                    step = abs(delta1)
+                    step = min(abs(delta1), 0.5)
                     delta1 = delta1_tmp
                 log.info("dMu = %20.12f nelec = %20.12f", 0., nelec)
                 log.info("dMu = %20.12f nelec = %20.12f", delta, nelec1)
@@ -127,23 +127,14 @@ class MuSolver(object):
                     self.history.append(record)
                     return rhoEmb2, EnergyEmb2, ImpHam, delta1
                 else:
-                    log.info("use quadratic fitting.")
-                    from quad_fit import quad_fit
-                    step *= 2.0
-                    mus = np.array([0.0, delta, delta1])
-                    delta_nelec = np.array([nelec, nelec1, nelec2]) - (filling * 2.0)
-                    delta2, status = quad_fit(mus, delta_nelec, tol = 1e-12)
-                    if not status:
-                        log.info("quadratic fails, use linear extrapolation.")
-                        slope = (nelec2 - nelec1) / (delta1 - delta)
-                        intercept = nelec1 - slope * delta
-                        delta2 = (filling * 2.0 - intercept) / slope
 
-                    if abs(delta2) > step:
-                        log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta2, step)
-                        delta2 = copysign(step, delta2)
+                    from quad_fit import quad_fit_mu
                     
-                    log.result("extrapolated to dMu = %20.12f", delta2)
+                    mus = np.array([0.0, delta, delta1])
+                    nelecs = np.array([nelec, nelec1, nelec2])
+                    
+                    delta2 = quad_fit_mu(mus, nelecs, filling, step)
+
                     rhoEmb3, EnergyEmb3 = solve_with_mu(delta2)
                     nelec3 = transformResults(rhoEmb3, None, basis, None, None)
                     record.append((delta2, nelec3))
@@ -155,28 +146,12 @@ class MuSolver(object):
                         self.history.append(record)
                         return rhoEmb3, EnergyEmb3, ImpHam, delta2
                     else:
-                        log.info("use quadratic fitting #2.")
                         
                         mus = np.array([0.0, delta, delta1, delta2])
-                        delta_nelecs = np.array([nelec, nelec1, nelec2, nelec3]) - (filling * 2.0)
-                        dN_abs = np.abs(delta_nelecs)
+                        nelecs = np.array([nelec, nelec1, nelec2, nelec3])
                         
-                        idx_dN = np.argsort(dN_abs)
-                        mus_sub = mus[idx_dN][:3]
-                        delta_nelecs_sub = delta_nelecs[idx_dN][:3]
-                        
-                        delta3, status = quad_fit(mus_sub, delta_nelecs_sub, tol = 1e-12)
-                        if not status:
-                            log.info("quadratic fails, use linear extrapolation.")
-                            from scipy import stats
-                            slope, intercept, r_value, p_value, std_err = stats.linregress(delta_nelecs_sub, mus_sub)
-                            delta3 = intercept
+                        delta3 = quad_fit_mu(mus, nelecs, filling, step)
 
-                        if abs(delta3) > step:
-                            log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta3, step)
-                            delta3 = copysign(step, delta3)
-                        
-                        log.result("extrapolated to dMu = %20.12f", delta3)
                         rhoEmb4, EnergyEmb4 = solve_with_mu(delta3)
                         nelec4 = transformResults(rhoEmb4, None, basis, None, None)
                         record.append((delta3, nelec4))

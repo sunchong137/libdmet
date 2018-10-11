@@ -9,6 +9,7 @@ import math
 import cmath
 from scipy import stats
 import numpy as np
+import libdmet.utils.logger as log
 
 def calc_parabola_vertex(x, y, tol = 1e-12):
     x1, x2, x3 = x
@@ -122,6 +123,52 @@ def quad_fit(mu, deltaN, tol = 1e-12):
             print "roots: ", roots
             return 0, False
 
+def quad_fit_mu(mus, nelecs, filling, step):
+
+    num_fit = len(mus) - 2
+    log.info("use quadratic fitting # %d", num_fit)
+ 
+    target = filling * 2.0
+
+    dN = nelecs - target
+    dN_abs = np.abs(dN)
+    
+    # get three nearest points
+    idx_dN = np.argsort(dN_abs)
+    mus_sub = mus[idx_dN][:3]
+    dN_sub = dN[idx_dN][:3]
+    
+    delta, status = quad_fit(mus_sub, dN_sub, tol = 1e-12)
+    
+    # check duplicates
+    dmus_abs = np.abs(mus - delta)
+    if (dmus_abs < 1e-6).any():
+        log.info("duplicate in extrapolation.")
+        status = False
+
+    if not status:
+        log.info("quadratic fails, use linear regression.")
+        #from scipy import stats
+        slope, intercept, r_value, p_value, std_err = stats.linregress(dN_sub, mus_sub)
+        delta = intercept
+    
+    # check duplicates
+    dmus_abs = np.abs(mus - delta)
+    if (dmus_abs < 1e-6).any():
+        log.info("duplicate in extrapolation.")
+        delta = copysign(step, delta)
+
+    if abs(delta) > step:
+        log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta, step)
+        delta = copysign(step, delta)
+    
+    if (delta - mus[-1]) * (target - nelecs[-1]) < 0 and abs(delta - mus[-1]) > 2e-3 :
+        log.info("extrapolation gives wrong direction, use finite difference")
+        delta = copysign(step, (target - nelecs[-1]))
+    
+    log.result("extrapolated to dMu = %20.12f", delta)
+
+    return delta
 
     
 
