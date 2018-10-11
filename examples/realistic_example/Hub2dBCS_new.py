@@ -63,6 +63,7 @@ else:
 E_old = 0.0
 conv = False
 history = dmet.IterHistory()
+dVcor_per_ele = None
 
 for iter in range(MaxIter):
     log.section("\n----------------------------------------------------------")
