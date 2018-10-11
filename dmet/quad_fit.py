@@ -10,6 +10,7 @@ import cmath
 from scipy import stats
 import numpy as np
 import libdmet.utils.logger as log
+from math import copysign
 
 def calc_parabola_vertex(x, y, tol = 1e-12):
     x1, x2, x3 = x
