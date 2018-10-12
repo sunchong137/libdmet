@@ -173,7 +173,8 @@ def quad_fit_mu(mus, nelecs, filling, step):
     if abs(delta - mus[-1]) > step:
         log.info("extrapolation dMu %20.12f more than trust step %20.12f", delta - mus[-1], step)
         delta = copysign(step, delta - mus[-1]) + mus[-1]
-    
+   
+    # TODO determine the range mu should be and use middle point to predict next mu.
     # check duplicates
     if has_duplicate(delta, mus):
         log.info("duplicate in extrapolation.")

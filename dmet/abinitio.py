@@ -72,7 +72,7 @@ def buildHamiltonian(dirname, lattice, kspace_input = False):
     return HamNonInt(lattice, *(read_integral(dirname, lattice)), kspace_input = kspace_input)
 
 def AFInitGuessIdx(v, nscsites, AFidx, PMidx, shift = 0., polar = 0.5, \
-        bogoliubov = False, rand = 0., PMshift = None):
+        bogoliubov = False, rand = 0., PMshift = None, PMidx2 = None, PMshift2 = None):
     subA, subB = AFidx
     subC = PMidx
     if PMshift is None:
@@ -89,6 +89,11 @@ def AFInitGuessIdx(v, nscsites, AFidx, PMidx, shift = 0., polar = 0.5, \
         vguess[1, site, site] = shift + polar
     for site in subC:
         vguess[0, site, site] = vguess[1, site, site] = PMshift
+    if PMidx2 is not None:
+        if PMshift2 is None:
+            PMshift2 = 0.0
+        for site in PMidx2:
+            vguess[0, site, site] = vguess[1, site, site] = PMshift2
     if bogoliubov:
         np.random.seed(32499823)
         nact = len(subA) + len(subB)

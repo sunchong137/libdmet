@@ -67,11 +67,39 @@ class MuSolver(object):
         self.first_run = True
 
     def __call__(self, lattice, filling, ImpHam, basis, solver, \
-            solver_args = {}, delta = 0.02, thrnelec = 1e-5, step = 0.05):
+            solver_args = {}, delta = 0.02, thrnelec = 1e-5, step = 0.05, \
+            brentq_bound = None, brentq_value = None):
         solve_with_mu = lambda mu: SolveImpHam_with_dmu(lattice, ImpHam, basis, \
                 mu, solver, solver_args)
+        
+        if brentq_bound is not None:
+            lbound, rbound = brentq_bound
+            res_collect = []
+            def func(mu):
+                print "mu (brentq guess): ", mu
+                if brentq_value is not None:
+                    if mu == lbound:
+                        nelec = brentq_value[0]
+                        print "mu : ", mu, " dnelec :", nelec - filling * 2
+                        return nelec - filling * 2
+                    elif mu == rbound:
+                        nelec = brentq_value[1]
+                        print "mu : ", mu, " dnelec :", nelec - filling * 2
+                        return nelec - filling * 2
+                    
+
+                rhoEmb, EnergyEmb = solve_with_mu(mu)
+                nelec = transformResults(rhoEmb, None, basis, None, None)
+                print "mu : ", mu, " dnelec :", nelec - filling * 2
+                return nelec - filling * 2
+            from scipy.optimize import brentq
+            delta = brentq(func, lbound, rbound, xtol=1e-5, rtol=1e-5, \
+                    maxiter=20, full_output=False, disp=True)
+            exit()
+
         rhoEmb, EnergyEmb = solve_with_mu(0.)
         nelec = transformResults(rhoEmb, None, basis, None, None)
+        
         record = [(0., nelec)]
         log.result("nelec = %20.12f (target is %20.12f)", nelec, filling*2)
 
