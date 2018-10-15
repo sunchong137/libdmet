@@ -20,3 +20,5 @@ block/genetic/gaopt
 *.log
 
 tmp*
+
+test*

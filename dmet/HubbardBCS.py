@@ -75,6 +75,40 @@ def transformResults(GRhoEmb, E, lattice, basis, ImpHam, H_energy, dmu):
 
         return GRhoImp, Efrag/nscsites, nelec/nscsites
 
+def transformResults_QC(GRhoEmb_list, E_list, lattice, basis_list, ImpHam_list, H_energy_list, dmu):
+    GRhoImp_list = []
+    Efrag_list = []
+    nelec_list = []
+    for GRhoEmb, E, basis, ImpHam, H_energy \
+            in zip(GRhoEmb_list, E_list, basis_list, ImpHam_list, H_energy_list):
+        nscsites = basis.shape[-2] / 2
+        GRhoImp, Efrag, nelec = bcs.transformResults(GRhoEmb, E, lattice, \
+                basis, ImpHam, H_energy, dmu)
+        log.debug(1, "impurity generalized density matrix:\n%s", GRhoImp)
+
+        if Efrag is None:
+            nelec_list.append(nelec)
+            #return nelec/nscsites
+        else:
+            log.result("Local density matrix (impurity): alpha, beta and pairing")
+            rhoA, rhoB, kappaBA = extractRdm(GRhoImp)
+            log.result("%s", rhoA)
+            log.result("%s", rhoB)
+            log.result("%s", -kappaBA.T)
+            log.result("nelec (impurity) = %20.12f", nelec)
+            log.result("Energy (impurity) = %20.12f", Efrag)
+
+            GRhoImp_list.append(GRhoImp)
+            Efrag_list.append(Efrag)
+            nelec_list.append(nelec)
+
+            #return GRhoImp, Efrag/nscsites, nelec/nscsites
+    if Efrag is None:
+        return nelec_list
+    else:
+        return GRhoImp_list, Efrag_list, nelec_list
+
+
 def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, last_dmu, Mu):
     nscsites = basis.shape[-2] / 2
     GRhoImp, Efrag, nelec = bcs.transformResults_new(GRhoEmb, E, lattice, \
@@ -94,8 +128,46 @@ def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, last_dmu,
 
         return GRhoImp, Efrag/nscsites, nelec/nscsites
 
+def transformResults_new_QC(GRhoEmb_list, E_list, lattice, basis_list, ImpHam_list, H_energy_list, last_dmu, Mu):
+    GRhoImp_list = []
+    Efrag_list = []
+    nelec_list = []
+    for GRhoEmb, E, basis, ImpHam, H_energy \
+            in zip(GRhoEmb_list, E_list, basis_list, ImpHam_list, H_energy_list):
+        nscsites = basis.shape[-2] / 2
+        #GRhoImp, Efrag, nelec = bcs.transformResults(GRhoEmb, E, lattice, \
+        #        basis, ImpHam, H_energy, dmu)
+        GRhoImp, Efrag, nelec = bcs.transformResults_new(GRhoEmb, E, lattice, \
+                basis, ImpHam, H_energy, last_dmu, Mu)
+        log.debug(1, "impurity generalized density matrix:\n%s", GRhoImp)
+
+        if Efrag is None:
+            nelec_list.append(nelec)
+            #return nelec/nscsites
+        else:
+            log.result("Local density matrix (impurity): alpha, beta and pairing")
+            rhoA, rhoB, kappaBA = extractRdm(GRhoImp)
+            log.result("%s", rhoA)
+            log.result("%s", rhoB)
+            log.result("%s", -kappaBA.T)
+            log.result("nelec (impurity) = %20.12f", nelec)
+            log.result("Energy (impurity) = %20.12f", Efrag)
+
+            GRhoImp_list.append(GRhoImp)
+            Efrag_list.append(Efrag)
+            nelec_list.append(nelec)
+
+            #return GRhoImp, Efrag/nscsites, nelec/nscsites
+    if Efrag is None:
+        return nelec_list
+    else:
+        return GRhoImp_list, Efrag_list, nelec_list
+
 Hubbard.transformResults = lambda GRhoEmb, E, basis, ImpHam, H_energy: \
       transformResults(GRhoEmb, E, None, basis, ImpHam, H_energy, 0.)
+
+Hubbard.transformResults_QC = lambda GRhoEmb_list, E_list, basis_list, ImpHam_list, H_energy_list: \
+      transformResults_QC(GRhoEmb_list, E_list, None, basis_list, ImpHam_list, H_energy_list, 0.)
 
 def ConstructImpHam(Lat, GRho, v, mu, matching = True, local = True, **kwargs):
     log.result("Making embedding basis")

@@ -64,6 +64,16 @@ def __embBasis_proj(lattice, GRho, **kwargs):
         #B = np.swapaxes(np.tensordot(la.inv(A), GRho[1:], axes = (1,1)), 0, 1)
         #B = np.swapaxes(B, 1, 2)
         #B = orthonormalizeBasis(B)
+        
+        # ZHC NOTE
+        # GRho [a stripe] 3 dim: 0- cell label, 1-site-basis, 2-site-basis
+        # GRho[1:], imp-env part of stripe, 0- cell label, 1-site-basis, 2-site-basis
+        # GRhoImpEnv 0- imp site basis, 1- env site basis
+        # vt 0- emb basis, 1- env site basis
+        # B 0- cell label of env part, 1- site basis, 2 - emb basis
+        # basis 0- spin 1- cell label, 2-site basis, 3- emb basis
+
+
         GRhoImpEnv = np.transpose(GRho[1:], (1, 0, 2)).reshape(nscsites*2, nscsites*(ncells-1)*2)
         _, s, vt = la.svd(GRhoImpEnv, full_matrices = False)
         log.debug(1, "bath orbitals\n%s", vt)
@@ -150,6 +160,9 @@ def __embHam1e(lattice, basis, vcor, mu, **kwargs):
     # Fock part first
     log.debug(1, "transform Fock")
     H1["cd"], H1["cc"][0], H0 = transform_trans_inv_sparse(basis, lattice, latFock)
+    print "H1 cc"
+    print H1["cc"]
+    exit()
     # then add Vcor, only in environment; and -mu*I in impurity and environment
     # add it everywhere then subtract impurity part
     log.debug(1, "transform Vcor")
@@ -207,14 +220,22 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         cccc = np.zeros((1, nbasis, nbasis, nbasis, nbasis))
 
     log.info("H2 memory allocated size = %d MB", ccdd.size * 2 * 8. / 1024 / 1024)
-    
+     
     if local:
-        for s in range(2):
-            log.eassert(la.norm(basis[s,0,:nscsites,:nscsites] - np.eye(nscsites)) \
-                    < 1e-10, "the embedding basis is not local")
-        for i in range(ccdd.shape[0]):
-            ccdd[i, :nscsites, :nscsites, :nscsites, :nscsites] = lattice.getH2()
-        return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, None, 0.
+        if "sites" in kwargs:
+            Imps = kwargs["sites"]
+            nImp = len(Imps)
+            mask = np.ix_(Imps, Imps, Imps, Imps)
+            for i in range(ccdd.shape[0]):
+                ccdd[i, :nImp, :nImp, :nImp, :nImp] = lattice.getH2()[mask]
+            return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, None, 0.
+        else:
+            for s in range(2):
+                log.eassert(la.norm(basis[s,0,:nscsites,:nscsites] - np.eye(nscsites)) \
+                        < 1e-10, "the embedding basis is not local")
+            for i in range(ccdd.shape[0]):
+                ccdd[i, :nscsites, :nscsites, :nscsites, :nscsites] = lattice.getH2()
+            return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, None, 0.
     else:
         from libdmet.integral.integral_nonlocal_emb import transform
         VA, VB, UA, UB = separate_basis(basis)
@@ -224,6 +245,7 @@ def __embHam2e(lattice, basis, vcor, local, **kwargs):
         return {"ccdd": ccdd, "cccd": cccd, "cccc": cccc}, {"cd": cd, "cc": cc}, H0
 
 def foldRho(GRho, Lat, basis, thr = 1e-7):
+    # ZHC NOTE be careful of "sites" version
     ncells = Lat.ncells
     nscsites = Lat.supercell.nsites
     nbasis = basis.shape[-1]
@@ -374,6 +396,189 @@ def FitVcorEmb(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = False, 
 
 
     return vcor, err_begin, err_end
+
+def FitVcorEmb_QC(GRho_list, lattice, basis_list, vcor_list, mu, Imp_list, MaxIter = 300, CG_check = False, **kwargs):
+    """
+    QC version
+    """
+
+    nImp = len(Imp_list)
+    param_all_begin = np.hstack((vcor_list[i].param for i in range(nImp)))
+    vcor_list_copy = deepcopy(vcor_list)
+
+    embH_list = []
+    dV_dparam_list = []
+    ABD_list = []
+
+    for i in range(nImp):
+        
+        GRho = GRho_list[i]
+        basis = basis_list[i]
+        vcor = vcor_list[i]
+        Imp = Imp_list[i]
+
+        param_begin = vcor.param.copy()
+        #nscsites = lattice.supercell.nsites
+        limp = len(Imp)
+        nbasis = basis.shape[-1]
+        (embHA, embHB), embD, _ = transform_trans_inv_sparse(basis, lattice, \
+                lattice.getFock(kspace = False))
+        embH = np.empty((nbasis*2, nbasis*2))
+        embH[:nbasis, :nbasis] = embHA
+        embH[nbasis:, nbasis:] = -embHB
+        embH[:nbasis, nbasis:] = embD
+        embH[nbasis:, :nbasis] = embD.T
+        
+        # now compute dV/dparam (will be used in gradient)
+        dV_dparam = np.empty((vcor.length(), nbasis*2, nbasis*2))
+        for ip in range(vcor.length()):
+            (dA_dV, dB_dV), dD_dV, _ = \
+                    transform_local(basis, lattice, vcor.gradient()[ip])
+            dV_dparam[ip, :nbasis, :nbasis] = dA_dV
+            dV_dparam[ip, nbasis:, nbasis:] = -dB_dV
+            dV_dparam[ip, :nbasis, nbasis:] = dD_dV
+            dV_dparam[ip, nbasis:, :nbasis] = dD_dV.T
+        
+        vcor_zero = deepcopy(vcor)
+        vcor_zero.update(np.zeros(vcor_zero.length()))
+        v0 = vcor_zero.get()
+        #v0[0] -= mu * np.eye(nscsites)
+        #v0[1] -= mu * np.eye(nscsites)
+        v0[0] -= mu * np.eye(limp)
+        v0[1] -= mu * np.eye(limp)
+        (A0, B0), D0, _ = \
+                transform_local(basis, lattice, v0)
+        
+        embH_list.append(embH.copy())
+        dV_dparam_list.append(dV_dparam.copy())
+        ABD_list.append((A0.copy, B0.copy(), D0.copy()))
+        
+    def vcor_list_update(param_all):
+        start = 0
+        for i in range(nImp):
+            end = start + len(vcor_list[i].param)
+            param = param_all[start:end]
+            vcor_list[i].update(param)
+            start = end
+
+    def Vemb_param(param, dV_dparam, ABD):
+        A0, B0, D0 = ABD
+        V = np.tensordot(param, dV_dparam, axes = (0, 0))
+        # add contribution of chemical potential # ZHC NOTE
+        V[:nbasis, :nbasis] += A0
+        V[nbasis:, nbasis:] -= B0
+        V[:nbasis, nbasis:] += D0
+        V[nbasis:, :nbasis] += D0.T
+        return V
+
+    def errfunc(param_all):
+        
+        res = 0.0
+        start = 0
+        for i in range(nImp):
+            end = start + len(vcor_list[i].param)
+            param = param_all[start:end]
+            #vcor_list[i].update(param)
+            start = end
+            
+            embHeff = embH_list[i] + Vemb_param(param, dV_dparam_list[i], ABD_list[i])
+            ew, ev = la.eigh(embHeff)
+            occ = 1 * (ew < 0.)
+            GRho1 = mdot(ev, np.diag(occ), ev.T)
+            res += la.norm(GRho_list[i] - GRho1) / sqrt(2.)
+        
+        return res
+    
+    def gradfunc(param_all):
+        
+        res = 0.0
+        start = 0
+
+        grad_list = []
+        for i in range(nImp):
+            
+            GRho = GRho_list[i]
+            embH = embH_list[i]
+            dV_dparam = dV_dparam_list[i]
+            ABD = ABD_list[i]
+            basis = basis_list[i]
+            nbasis = basis.shape[-1]
+
+            end = start + len(vcor_list[i].param)
+            param = param_all[start:end]
+            #vcor_list[i].update(param)
+            start = end
+            embHeff = embH + Vemb_param(param, dV_dparam, ABD)
+            ew, ev = la.eigh(embHeff)
+            nocc = 1 * (ew < 0.)
+            GRho1 = mdot(ev, np.diag(nocc), ev.T)
+            val = la.norm(GRho - GRho1)
+       
+            ewocc, ewvirt = ew[:nbasis], ew[nbasis:]
+            evocc, evvirt = ev[:, :nbasis], ev[:, nbasis:]
+            
+            e_mn = 1. / (-ewvirt.reshape((-1,1)) + ewocc)
+            temp_mn = mdot(evvirt.T, GRho1 - GRho, evocc) * e_mn / val / sqrt(2.)
+            dnorm_dV = mdot(evvirt, temp_mn, evocc.T)
+            dnorm_dV += dnorm_dV.T
+            grad_i = np.tensordot(dV_dparam, dnorm_dV, axes = ((1,2), (0,1)))
+            grad_list.append(grad_i)
+
+        return np.hstack(grad_list)
+
+
+    err_begin = errfunc(param_all_begin)
+    log.info("Using analytic gradient")
+    param_all, err_end, converge_pattern = minimize(errfunc, vcor.param, MaxIter, gradfunc, **kwargs)
+    
+    # ZHC NOTE
+    gnorm_res = la.norm(gradfunc(param_all))
+    
+
+
+    #vcor.update(param)
+    vcor_list_update(param_all)
+    
+    print "Minimizer converge pattern: %d "%converge_pattern
+    print "Current function value: %15.8f"%err_end
+    print "Norm of gradients: %15.8f"%gnorm_res
+    print "Norm diff of x: %15.8f"%(la.norm(param_all - param_all_begin))
+    
+    if CG_check and (converge_pattern == 0 or gnorm_res > 1.0e-4):
+        
+        print "Not converge in Bo-Xiao's minimizer, try mixed solver in scipy..."
+
+        param_new = param_all.copy()
+        gtol = 5.0e-5
+
+        from scipy import optimize as opt
+        min_result = opt.minimize(errfunc, param_new, method = 'CG', jac = gradfunc ,\
+                options={'maxiter': 10 * len(param_new), 'disp': True, 'gtol': gtol})
+        param_new_2 = min_result.x
+    
+        print "CG Final Diff: ", min_result.fun, "Converged: ",min_result.status,\
+                " Jacobian: ", la.norm(min_result.jac)      
+        if(not min_result.success):
+            print "WARNING: Minimization unsuccessful. Message: ",min_result.message
+    
+        gnorm_new = la.norm(min_result.jac)
+        diff_CG_BX = np.max(np.abs(param_new_2 - param_new))
+        print "max diff in x between CG and BX", diff_CG_BX
+        if (gnorm_new < gnorm_res * 0.5) and (min_result.fun < err_end) and (diff_CG_BX < 1.0):
+            print "CG result used"
+            #vcor.param = param_new_2
+            #vcor.update(param_new_2)
+            vcor_list_update(param_new_2)
+            err_end = min_result.fun
+        else:
+            print "BX result used"
+            #vcor.update(param_new)
+            vcor_list_update(param_new)
+    else:
+        print "BX result used"
+
+
+    return vcor_list, err_begin, err_end
 
 def FitVcorEmb_triu(GRho, lattice, basis, vcor, mu, MaxIter = 300, CG_check = False, **kwargs):
     param_begin = vcor.param.copy()
@@ -774,15 +979,15 @@ def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, last_dmu,
         H1_scaled["cc"][0] += tempCC
 
         # scale by the number of imp indices
-        H1_scaled["cd"][0][:nscsites, nscsites:] *= 0.5
-        H1_scaled["cd"][0][nscsites:, :nscsites] *= 0.5
-        H1_scaled["cd"][0][nscsites:, nscsites:] = 0.0
-        H1_scaled["cd"][1][:nscsites, nscsites:] *= 0.5
-        H1_scaled["cd"][1][nscsites:, :nscsites] *= 0.5
-        H1_scaled["cd"][1][nscsites:, nscsites:] = 0.0
-        H1_scaled["cc"][0][:nscsites, nscsites:] *= 0.5
-        H1_scaled["cc"][0][nscsites:, :nscsites] *= 0.5
-        H1_scaled["cc"][0][nscsites:, nscsites:] = 0.0
+        H1_scaled["cd"][0][:nbasis, nbasis:] *= 0.5
+        H1_scaled["cd"][0][nbasis:, :nbasis] *= 0.5
+        H1_scaled["cd"][0][nbasis:, nbasis:] = 0.0
+        H1_scaled["cd"][1][:nbasis, nbasis:] *= 0.5
+        H1_scaled["cd"][1][nbasis:, :nbasis] *= 0.5
+        H1_scaled["cd"][1][nbasis:, nbasis:] = 0.0
+        H1_scaled["cc"][0][:nbasis, nbasis:] *= 0.5
+        H1_scaled["cc"][0][nbasis:, :nbasis] *= 0.5
+        H1_scaled["cc"][0][nbasis:, nbasis:] = 0.0
         
         E1 = np.sum(H1_scaled["cd"][0] * rhoA + H1_scaled["cd"][1] * rhoB) + \
                 2 * np.sum(H1_scaled["cc"][0] * kappaBA.T)
