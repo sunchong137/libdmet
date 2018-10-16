@@ -633,7 +633,7 @@ def FitVcorFullK(GRho, lattice, basis, vcor, mu, MaxIter, **kwargs):
 
 
 def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0, kinetic = False, triu = True, CG_check
-        = False):
+        = False, serial = False):
     vcor_new = deepcopy(vcor)
     log.result("Using two-step vcor fitting")
     err_begin = None
@@ -651,10 +651,10 @@ def FitVcorTwoStep(GRho, lattice, basis, vcor, mu, MaxIter1 = 300, MaxIter2 = 0,
             log.info("Impurity model stage  max %d steps", MaxIter1)
             if triu:
                 vcor_new, err_begin1, err_end1 = FitVcorEmb_triu(GRho, lattice, basis, vcor_new, \
-                        mu, MaxIter = MaxIter1, CG_check = CG_check, serial = True)
+                        mu, MaxIter = MaxIter1, CG_check = CG_check, serial = serial)
             else:
                 vcor_new, err_begin1, err_end1 = FitVcorEmb(GRho, lattice, basis, vcor_new, \
-                        mu, MaxIter = MaxIter1, CG_check = CG_check, serial = True)
+                        mu, MaxIter = MaxIter1, CG_check = CG_check, serial = serial)
 
             log.info("Embedding Stage:\nbegin %20.12f    end %20.12f" % (err_begin1, err_end1))
         if MaxIter2 > 0:
