@@ -740,6 +740,10 @@ def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, last_dmu,
     VA, VB, UA, UB = separate_basis(basis)
     nscsites = basis.shape[-2] / 2
     nbasis = basis.shape[-1]
+    
+    print "nbasis", nbasis
+    print "nscsites", nscsites
+
     R = np.empty((nscsites*2, nbasis*2))
     R[:nscsites, :nbasis] = VA[0]
     R[nscsites:, :nbasis] = UB[0]
@@ -774,15 +778,16 @@ def transformResults_new(GRhoEmb, E, lattice, basis, ImpHam, H_energy, last_dmu,
         H1_scaled["cc"][0] += tempCC
 
         # scale by the number of imp indices
-        H1_scaled["cd"][0][:nbasis, nbasis:] *= 0.5
-        H1_scaled["cd"][0][nbasis:, :nbasis] *= 0.5
-        H1_scaled["cd"][0][nbasis:, nbasis:] = 0.0
-        H1_scaled["cd"][1][:nbasis, nbasis:] *= 0.5
-        H1_scaled["cd"][1][nbasis:, :nbasis] *= 0.5
-        H1_scaled["cd"][1][nbasis:, nbasis:] = 0.0
-        H1_scaled["cc"][0][:nbasis, nbasis:] *= 0.5
-        H1_scaled["cc"][0][nbasis:, :nbasis] *= 0.5
-        H1_scaled["cc"][0][nbasis:, nbasis:] = 0.0
+        limp = nbasis / 2 
+        H1_scaled["cd"][0][:limp, limp:] *= 0.5
+        H1_scaled["cd"][0][limp:, :limp] *= 0.5
+        H1_scaled["cd"][0][limp:, limp:] = 0.0
+        H1_scaled["cd"][1][:limp, limp:] *= 0.5
+        H1_scaled["cd"][1][limp:, :limp] *= 0.5
+        H1_scaled["cd"][1][limp:, limp:] = 0.0
+        H1_scaled["cc"][0][:limp, limp:] *= 0.5
+        H1_scaled["cc"][0][limp:, :limp] *= 0.5
+        H1_scaled["cc"][0][limp:, limp:] = 0.0
         
         E1 = np.sum(H1_scaled["cd"][0] * rhoA + H1_scaled["cd"][1] * rhoB) + \
                 2 * np.sum(H1_scaled["cc"][0] * kappaBA.T)
