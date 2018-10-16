@@ -168,6 +168,7 @@ def quad_fit_mu(mus, nelecs, filling, step):
         delta = intercept
         if violate_previous_mu(delta, mus, target, nelecs):
             log.info("predicted mu from linear regression also violates. use finite step.")
+            step = min(step, 1e-3)
             delta = copysign(step, (target - nelecs[-1])) +  mus[-1]
 
     if abs(delta - mus[-1]) > step:
